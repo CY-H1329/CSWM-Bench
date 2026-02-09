@@ -36,6 +36,42 @@ def load_preds(run_dir: Path, model_name: str) -> list:
     return records
 
 
+def load_dataset_for_run(run_dir: Path, config: dict, expected_len: int = None):
+    """run 시 사용한 것과 동일한 데이터셋 로드 (dataset_info.json 우선). expected_len은 preds 개수."""
+    dataset_info_path = run_dir / "dataset_info.json"
+    if dataset_info_path.exists():
+        with open(dataset_info_path) as f:
+            info = json.load(f)
+        return load_stvqa(
+            dataset_name=info.get("dataset_name", "OX-PIXL/STVQA-7K"),
+            split=info["split"],
+            max_samples=info.get("max_samples"),
+            max_per_category=info.get("max_per_category"),
+        )
+    ds_cfg = config.get("dataset", {})
+    name = ds_cfg.get("name", "OX-PIXL/STVQA-7K")
+    # Ancien run sans dataset_info.json: deviner split/max_per_category en faisant matcher la taille
+    if expected_len is not None:
+        for split, max_per_cat in [("train", 100), ("train", None), ("val", None), ("val", 100)]:
+            try:
+                ds = load_stvqa(dataset_name=name, split=split, max_samples=None, max_per_category=max_per_cat)
+                if len(ds) == expected_len:
+                    print(f"[export] Using dataset: split={split}, max_per_category={max_per_cat}, len={len(ds)}")
+                    return ds
+            except Exception:
+                continue
+        raise SystemExit(
+            f"No dataset matching preds length {expected_len}. "
+            "Re-run run_eval.py (recent code writes dataset_info.json), then run export again."
+        )
+    return load_stvqa(
+        dataset_name=name,
+        split=ds_cfg.get("split", "val"),
+        max_samples=ds_cfg.get("max_samples"),
+        max_per_category=ds_cfg.get("max_per_category"),
+    )
+
+
 def export_failed(run_dir: Path, model_name: str, dataset, out_base: Path) -> int:
     """한 모델에 대해 틀린 샘플만 이미지+메타 저장. 반환: 실패 개수."""
     records = load_preds(run_dir, model_name)
@@ -101,6 +137,27 @@ def export_failed(run_dir: Path, model_name: str, dataset, out_base: Path) -> in
         }
         manifest_lines.append(json.dumps(entry, ensure_ascii=False))
 
+        # 카테고리 폴더 안에 질문/모델답/GT 정리 (데이터셋처럼 보기 쉽게)
+        info_lines = [
+            "=== 질문 ===",
+            (row.get("question_only") or row.get("question_with_options") or "").strip() or "(없음)",
+            "",
+            "=== 옵션 ===",
+        ]
+        for i, o in enumerate(options or []):
+            label = chr(65 + i)
+            info_lines.append(f"  ({label}) {o}")
+        info_lines.extend([
+            "",
+            "=== 모델 예측 ===",
+            f"  {pred_letter}  ({pred_text})" if pred_text else f"  {pred_letter}",
+            "",
+            "=== 정답 (GT) ===",
+            f"  {gt_letter}  ({gt_text})" if gt_text else f"  {gt_letter}",
+        ])
+        info_path = cat_dir / f"img_{idx:05d}.txt"
+        info_path.write_text("\n".join(info_lines), encoding="utf-8")
+
     with open(manifest_path, "w") as f:
         f.write("\n".join(manifest_lines))
 
@@ -120,7 +177,9 @@ def export_failed(run_dir: Path, model_name: str, dataset, out_base: Path) -> in
         f"- Total failed: {len(failed)} / {len(records)}",
         "",
         "## by_category/",
-        "각 폴더는 task(category)별로, 틀린 이미지가 `img_<idx>.png` 로 들어 있습니다.",
+        "각 폴더는 task(category)별로 정리됨. 각 틀린 샘플마다:",
+        "- `img_<idx>.png` : 이미지",
+        "- `img_<idx>.txt` : 질문, 옵션, 모델 예측, 정답(GT)",
         "",
         "## failed_manifest.jsonl",
         "한 줄에 한 샘플 (JSON). 필드: idx, category, question_only, options, answer_gt, answer_pred, answer_text_gt, answer_text_pred, level, rating, image_path, image_id",
@@ -147,17 +206,15 @@ def main():
     import yaml
     with open(config_path) as f:
         config = yaml.safe_load(f)
-    ds_cfg = config.get("dataset", {})
-    dataset_name = ds_cfg.get("name", "OX-PIXL/STVQA-7K")
-    split = ds_cfg.get("split", "val")
-
-    dataset = load_stvqa(dataset_name=dataset_name, split=split)
-    print(f"Dataset: {dataset_name} split={split}, len={len(dataset)}")
 
     if args.models is None:
         args.models = [p.stem.replace("_preds", "") for p in run_dir.glob("*_preds.jsonl")]
     if not args.models:
         raise SystemExit("No *_preds.jsonl in run_dir. Run eval with save_predictions: true first.")
+
+    expected_len = len(load_preds(run_dir, args.models[0]))
+    dataset = load_dataset_for_run(run_dir, config, expected_len=expected_len)
+    print(f"Dataset: len={len(dataset)} (same as run)")
 
     out_base = Path(args.out_dir) if args.out_dir else (run_dir / "failed_samples")
     out_base.mkdir(parents=True, exist_ok=True)

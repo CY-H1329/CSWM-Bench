@@ -186,6 +186,15 @@ def main():
     run_dir.mkdir(parents=True, exist_ok=True)
     with open(run_dir / "config_snapshot.yaml", "w") as f:
         yaml.dump(config, f)
+    # export_failed_samples.py가 같은 데이터셋을 재현할 수 있도록 저장
+    with open(run_dir / "dataset_info.json", "w") as f:
+        json.dump({
+            "dataset_name": ds_cfg.get("name", "OX-PIXL/STVQA-7K"),
+            "split": args.split,
+            "max_samples": ds_cfg.get("max_samples"),
+            "max_per_category": max_per_cat,
+            "num_loaded": len(dataset),
+        }, f, indent=2)
 
     all_results = []
     for model_name in args.models:
