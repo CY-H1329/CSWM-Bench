@@ -3,6 +3,7 @@ STVQA-7K dataset loader for evaluation.
 Dataset: https://huggingface.co/datasets/OX-PIXL/STVQA-7K
 Paper: SpatialThinker (arXiv:2511.07403)
 """
+import random
 from typing import Optional
 
 from datasets import load_dataset
@@ -12,14 +13,31 @@ def load_stvqa(
     dataset_name: str = "OX-PIXL/STVQA-7K",
     split: str = "val",
     max_samples: Optional[int] = None,
+    max_per_category: Optional[int] = None,
+    seed: int = 42,
 ):
     """
     Load STVQA-7K for evaluation.
     - split: "val" (692) or "train" (6895)
-    - Each sample: image, question_only, options, answer_only (A/B/C/D), category, etc.
+    - max_samples: 전체 상한 (앞에서부터)
+    - max_per_category: 카테고리별 최대 개수 (균등 샘플링). 모든 task를 골고루 실험할 때 사용.
     """
     dataset = load_dataset(dataset_name, split=split)
-    if max_samples is not None:
+    if max_per_category is not None and "category" in dataset.features:
+        rng = random.Random(seed)
+        by_cat = {}
+        for i in range(len(dataset)):
+            c = dataset[i].get("category") or "unknown"
+            if c not in by_cat:
+                by_cat[c] = []
+            by_cat[c].append(i)
+        indices = []
+        for c, idx_list in by_cat.items():
+            k = min(max_per_category, len(idx_list))
+            indices.extend(rng.sample(idx_list, k))
+        indices.sort()
+        dataset = dataset.select(indices)
+    elif max_samples is not None:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
     return dataset
 
