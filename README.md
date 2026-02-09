@@ -32,11 +32,19 @@ export OPENAI_API_KEY=sk-...
 
 ## 3. 실행
 
-### 전체 평가 (Qwen + LLaVA + GPT)
+### 전체 평가 (기본: Qwen + LLaVA만 — Gemini는 느림/한도)
 
 ```bash
-python run_eval.py --models qwen llava gpt --split val
+python run_eval.py --models qwen llava --split val
 ```
+
+**카테고리별 100개씩 균등 샘플링** (모든 task를 골고루 실험):
+
+```bash
+python run_eval.py --models qwen llava --split val --max_per_category 100
+```
+
+(Gemini 포함 시): `python run_eval.py --models qwen llava gemini --split val`
 
 ### 특정 모델만
 

@@ -111,7 +111,12 @@ def run_model_multiagent(
         return None
 
     eval_cfg = config.get("eval", {})
-    temp = eval_cfg.get("temperature", 0.0)
+    # 멀티에이전트: multi_agent_temperature 가 있으면 그걸 사용 (3명이 서로 다르게 답하게). 없으면 temperature (0이면 3명 답 동일)
+    temp = eval_cfg.get("multi_agent_temperature")
+    if temp is None:
+        temp = eval_cfg.get("temperature", 0.0)
+    if temp > 0:
+        print(f"  [{model_name}] multi-agent temperature={temp} (3 agents can disagree)")
     max_new = eval_cfg.get("max_new_tokens", 512)
     use_max_tokens = model_name in ("gpt", "gemini")
 

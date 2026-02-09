@@ -23,8 +23,8 @@ eval "$(conda shell.bash hook)"
 conda activate "$CONDA_ENV"
 
 echo "[Spatial_MAS] Unified: single-agent → multi-agent (3 agents, majority) + comparison"
-echo "[Spatial_MAS] Running: python run_eval_unified.py --models qwen llava --split train --max_per_category 100 $*"
-python run_eval_unified.py --models qwen llava --split train --max_per_category 100 "$@"
+echo "[Spatial_MAS] Running: python run_eval_unified.py --models qwen llava --split train --max_per_category 7 $*"
+python run_eval_unified.py --models qwen llava --split train --max_per_category 7 "$@"
 
 LATEST_RUN=$(ls -td results/*_unified 2>/dev/null | head -1)
 if [ -n "$LATEST_RUN" ]; then

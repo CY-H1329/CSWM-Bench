@@ -5,10 +5,12 @@ dataset:
   name: "OX-PIXL/STVQA-7K"  # or hunarbatra/STVQA-7K
   split: "val"               # val (692) for quick eval; "train" for full 6895
   max_samples: null          # null = all; set e.g. 100 for debugging
+  max_per_category: 7       # 카테고리별 샘플 수 (빠른 테스트용). 9카테고리×7=63개
 
 eval:
   batch_size: 1              # VLM inference usually 1
-  temperature: 0.0           # greedy decoding (paper setting)
+  temperature: 0.0           # greedy decoding (paper setting). 단일 에이전트용.
+  multi_agent_temperature: 0.4  # 멀티(3 agents)에서만 사용. 3명이 서로 다르게 답해 다수결 의미 있음.
   max_new_tokens: 512
 
 models:

@@ -15,11 +15,13 @@ class LLaVARunner:
         **kwargs,
     ):
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        # H100 등 GPU: device_map="auto" 로 가용 GPU 사용
+        device_map = "auto" if device == "cuda" and torch.cuda.is_available() else device
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         self.model = LlavaForConditionalGeneration.from_pretrained(
             model_id,
             torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-            device_map=device,
+            device_map=device_map,
             trust_remote_code=True,
             **kwargs,
         )

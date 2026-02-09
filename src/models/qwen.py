@@ -20,12 +20,14 @@ class QwenRunner:
         **kwargs,
     ):
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        # H100 등 GPU: device_map="auto" 로 가용 GPU 사용
+        device_map = "auto" if device == "cuda" and torch.cuda.is_available() else device
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         if Qwen2_5_VLForConditionalGeneration is not None:
             self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
                 model_id,
                 torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-                device_map=device,
+                device_map=device_map,
                 trust_remote_code=True,
                 **kwargs,
             )
@@ -34,7 +36,7 @@ class QwenRunner:
             self.model = AutoModelForVision2Seq.from_pretrained(
                 model_id,
                 torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-                device_map=device,
+                device_map=device_map,
                 trust_remote_code=True,
                 **kwargs,
             )
