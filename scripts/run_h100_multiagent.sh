@@ -10,7 +10,7 @@ set -e
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
-CONDA_ENV="${CONDA_ENV:-spatial_mas}"
+CONDA_ENV="${CONDA_ENV:-spatialeval_orchestration}"
 
 if [ -f "$ROOT/.env" ]; then
   set -a

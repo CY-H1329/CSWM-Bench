@@ -15,9 +15,10 @@ if [ -f "$ROOT/.env" ]; then
   echo "[Spatial_MAS] Loaded .env"
 fi
 
-# Conda 활성화
+# Conda 활성화 (서버 환경: spatialeval_orchestration / 로컬: CONDA_ENV=spatial_mas 등으로 변경 가능)
+CONDA_ENV="${CONDA_ENV:-spatialeval_orchestration}"
 eval "$(conda shell.bash hook)"
-conda activate spatial_mas
+conda activate "$CONDA_ENV"
 
 # GPU 지정 (필요 시 여기서 수정)
 # export CUDA_VISIBLE_DEVICES=0
