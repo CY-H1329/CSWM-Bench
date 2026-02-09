@@ -4,7 +4,12 @@ Qwen2.5-VL inference for STVQA-7K.
 from typing import Optional
 from PIL import Image
 import torch
-from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+from transformers import AutoProcessor
+
+try:
+    from transformers import Qwen2_5_VLForConditionalGeneration
+except ImportError:
+    Qwen2_5_VLForConditionalGeneration = None  # fallback below
 
 
 class QwenRunner:
@@ -16,13 +21,23 @@ class QwenRunner:
     ):
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-        self.model = Qwen2VLForConditionalGeneration.from_pretrained(
-            model_id,
-            torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-            device_map=device,
-            trust_remote_code=True,
-            **kwargs,
-        )
+        if Qwen2_5_VLForConditionalGeneration is not None:
+            self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                model_id,
+                torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
+                device_map=device,
+                trust_remote_code=True,
+                **kwargs,
+            )
+        else:
+            from transformers import AutoModelForVision2Seq
+            self.model = AutoModelForVision2Seq.from_pretrained(
+                model_id,
+                torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
+                device_map=device,
+                trust_remote_code=True,
+                **kwargs,
+            )
         self.model.eval()
         self.device = device
 

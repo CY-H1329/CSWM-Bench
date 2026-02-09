@@ -12,18 +12,13 @@ def load_stvqa(
     dataset_name: str = "OX-PIXL/STVQA-7K",
     split: str = "val",
     max_samples: Optional[int] = None,
-    trust_remote_code: bool = True,
 ):
     """
     Load STVQA-7K for evaluation.
     - split: "val" (692) or "train" (6895)
     - Each sample: image, question_only, options, answer_only (A/B/C/D), category, etc.
     """
-    dataset = load_dataset(
-        dataset_name,
-        split=split,
-        trust_remote_code=trust_remote_code,
-    )
+    dataset = load_dataset(dataset_name, split=split)
     if max_samples is not None:
         dataset = dataset.select(range(min(max_samples, len(dataset))))
     return dataset
