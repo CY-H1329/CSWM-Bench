@@ -148,23 +148,35 @@ def run_model(model_name: str, dataset, config: dict, output_dir: Path):
 def main():
     parser = argparse.ArgumentParser(description="STVQA-7K evaluation")
     parser.add_argument("--config", default="config.yaml", help="Config YAML")
-    parser.add_argument("--models", nargs="+", default=["qwen", "llava", "gemini"])
+    parser.add_argument("--models", nargs="+", default=["qwen", "llava"], help="default: qwen llava (Gemini 제외, 속도·한도 때문)")
     parser.add_argument("--split", default="val", choices=["train", "val"])
     parser.add_argument("--max_samples", type=int, default=None)
+    parser.add_argument("--max_per_category", type=int, default=None, help="카테고리별 최대 개수(균등 샘플링). 예: 100")
     parser.add_argument("--output_dir", default=None)
     args = parser.parse_args()
+
+    # GPU 사용 확인 (Qwen/LLaVA 사용 시)
+    if any(m in args.models for m in ("qwen", "llava")):
+        import torch
+        if torch.cuda.is_available():
+            for i in range(torch.cuda.device_count()):
+                print(f"[GPU] {i}: {torch.cuda.get_device_name(i)}")
+        else:
+            print("[WARN] CUDA not available. Qwen/LLaVA will run on CPU (slow).")
 
     config = load_config(args.config)
     ds_cfg = config.get("dataset", {})
     if args.max_samples is not None:
         ds_cfg = {**ds_cfg, "max_samples": args.max_samples}
+    max_per_cat = args.max_per_category or ds_cfg.get("max_per_category")
 
     dataset = load_stvqa(
         dataset_name=ds_cfg.get("name", "OX-PIXL/STVQA-7K"),
         split=args.split,
         max_samples=ds_cfg.get("max_samples"),
+        max_per_category=max_per_cat,
     )
-    print(f"Loaded {len(dataset)} samples (split={args.split})")
+    print(f"Loaded {len(dataset)} samples (split={args.split}" + (f", max_per_category={max_per_cat})" if max_per_cat else ")")
 
     output_dir = Path(args.output_dir or config.get("output", {}).get("dir", "results"))
     output_dir.mkdir(parents=True, exist_ok=True)
