@@ -176,7 +176,8 @@ def main():
         max_samples=ds_cfg.get("max_samples"),
         max_per_category=max_per_cat,
     )
-    print(f"Loaded {len(dataset)} samples (split={args.split}" + (f", max_per_category={max_per_cat})" if max_per_cat else ")")
+    suffix = f", max_per_category={max_per_cat})" if max_per_cat else ")"
+    print(f"Loaded {len(dataset)} samples (split={args.split}{suffix}")
 
     output_dir = Path(args.output_dir or config.get("output", {}).get("dir", "results"))
     output_dir.mkdir(parents=True, exist_ok=True)
