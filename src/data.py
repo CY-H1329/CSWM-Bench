@@ -32,9 +32,14 @@ def load_stvqa(
                 by_cat[c] = []
             by_cat[c].append(i)
         indices = []
-        for c, idx_list in by_cat.items():
+        for c in sorted(by_cat.keys()):
+            idx_list = by_cat[c]
             k = min(max_per_category, len(idx_list))
             indices.extend(rng.sample(idx_list, k))
+            if max_per_category < len(idx_list):
+                print(f"  [data] {c}: {k}/{len(idx_list)} (capped by max_per_category)")
+            else:
+                print(f"  [data] {c}: {k}/{len(idx_list)}")
         indices.sort()
         dataset = dataset.select(indices)
     elif max_samples is not None:
