@@ -1,0 +1,31 @@
+# Spatial_MAS evaluation config
+# Override on H100: set CUDA_VISIBLE_DEVICES, model paths, OPENAI_API_KEY
+
+dataset:
+  name: "OX-PIXL/STVQA-7K"  # or hunarbatra/STVQA-7K
+  split: "val"               # val (692) for quick eval; "train" for full 6895
+  max_samples: null          # null = all; set e.g. 100 for debugging
+
+eval:
+  batch_size: 1              # VLM inference usually 1
+  temperature: 0.0           # greedy decoding (paper setting)
+  max_new_tokens: 512
+
+models:
+  qwen:
+    enabled: true
+    model_id: "Qwen/Qwen2.5-VL-7B-Instruct"  # or Qwen2.5-VL-3B-Instruct
+    device: "cuda"
+  llava:
+    enabled: true
+    model_id: "llava-hf/llava-1.5-7b-hf"     # or llava-hf/llava-1.5-13b-hf
+    device: "cuda"
+  gpt:
+    enabled: true
+    model_id: "gpt-4o"       # or gpt-4o-mini, gpt-4-turbo
+    api_key_env: "OPENAI_API_KEY"
+
+output:
+  dir: "results"
+  save_predictions: true
+  per_category_accuracy: true

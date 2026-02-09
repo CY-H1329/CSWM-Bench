@@ -1,0 +1,6 @@
+results/
+*.pyc
+__pycache__/
+.conda/
+.env
+.DS_Store

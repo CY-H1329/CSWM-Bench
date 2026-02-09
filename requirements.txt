@@ -1,0 +1,16 @@
+# pip fallback (conda env 권장: conda env create -f environment.yml)
+torch>=2.1.0
+torchvision
+transformers>=4.45.0
+datasets
+huggingface_hub
+accelerate
+qwen-vl-utils
+pillow
+openai>=1.0.0
+tqdm
+pyyaml
+pandas
+numpy
+jupyter
+ipykernel
