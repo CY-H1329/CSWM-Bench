@@ -1,0 +1,18 @@
+# Conda 없이 빠른 설치 (base 또는 기존 env 에서)
+# H100: 아래 순서로 실행 (torch CUDA 먼저, 나머지 한 번에)
+#  pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#  pip install -r requirements-fast.txt
+transformers>=4.45.0
+datasets
+huggingface_hub
+accelerate
+qwen-vl-utils
+pillow
+openai>=1.0.0
+google-genai
+tqdm
+pyyaml
+pandas
+numpy
+jupyter
+ipykernel

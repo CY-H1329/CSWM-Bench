@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-STVQA-7K evaluation: Qwen2.5-VL, LLaVA, GPT.
+STVQA-7K evaluation: Qwen2.5-VL, LLaVA, GPT, Gemini.
 Usage:
-  python run_eval.py --models qwen llava gpt --split val --max_samples 50
-  OPENAI_API_KEY=sk-... python run_eval.py --models gpt
+  python run_eval.py --models qwen llava gemini --split val --max_samples 50
+  GEMINI_API_KEY=... python run_eval.py --models gemini
 """
 import argparse
 import json
@@ -23,6 +23,7 @@ from src.data import (
 from src.models.qwen import QwenRunner
 from src.models.llava import LLaVARunner
 from src.models.gpt import GPTRunner
+from src.models.gemini import GeminiRunner
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -67,6 +68,18 @@ def run_model(model_name: str, dataset, config: dict, output_dir: Path):
             model_id=m_cfg.get("model_id", "gpt-4o"),
             api_key=api_key,
         )
+    elif model_name == "gemini":
+        m_cfg = config.get("models", {}).get("gemini", {})
+        if not m_cfg.get("enabled", True):
+            return None
+        api_key = os.environ.get(m_cfg.get("api_key_env", "GEMINI_API_KEY")) or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            print(f"[skip] {model_name}: no GEMINI_API_KEY / GOOGLE_API_KEY")
+            return None
+        runner = GeminiRunner(
+            model_id=m_cfg.get("model_id", "gemini-2.0-flash"),
+            api_key=api_key,
+        )
     else:
         raise ValueError(f"Unknown model: {model_name}")
 
@@ -74,7 +87,7 @@ def run_model(model_name: str, dataset, config: dict, output_dir: Path):
     for i in tqdm(range(len(dataset)), desc=model_name):
         img = images[i]
         prompt = prompts[i]
-        if model_name == "gpt":
+        if model_name in ("gpt", "gemini"):
             out = runner.generate(img, prompt, temperature=temp, max_tokens=max_new)
         else:
             out = runner.generate(img, prompt, temperature=temp, max_new_tokens=max_new)
@@ -135,7 +148,7 @@ def run_model(model_name: str, dataset, config: dict, output_dir: Path):
 def main():
     parser = argparse.ArgumentParser(description="STVQA-7K evaluation")
     parser.add_argument("--config", default="config.yaml", help="Config YAML")
-    parser.add_argument("--models", nargs="+", default=["qwen", "llava", "gpt"])
+    parser.add_argument("--models", nargs="+", default=["qwen", "llava", "gemini"])
     parser.add_argument("--split", default="val", choices=["train", "val"])
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--output_dir", default=None)

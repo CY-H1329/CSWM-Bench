@@ -1,4 +1,8 @@
-# GitHub 푸시 & H100에서 실행
+# GitHub 푸시 & Pull & H100에서 실행
+
+**저장소 주소:** https://github.com/CY-H1329/Spatial_MAS
+
+---
 
 ## 1. 로컬에서 GitHub에 푸시 (최초 1회)
 
@@ -12,9 +16,9 @@ git init
 git add .
 git commit -m "Initial: STVQA-7K eval, failure analysis, export failed samples"
 
-# GitHub에서 새 저장소 생성 후 (예: YOUR_USERNAME/Spatial_MAS)
-git remote add origin https://github.com/YOUR_USERNAME/Spatial_MAS.git
-# 또는 SSH: git remote add origin git@github.com:YOUR_USERNAME/Spatial_MAS.git
+# 이 저장소로 연결
+git remote add origin https://github.com/CY-H1329/Spatial_MAS.git
+# SSH 사용 시: git remote add origin git@github.com:CY-H1329/Spatial_MAS.git
 
 git branch -M main
 git push -u origin main
@@ -25,11 +29,25 @@ git push -u origin main
 
 ---
 
-## 2. H100 서버에서 clone & 환경 설정
+## 2. Pull — GitHub에서 최신 코드 받기
+
+다른 PC(H100 등)에서 이미 clone 해 둔 폴더를 **최신 상태로 맞출 때**, 또는 로컬에서 GitHub에 올린 뒤 다른 곳에서 받을 때:
 
 ```bash
-# 저장소 클론
-git clone https://github.com/YOUR_USERNAME/Spatial_MAS.git
+cd /path/to/Spatial_MAS
+git pull origin main
+```
+
+- **처음 이 PC에서 받을 때**는 clone 한 번만 하면 됨 (아래 3단계).
+- **이미 clone 한 폴더**가 있으면, 그 폴더 안에서 위처럼 `git pull` 만 하면 됨.
+
+---
+
+## 3. H100 서버에서 처음 받기 (clone) & 환경 설정
+
+```bash
+# 저장소 클론 (최초 1회)
+git clone https://github.com/CY-H1329/Spatial_MAS.git
 cd Spatial_MAS
 
 # Conda 환경 생성
@@ -52,7 +70,7 @@ python -m ipykernel install --user --name spatial_mas --display-name "spatial_ma
 
 ---
 
-## 3. H100에서 실행 순서
+## 4. H100에서 실행 순서
 
 ### 1) 평가 실행
 
@@ -109,21 +127,22 @@ results/YYYYMMDD_HHMMSS/failed_samples/
 
 ---
 
-## 4. 이후 코드 반영 (로컬 ↔ H100)
+## 5. 이후 코드 반영 (로컬 ↔ H100)
 
 - **로컬에서 수정 후 GitHub에 푸시**
   ```bash
+  cd ~/Desktop/Spatial_MAS
   git add .
   git commit -m "설명"
-  git push
+  git push origin main
   ```
 
-- **H100에서 최신 받기**
+- **H100(또는 다른 PC)에서 최신 받기 (Pull)**
   ```bash
   cd /path/to/Spatial_MAS
-  git pull
+  git pull origin main
   conda activate spatial_mas
   # 필요 시: pip install -r requirements.txt
   ```
 
-이후 위 3단계(평가 → 분석 → 틀린 샘플 저장) 순서대로 다시 실행하면 됩니다.
+이후 위 "3. H100에서 실행 순서"(평가 → 분석 → 틀린 샘플 저장)대로 다시 실행하면 됩니다.

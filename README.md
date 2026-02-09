@@ -90,12 +90,18 @@ python export_failed_samples.py --run_dir results/20250109_123456
 
 ---
 
-## 4. GitHub 푸시 & H100에서 clone 후 실행
+## 4. GitHub 푸시 & H100에서 Pull 후 실행
 
-- **로컬에서 GitHub에 푸시**: [docs/GITHUB_AND_H100.md](docs/GITHUB_AND_H100.md) 참고 (최초 `git init` → `git remote add` → `git push`).
-- **H100에서**: 저장소 clone → `conda env create -f environment.yml` → `conda activate spatial_mas` → 위와 동일하게 `run_eval.py` → `analyze_failures.py` → `export_failed_samples.py` 순서로 실행.
-
-자세한 명령어는 ** [docs/GITHUB_AND_H100.md](docs/GITHUB_AND_H100.md)** 에 정리해 두었습니다.
+- **로컬에서 GitHub에 푸시**: [docs/GITHUB_AND_H100.md](docs/GITHUB_AND_H100.md) 참고.
+- **H100에서**: Pull 후 **환경 설정 1회** → **실행 스크립트** 한 번에 끝.
+  ```bash
+  cd ~/CY/Spatial_MAS
+  git pull origin main
+  bash scripts/setup_h100.sh    # 최초 1회: conda env, API 키 안내
+  echo 'export OPENAI_API_KEY=sk-키' > .env   # GPT용, 1회
+  bash scripts/run_h100.sh     # 평가 + 실패 분석 + 틀린 샘플 저장
+  ```
+  자세한 순서·API 키 설정: **[docs/H100_설정_및_실행.md](docs/H100_설정_및_실행.md)**.
 
 ---
 
@@ -134,12 +140,17 @@ python export_failed_samples.py --run_dir results/20250109_123456
 Spatial_MAS/
 ├── environment.yml           # Conda 환경
 ├── config.yaml               # 데이터/모델/출력 설정
+├── .env.example              # API 키 예시 (복사해 .env 로 사용)
 ├── run_eval.py               # 평가 실행
 ├── analyze_failures.py       # 실패 질문 task별 분석
 ├── export_failed_samples.py  # 틀린 샘플만 이미지+전체 정보 저장
+├── scripts/
+│   ├── setup_h100.sh         # H100 환경 설정 (최초 1회)
+│   └── run_h100.sh           # H100 평가+분석+export 한 번에 실행
 ├── README.md
 ├── docs/
-│   └── GITHUB_AND_H100.md    # GitHub 푸시 & H100 실행 방법
+│   ├── GITHUB_AND_H100.md    # GitHub 푸시 & H100 실행 방법
+│   └── H100_설정_및_실행.md  # H100 Pull 후 설정·실행 순서
 ├── src/
 │   ├── data.py
 │   └── models/ (qwen, llava, gpt)

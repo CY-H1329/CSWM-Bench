@@ -1,5 +1,5 @@
 # Spatial_MAS evaluation config
-# Override on H100: set CUDA_VISIBLE_DEVICES, model paths, OPENAI_API_KEY
+# Override on H100: set CUDA_VISIBLE_DEVICES, model paths, GEMINI_API_KEY
 
 dataset:
   name: "OX-PIXL/STVQA-7K"  # or hunarbatra/STVQA-7K
@@ -20,9 +20,13 @@ models:
     enabled: true
     model_id: "llava-hf/llava-1.5-7b-hf"     # or llava-hf/llava-1.5-13b-hf
     device: "cuda"
-  gpt:
+  gemini:
     enabled: true
-    model_id: "gpt-4o"       # or gpt-4o-mini, gpt-4-turbo
+    model_id: "gemini-2.0-flash"   # or gemini-2.5-flash, gemini-1.5-flash
+    api_key_env: "GEMINI_API_KEY"  # or GOOGLE_API_KEY
+  gpt:
+    enabled: false
+    model_id: "gpt-4o"
     api_key_env: "OPENAI_API_KEY"
 
 output:

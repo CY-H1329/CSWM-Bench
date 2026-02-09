@@ -8,6 +8,7 @@ accelerate
 qwen-vl-utils
 pillow
 openai>=1.0.0
+google-genai
 tqdm
 pyyaml
 pandas

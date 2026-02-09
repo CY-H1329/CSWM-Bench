@@ -21,10 +21,7 @@
    - **Public** 선택
    - **Add a README file**, **Add .gitignore**, **Choose a license** 는 **전부 체크하지 말고** 비워 둠
 4. **Create repository** 클릭
-5. 생성된 페이지에 **저장소 주소**가 나옴. 예:
-   - HTTPS: `https://github.com/내아이디/Spatial_MAS.git`
-   - SSH: `git@github.com:내아이디/Spatial_MAS.git`  
-   → 이 주소를 복사해 둠 (아래 3단계에서 씀)
+5. 이 프로젝트는 이미 **https://github.com/CY-H1329/Spatial_MAS** 에 있으므로, 아래 3단계에서는 이 주소를 사용하면 됨.
 
 ---
 
@@ -49,15 +46,14 @@ git init
 
 **2단계에서 복사한 주소**를 아래 `주소` 자리에 넣어서 실행.
 
-**HTTPS 사용할 때 (비밀번호 대신 토큰 쓰는 방식):**
+**HTTPS:**
 ```bash
-git remote add origin https://github.com/내아이디/Spatial_MAS.git
+git remote add origin https://github.com/CY-H1329/Spatial_MAS.git
 ```
-→ `내아이디`를 본인 GitHub 사용자명으로 바꾸기.
 
-**SSH 사용할 때 (키 설정해 두었다면):**
+**SSH (키 설정해 두었다면):**
 ```bash
-git remote add origin git@github.com:내아이디/Spatial_MAS.git
+git remote add origin git@github.com:CY-H1329/Spatial_MAS.git
 ```
 
 연결 확인:
@@ -106,11 +102,25 @@ git push -u origin main
     권한에 `repo` 체크 후 생성한 토큰을 복사해 비밀번호 자리에 붙여넣기.
 - **SSH** 로 했는데 권한 오류가 나오면: SSH 키를 GitHub에 등록했는지 확인.
 
-푸시가 끝나면 브라우저에서 `https://github.com/내아이디/Spatial_MAS` 를 새로고침하면 파일들이 보입니다.
+푸시가 끝나면 브라우저에서 **https://github.com/CY-H1329/Spatial_MAS** 를 새로고침하면 파일들이 보입니다.
 
 ---
 
-## 5. 이후에 코드 수정했을 때 푸시하는 방법
+## 5. Pull — GitHub에서 최신 코드 받기
+
+다른 PC(예: H100 서버)에서 **이미 clone 해 둔** Spatial_MAS 폴더를 최신으로 맞추려면:
+
+```bash
+cd /path/to/Spatial_MAS
+git pull origin main
+```
+
+- **이 PC에서 처음 받을 때**는 clone부터 해야 함 (아래 7단계).
+- **이미 clone 한 폴더**가 있으면, 그 안에서 위 `git pull` 만 하면 됨.
+
+---
+
+## 6. 이후에 코드 수정했을 때 푸시하는 방법
 
 수정한 뒤, 같은 폴더에서:
 
@@ -119,28 +129,42 @@ cd ~/Desktop/Spatial_MAS
 git add .
 git status
 git commit -m "수정 내용 한 줄 요약"
-git push
+git push origin main
 ```
 
 - 첫 푸시에서 `-u origin main` 을 했으면, 이후에는 `git push` 만 해도 됨.
 
 ---
 
-## 6. 정리: 한 번에 복사해서 쓸 수 있는 명령어
+## 7. 정리: 이 저장소 주소로 한 번에 쓰는 명령어
 
-**저장소를 방금 만들었고, 아직 로컬에서 `git init` 안 했을 때:**
+**저장소 주소:** https://github.com/CY-H1329/Spatial_MAS
+
+**로컬에서 처음 연결 & 푸시:**
 
 ```bash
 cd ~/Desktop/Spatial_MAS
 git init
-git remote add origin https://github.com/내아이디/Spatial_MAS.git
+git remote add origin https://github.com/CY-H1329/Spatial_MAS.git
 git add .
 git commit -m "Initial: STVQA-7K eval and failure analysis"
 git branch -M main
 git push -u origin main
 ```
 
-→ **`내아이디`** 만 본인 GitHub 아이디로 바꾸면 됨.
+**다른 PC(H100 등)에서 처음 받기 (clone):**
+
+```bash
+git clone https://github.com/CY-H1329/Spatial_MAS.git
+cd Spatial_MAS
+```
+
+**이미 clone 한 폴더에서 최신 받기 (pull):**
+
+```bash
+cd /path/to/Spatial_MAS
+git pull origin main
+```
 
 ---
 
