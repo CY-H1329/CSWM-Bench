@@ -196,6 +196,31 @@ def main():
         ensure_ascii=False,
         default=str,
     )
+
+    # 카테고리별 정확도(rate) 저장 — 어떤 문제 유형을 잘 못하는지 보기 위함
+    category_rates = {}
+    for r in all_results:
+        if "by_category" not in r or not r["by_category"]:
+            continue
+        model_name = r["model"]
+        category_rates[model_name] = r["by_category"]
+    if category_rates:
+        # category_rates.json: 모델별 → 카테고리별 정확도(0~1)
+        with open(run_dir / "category_rates.json", "w") as f:
+            json.dump(category_rates, f, indent=2, ensure_ascii=False)
+        # category_rates.csv: 행=카테고리, 열=모델, 셀=정확도(%) — 엑셀/시각화용
+        all_cats = sorted({c for m in category_rates.values() for c in m})
+        csv_path = run_dir / "category_rates.csv"
+        with open(csv_path, "w") as f:
+            f.write("category," + ",".join(category_rates.keys()) + "\n")
+            for cat in all_cats:
+                row = [cat]
+                for model_name in category_rates:
+                    rate = category_rates[model_name].get(cat)
+                    row.append(f"{rate * 100:.1f}" if rate is not None else "")
+                f.write(",".join(row) + "\n")
+        print(f"Category rates saved: {run_dir / 'category_rates.json'}, {csv_path}")
+
     print(f"Results saved to {run_dir}")
 
 

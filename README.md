@@ -56,6 +56,7 @@ python run_eval.py --models qwen llava --split val --max_samples 50
 - `*_results.json`: 정확도, (옵션) 카테고리별 정확도
 - `*_preds.jsonl`: 샘플별 예측 (config에서 `save_predictions: true`일 때)
 - `summary.json`: 모델별 요약
+- **`category_rates.json`**, **`category_rates.csv`**: 카테고리(문제 유형)별 정확도(rate). 어떤 유형을 잘 못하는지 비교용 (config에서 `per_category_accuracy: true`일 때 생성)
 
 ### 실패 질문을 task(category)별로 분석
 
