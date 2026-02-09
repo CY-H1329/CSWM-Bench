@@ -241,3 +241,7 @@ def main():
         encoding="utf-8",
     )
     print(f"Done. Failed samples under: {out_base}")
+
+
+if __name__ == "__main__":
+    main()
