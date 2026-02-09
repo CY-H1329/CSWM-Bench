@@ -44,7 +44,7 @@ def load_dataset_for_run(run_dir: Path, config: dict, expected_len: int = None):
             info = json.load(f)
         return load_stvqa(
             dataset_name=info.get("dataset_name", "OX-PIXL/STVQA-7K"),
-            split=info["split"],
+            split=info.get("split", "val"),
             max_samples=info.get("max_samples"),
             max_per_category=info.get("max_per_category"),
         )
@@ -76,12 +76,18 @@ def export_failed(run_dir: Path, model_name: str, dataset, out_base: Path) -> in
     """한 모델에 대해 틀린 샘플만 이미지+메타 저장. 반환: 실패 개수."""
     records = load_preds(run_dir, model_name)
     failed = [r for r in records if not r.get("correct", True)]
-    if not failed:
-        return 0
 
     model_out = out_base / model_name
     by_cat_dir = model_out / "by_category"
+    model_out.mkdir(parents=True, exist_ok=True)
     by_cat_dir.mkdir(parents=True, exist_ok=True)
+
+    if not failed:
+        (model_out / "README.md").write_text(
+            f"# {model_name}: 0 failed samples\nTotal: {len(records)} (all correct).\n",
+            encoding="utf-8",
+        )
+        return 0
 
     manifest_path = model_out / "failed_manifest.jsonl"
     manifest_lines = []
@@ -196,7 +202,7 @@ def main():
     parser.add_argument("--out_dir", type=str, default=None, help="저장 위치 (기본: run_dir/failed_samples)")
     args = parser.parse_args()
 
-    run_dir = Path(args.run_dir)
+    run_dir = Path(args.run_dir).resolve()
     if not run_dir.is_dir():
         raise SystemExit(f"Run directory not found: {run_dir}")
 
@@ -212,15 +218,26 @@ def main():
     if not args.models:
         raise SystemExit("No *_preds.jsonl in run_dir. Run eval with save_predictions: true first.")
 
-    expected_len = len(load_preds(run_dir, args.models[0]))
-    dataset = load_dataset_for_run(run_dir, config, expected_len=expected_len)
-    print(f"Dataset: len={len(dataset)} (same as run)")
-
-    out_base = Path(args.out_dir) if args.out_dir else (run_dir / "failed_samples")
+    out_base = Path(args.out_dir).resolve() if args.out_dir else (run_dir / "failed_samples")
     out_base.mkdir(parents=True, exist_ok=True)
+    print(f"Output dir: {out_base}")
+
+    expected_len = len(load_preds(run_dir, args.models[0]))
+    if expected_len == 0:
+        raise SystemExit(f"No predictions in {args.models[0]}_preds.jsonl")
+    print(f"Preds count: {expected_len}")
+
+    dataset = load_dataset_for_run(run_dir, config, expected_len=expected_len)
+    if len(dataset) != expected_len:
+        raise SystemExit(f"Dataset length {len(dataset)} != preds count {expected_len}. Export aborted.")
+    print(f"Dataset: len={len(dataset)}")
 
     for model_name in args.models:
         n = export_failed(run_dir, model_name, dataset, out_base)
-        print(f"{model_name}: exported {n} failed samples -> {out_base / model_name}")
+        print(f"  {model_name}: {n} failed -> {out_base / model_name}")
 
+    (out_base / "README.md").write_text(
+        f"# Failed samples export\n\nRun: {run_dir}\n\nEach model has by_category/<category>/ with img_<idx>.png and img_<idx>.txt (question, pred, GT).\n",
+        encoding="utf-8",
+    )
     print(f"Done. Failed samples under: {out_base}")
