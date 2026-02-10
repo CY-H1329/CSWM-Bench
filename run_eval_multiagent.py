@@ -118,6 +118,8 @@ def run_model_multiagent(
     if temp > 0:
         print(f"  [{model_name}] multi-agent temperature={temp} (3 agents can disagree)")
     max_new = eval_cfg.get("max_new_tokens", 512)
+    top_k = eval_cfg.get("top_k", 0)
+    top_p = eval_cfg.get("top_p", 0.0)
     use_max_tokens = model_name in ("gpt", "gemini")
 
     n = len(dataset)
@@ -136,9 +138,9 @@ def run_model_multiagent(
         raws = []
         for _ in range(NUM_AGENTS):
             if use_max_tokens:
-                out = runner.generate(img, prompt, temperature=temp, max_tokens=max_new)
+                out = runner.generate(img, prompt, temperature=temp, max_tokens=max_new, top_k=top_k, top_p=top_p)
             else:
-                out = runner.generate(img, prompt, temperature=temp, max_new_tokens=max_new)
+                out = runner.generate(img, prompt, temperature=temp, max_new_tokens=max_new, top_k=top_k, top_p=top_p)
             raws.append(out)
             letters.append(normalize_answer_only(out))
         majority = majority_vote(letters)

@@ -67,7 +67,7 @@ def get_prompt_with_reasoning(example: dict) -> str:
     base = get_prompt(example, include_options=True)
     return (
         base
-        + "\n\nFirst briefly explain your reasoning in one sentence, then give your answer as (A), (B), (C), or (D)."
+        + "\n\nReply in this format:\nReasoning: [one sentence explaining why]\nAnswer: (A) or (B) or (C) or (D)"
     )
 
 

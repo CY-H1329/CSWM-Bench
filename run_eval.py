@@ -35,6 +35,8 @@ def run_model(model_name: str, dataset, config: dict, output_dir: Path):
     eval_cfg = config.get("eval", {})
     temp = eval_cfg.get("temperature", 0.0)
     max_new = eval_cfg.get("max_new_tokens", 512)
+    top_k = eval_cfg.get("top_k", 0)
+    top_p = eval_cfg.get("top_p", 0.0)
     prompts = [get_prompt(dataset[i]) for i in range(len(dataset))]
     # STVQA-7K uses "images" column (PIL)
     images = [dataset[i].get("images") or dataset[i].get("image") for i in range(len(dataset))]
@@ -88,9 +90,9 @@ def run_model(model_name: str, dataset, config: dict, output_dir: Path):
         img = images[i]
         prompt = prompts[i]
         if model_name in ("gpt", "gemini"):
-            out = runner.generate(img, prompt, temperature=temp, max_tokens=max_new)
+            out = runner.generate(img, prompt, temperature=temp, max_tokens=max_new, top_k=top_k, top_p=top_p)
         else:
-            out = runner.generate(img, prompt, temperature=temp, max_new_tokens=max_new)
+            out = runner.generate(img, prompt, temperature=temp, max_new_tokens=max_new, top_k=top_k, top_p=top_p)
         letter = normalize_answer_only(out)
         preds.append(letter)
 

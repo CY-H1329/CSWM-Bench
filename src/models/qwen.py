@@ -49,6 +49,8 @@ class QwenRunner:
         prompt: str,
         temperature: float = 0.0,
         max_new_tokens: int = 512,
+        top_k: int = 0,
+        top_p: float = 0.0,
         **kwargs,
     ) -> str:
         # Qwen2.5-VL chat format
@@ -70,14 +72,19 @@ class QwenRunner:
             padding=True,
             return_tensors="pt",
         ).to(self.model.device)
+        gen_kwargs = dict(
+            max_new_tokens=max_new_tokens,
+            do_sample=temperature > 0,
+            temperature=temperature if temperature > 0 else None,
+            **kwargs,
+        )
+        if temperature > 0:
+            if top_k and top_k > 0:
+                gen_kwargs["top_k"] = top_k
+            if top_p and top_p > 0:
+                gen_kwargs["top_p"] = top_p
         with torch.no_grad():
-            out = self.model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=temperature > 0,
-                temperature=temperature if temperature > 0 else None,
-                **kwargs,
-            )
+            out = self.model.generate(**inputs, **gen_kwargs)
         answer = self.processor.decode(
             out[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
         )

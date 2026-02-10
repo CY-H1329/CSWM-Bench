@@ -10,7 +10,10 @@ dataset:
 eval:
   batch_size: 1              # VLM inference usually 1
   temperature: 0.0           # greedy decoding (paper setting). 단일 에이전트용.
-  multi_agent_temperature: 0.4  # 멀티(3 agents)에서만 사용. 3명이 서로 다르게 답해 다수결 의미 있음.
+  multi_agent_temperature: 0.4  # 멀티(3 agents)에서만 사용.
+  collab_temperature: 0.4   # 협업(discuss) 모드에서 Qwen/LLaVA 답 다양화. >0 이면 top_k/top_p 적용.
+  top_k: 50                 # temperature>0 일 때 sampling
+  top_p: 0.9                # nucleus sampling
   max_new_tokens: 512
 
 models:
