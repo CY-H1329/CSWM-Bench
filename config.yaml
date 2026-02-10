@@ -23,7 +23,8 @@ models:
     device: "cuda"
   llava:
     enabled: true
-    model_id: "llava-hf/llava-1.5-7b-hf"     # or llava-hf/llava-1.5-13b-hf
+    # LLaVA-1.6 (NeXT): 1.5보다 고해상도·추론/OCR 강화. 1.5로 돌리려면 llava-hf/llava-1.5-7b-hf
+    model_id: "llava-hf/llava-v1.6-mistral-7b-hf"
     device: "cuda"
   gemini:
     enabled: true
