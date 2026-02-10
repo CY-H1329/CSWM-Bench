@@ -62,6 +62,15 @@ def get_prompt(example: dict, include_options: bool = True) -> str:
     return q
 
 
+def get_prompt_with_reasoning(example: dict) -> str:
+    """협의용: 질문+옵션 + 추론 한 문장 후 (A)/(B)/(C)/(D) 로 답하라고 안내."""
+    base = get_prompt(example, include_options=True)
+    return (
+        base
+        + "\n\nFirst briefly explain your reasoning in one sentence, then give your answer as (A), (B), (C), or (D)."
+    )
+
+
 def normalize_answer_only(pred: str) -> str:
     """Extract answer letter (A/B/C/D) from model output for matching."""
     pred = (pred or "").strip().upper()
