@@ -112,6 +112,8 @@ python export_failed_samples.py --run_dir results/20250109_123456
   ```
   자세한 순서·API 키 설정: **[docs/H100_설정_및_실행.md](docs/H100_설정_및_실행.md)**.
 
+**Expériences multi-agent, collab, etc.** : **[docs/experiments/baseline_experiments/single_agent/README.md](docs/experiments/baseline_experiments/single_agent/README.md)**
+
 ---
 
 ## 5. JupyterHub H100 서버에서 실행
@@ -150,22 +152,30 @@ Spatial_MAS/
 ├── environment.yml           # Conda 환경
 ├── config.yaml               # 데이터/모델/출력 설정
 ├── .env.example              # API 키 예시 (복사해 .env 로 사용)
-├── run_eval.py               # 평가 실행
+├── run_eval.py               # Single-agent 평가
+├── run_eval_multiagent.py    # Multi-agent (3 agents, 다수결)
+├── run_eval_unified.py       # Single → Multi 통합 실행
+├── run_eval_collab.py        # Qwen + LLaVA 협력
 ├── analyze_failures.py       # 실패 질문 task별 분석
 ├── export_failed_samples.py  # 틀린 샘플만 이미지+전체 정보 저장
 ├── scripts/
 │   ├── setup_h100.sh         # H100 환경 설정 (최초 1회)
-│   └── run_h100.sh           # H100 평가+분석+export 한 번에 실행
+│   ├── run_h100.sh           # H100 Single + 분석 + export
+│   ├── run_h100_multiagent.sh # H100 Unified (single → multi)
+│   ├── run_h100_collab.sh    # H100 Collab (Qwen + LLaVA)
+│   └── show_category_distribution.py
 ├── README.md
 ├── docs/
 │   ├── GITHUB_AND_H100.md    # GitHub 푸시 & H100 실행 방법
-│   └── H100_설정_및_실행.md  # H100 Pull 후 설정·실행 순서
+│   ├── H100_설정_및_실행.md  # H100 Pull 후 설정·실행 순서
+│   └── experiments/         # Expériences et tests (nouvelle page)
+│       └── README.md
 ├── src/
 │   ├── data.py
-│   └── models/ (qwen, llava, gpt)
+│   └── models/ (qwen, llava, gpt, gemini)
 ├── notebooks/
 │   └── run_eval.ipynb
-└── results/                  # run별 결과 (results/날짜시간/failed_samples/ 등)
+└── results/                  # run별 결과
 ```
 
 ---

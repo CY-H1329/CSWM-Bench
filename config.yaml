@@ -17,14 +17,30 @@ eval:
   max_new_tokens: 512
 
 models:
+  # Legacy / baseline
   qwen:
     enabled: true
     model_id: "Qwen/Qwen2.5-VL-7B-Instruct"  # or Qwen2.5-VL-3B-Instruct
     device: "cuda"
   llava:
     enabled: true
-    # LLaVA-1.6 (NeXT): 1.5보다 고해상도·추론/OCR 강화. 1.5로 돌리려면 llava-hf/llava-1.5-7b-hf
     model_id: "llava-hf/llava-v1.6-mistral-7b-hf"
+    device: "cuda"
+
+  # Step 1 Phase 1: Qwen-3.0 4B, Llava-4D, Sa2VA
+  qwen3_4b:
+    enabled: true
+    model_id: "Qwen/Qwen3-VL-4B-Instruct"
+    device: "cuda"
+  llava4d:
+    enabled: true
+    # LLaVA-4D not yet released (ICLR 2026). Using LLaVA-NeXT 7B as fallback.
+    # Update model_id when LLaVA-4D is available.
+    model_id: "llava-hf/llava-v1.6-mistral-7b-hf"
+    device: "cuda"
+  sa2va:
+    enabled: true
+    model_id: "ByteDance/Sa2VA-4B"
     device: "cuda"
   gemini:
     enabled: true

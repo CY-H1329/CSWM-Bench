@@ -146,3 +146,40 @@ results/YYYYMMDD_HHMMSS/failed_samples/
   ```
 
 이후 위 "3. H100에서 실행 순서"(평가 → 분석 → 틀린 샘플 저장)대로 다시 실행하면 됩니다.
+
+---
+
+## 6. Push / Pull — MAS 모델 (Qwen3-4B, Sa2VA, LLaVA4D) 추가 후
+
+### 로컬 → GitHub (Push)
+
+```bash
+cd ~/Desktop/Spatial_MAS
+git add .
+git status                    # 확인
+git commit -m "Add Qwen3-4B, Sa2VA, LLaVA4D runners; MAS pipeline"
+git push origin main
+```
+
+### H100 서버 → GitHub (Pull)
+
+```bash
+cd /path/to/Spatial_MAS
+git pull origin main
+conda activate spatial_mas
+pip install -r requirements.txt   # transformers>=4.51, etc.
+```
+
+### H100에서 MAS 실행
+
+```bash
+# 1) Datasets (최초 1회)
+python scripts/setup_datasets.py
+
+# 2) MAS 평가 (Qwen3-4B × 3 agents)
+bash scripts/run_h100_mas.sh stvqa7k qwen3_4b qwen3_4b qwen3_4b --max_per_category 10
+
+# 3) 다른 조합
+bash scripts/run_h100_mas.sh stvqa7k sa2va sa2va sa2va
+bash scripts/run_h100_mas.sh stvqa7k qwen3_4b llava4d sa2va
+```

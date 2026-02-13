@@ -1,7 +1,7 @@
 # pip fallback (conda env 권장: conda env create -f environment.yml)
 torch>=2.1.0
 torchvision
-transformers>=4.45.0
+transformers>=4.51.0
 datasets
 huggingface_hub
 accelerate
@@ -11,6 +11,7 @@ openai>=1.0.0
 google-genai
 tqdm
 pyyaml
+requests
 pandas
 numpy
 jupyter
