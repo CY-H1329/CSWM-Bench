@@ -24,13 +24,11 @@ class Sa2VARunner:
 
         load_kwargs = dict(
             torch_dtype=torch.bfloat16,
-            low_cpu_mem_usage=True,
+            low_cpu_mem_usage=False,  # True causes meta tensor .item() error in InternVisionModel
             trust_remote_code=True,
             use_flash_attn=use_flash_attn,
             **kwargs,
         )
-        # Sa2VA + flash_attn: PyTorch version mismatch often causes ImportError.
-        # use_flash_attn=False by default; set True only if flash_attn works.
 
         self.model = AutoModel.from_pretrained(model_id, **load_kwargs).eval()
         if device == "cuda":
