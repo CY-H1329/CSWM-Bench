@@ -18,9 +18,10 @@ eval:
 
 **설치 (H100 / CUDA 12.x):**
 ```bash
-pip install flash-attn --no-build-isolation
+pip install flash-attn==2.7.3 --no-build-isolation
 ```
 
+- **PyTorch 2.5 + flash-attn 2.8+**: `undefined symbol: c105Error` 발생 시 → `flash-attn==2.7.3` 사용
 - 설치 실패 시: `use_flash_attn: false` 로 설정하면 기본 attention 사용
 - Qwen3-VL에서 메모리·속도 개선
 
