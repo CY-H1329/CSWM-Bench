@@ -23,14 +23,22 @@ class Sa2VARunner:
         self.model_id = model_id
 
         load_kwargs = dict(
+            **kwargs,
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=False,  # True causes meta tensor .item() error in InternVisionModel
             trust_remote_code=True,
             use_flash_attn=use_flash_attn,
-            **kwargs,
+            device_map=None,  # avoid accelerate meta-device path
         )
-
-        self.model = AutoModel.from_pretrained(model_id, **load_kwargs).eval()
+        # Avoid meta tensors: force CPU default during init (InternVisionModel uses .item() on linspace)
+        _prev = torch.get_default_device() if hasattr(torch, "get_default_device") else "cpu"
+        if hasattr(torch, "set_default_device"):
+            torch.set_default_device("cpu")
+        try:
+            self.model = AutoModel.from_pretrained(model_id, **load_kwargs).eval()
+        finally:
+            if hasattr(torch, "set_default_device"):
+                torch.set_default_device(_prev)
         if device == "cuda":
             self.model = self.model.cuda()
         self.tokenizer = AutoTokenizer.from_pretrained(
