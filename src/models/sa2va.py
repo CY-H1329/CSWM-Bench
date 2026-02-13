@@ -9,6 +9,20 @@ import torch
 from transformers import AutoModel, AutoTokenizer
 
 
+def _patch_torch_linspace_for_sa2va():
+    """InternVisionModel uses torch.linspace().item() which fails on meta tensors.
+    Force CPU device to avoid meta device from transformers/accelerate.
+    Returns the original to restore later."""
+    _orig = torch.linspace
+
+    def _patched(*args, **kwargs):
+        kwargs.setdefault("device", torch.device("cpu"))
+        return _orig(*args, **kwargs)
+
+    torch.linspace = _patched
+    return _orig
+
+
 class Sa2VARunner:
     """Runner for Sa2VA (e.g. ByteDance/Sa2VA-4B)."""
 
@@ -25,20 +39,16 @@ class Sa2VARunner:
         load_kwargs = dict(
             **kwargs,
             torch_dtype=torch.bfloat16,
-            low_cpu_mem_usage=False,  # True causes meta tensor .item() error in InternVisionModel
+            low_cpu_mem_usage=False,
             trust_remote_code=True,
             use_flash_attn=use_flash_attn,
-            device_map=None,  # avoid accelerate meta-device path
+            device_map=None,
         )
-        # Avoid meta tensors: force CPU default during init (InternVisionModel uses .item() on linspace)
-        _prev = torch.get_default_device() if hasattr(torch, "get_default_device") else "cpu"
-        if hasattr(torch, "set_default_device"):
-            torch.set_default_device("cpu")
+        _orig_linspace = _patch_torch_linspace_for_sa2va()
         try:
             self.model = AutoModel.from_pretrained(model_id, **load_kwargs).eval()
         finally:
-            if hasattr(torch, "set_default_device"):
-                torch.set_default_device(_prev)
+            torch.linspace = _orig_linspace
         if device == "cuda":
             self.model = self.model.cuda()
         self.tokenizer = AutoTokenizer.from_pretrained(
