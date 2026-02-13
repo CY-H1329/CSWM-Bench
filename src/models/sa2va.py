@@ -16,7 +16,7 @@ class Sa2VARunner:
         self,
         model_id: str = "ByteDance/Sa2VA-4B",
         device: Optional[str] = None,
-        use_flash_attn: bool = True,
+        use_flash_attn: bool = False,
         **kwargs,
     ):
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -26,14 +26,11 @@ class Sa2VARunner:
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             trust_remote_code=True,
+            use_flash_attn=use_flash_attn,
             **kwargs,
         )
-        if use_flash_attn and device == "cuda":
-            try:
-                import flash_attn  # noqa: F401
-                load_kwargs["use_flash_attn"] = True
-            except ImportError:
-                pass  # run without flash_attn
+        # Sa2VA + flash_attn: PyTorch version mismatch often causes ImportError.
+        # use_flash_attn=False by default; set True only if flash_attn works.
 
         self.model = AutoModel.from_pretrained(model_id, **load_kwargs).eval()
         if device == "cuda":

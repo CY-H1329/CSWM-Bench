@@ -82,6 +82,7 @@ def get_runner(model_name: str, config: dict):
         return Sa2VARunner(
             model_id=m_cfg.get("model_id", "ByteDance/Sa2VA-4B"),
             device=m_cfg.get("device", "cuda"),
+            use_flash_attn=m_cfg.get("use_flash_attn", False),
         )
     elif model_name == "gpt":
         m_cfg = config.get("models", {}).get("gpt", {})

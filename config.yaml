@@ -48,6 +48,7 @@ models:
     enabled: true
     model_id: "ByteDance/Sa2VA-4B"
     device: "cuda"
+    use_flash_attn: false   # flash_attn PyTorch 호환 문제 시 false
   gemini:
     enabled: true
     model_id: "gemini-2.0-flash"   # or gemini-2.5-flash, gemini-1.5-flash
