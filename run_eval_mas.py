@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 
+import torch
 import yaml
 from tqdm import tqdm
 
@@ -52,9 +53,11 @@ def get_runner(model_name: str, config: dict):
         m_cfg = models_cfg.get("qwen3_4b", {})
         if not m_cfg.get("enabled", True):
             return None
+        eval_cfg = config.get("eval", {})
         return Qwen3Runner(
             model_id=m_cfg.get("model_id", "Qwen/Qwen3-VL-4B-Instruct"),
             device=m_cfg.get("device", "cuda"),
+            use_flash_attn=eval_cfg.get("use_flash_attn", True),
         )
     elif model_name == "llava":
         m_cfg = models_cfg.get("llava", {})
@@ -101,9 +104,9 @@ def get_runner(model_name: str, config: dict):
     raise ValueError(f"Unknown model: {model_name}")
 
 
-def make_generate_fn(runner, eval_cfg: dict):
-    """Wrap runner.generate with config."""
-    temp = eval_cfg.get("temperature", 0.0)
+def make_generate_fn(runner, eval_cfg: dict, use_mas_temperature: bool = True):
+    """Wrap runner.generate with config. MAS uses mas_temperature (fixed for reproducibility)."""
+    temp = eval_cfg.get("mas_temperature", eval_cfg.get("temperature", 0.0)) if use_mas_temperature else eval_cfg.get("temperature", 0.0)
     max_new = eval_cfg.get("max_new_tokens", 512)
     top_k = eval_cfg.get("top_k", 0)
     top_p = eval_cfg.get("top_p", 0.0)
@@ -137,11 +140,17 @@ def main():
     )
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--max_per_category", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=None, help="Dataset sampling seed (default: config eval.mas_seed)")
     args = parser.parse_args()
 
     config = load_config(args.config)
     eval_cfg = config.get("eval", {})
     output_dir = Path(config.get("output", {}).get("dir", "results"))
+
+    # GPU utilization: TF32 (Ampere+), Flash Attention via model config
+    if eval_cfg.get("use_tf32", False) and torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     # Output: runs/<benchmark>/<head>_<perception>_<reasoning>/
     run_name = f"{args.head}_{args.perception}_{args.reasoning}"
@@ -149,12 +158,14 @@ def main():
     run_dir = output_dir / "runs" / args.benchmark / run_name / timestamp
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load dataset
-    print(f"Loading {args.benchmark}...")
+    # Load dataset (seed for reproducible sampling when max_per_category)
+    seed = args.seed if args.seed is not None else eval_cfg.get("mas_seed", 42)
+    print(f"Loading {args.benchmark}... (seed={seed})")
     dataset = load_benchmark(
         args.benchmark,
         max_samples=args.max_samples,
         max_per_category=args.max_per_category,
+        seed=seed,
     )
     print(f"  {len(dataset)} samples")
 
@@ -238,6 +249,8 @@ def main():
         "head": args.head,
         "perception": args.perception,
         "reasoning": args.reasoning,
+        "seed": seed,
+        "mas_temperature": eval_cfg.get("mas_temperature", 0.0),
     }
 
     with open(run_dir / "results.json", "w") as f:

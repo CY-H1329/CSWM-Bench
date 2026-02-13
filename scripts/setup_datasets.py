@@ -56,9 +56,9 @@ def download_benchmark(key: str, cfg: dict) -> bool:
 
     try:
         if subset:
-            ds = load_dataset(name, subset, split=split, trust_remote_code=True)
+            ds = load_dataset(name, subset, split=split)
         else:
-            ds = load_dataset(name, split=split, trust_remote_code=True)
+            ds = load_dataset(name, split=split)
         print(f"  OK: {len(ds)} samples")
         return True
     except Exception as e:

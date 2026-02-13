@@ -1,9 +1,13 @@
 """
 Pipeline Head → Perception → Reasoning.
 Head-Agent ne reçoit PAS la catégorie : il doit la classifier lui-même.
+Prompts: src/agents/prompts.yaml
+Docs: docs/experiments/baseline_experiments/single_agent/MAS_PROMPTS.md
 """
+from pathlib import Path
 from typing import Callable, Optional
 
+import yaml
 from PIL import Image
 
 # Catégories que le Head doit inférer (ne jamais les donner en entrée)
@@ -12,32 +16,20 @@ TASK_CATEGORIES = [
     "instance_location", "orientation", "size", "reach",
 ]
 
-MAS_PIPELINE_PROMPTS = {
-    "head": """Look at this image and the following question.
+_PROMPTS_PATH = Path(__file__).parent / "prompts.yaml"
 
-Question: {query}
 
-What type of spatial reasoning task is this? Choose exactly ONE from:
-depth, distance, relation, existence, count, instance_location, orientation, size, reach
+def _load_prompts() -> dict:
+    if _PROMPTS_PATH.exists():
+        with open(_PROMPTS_PATH, "r") as f:
+            return yaml.safe_load(f)
+    return {}
 
-Reply with ONLY the task name (one word or two words, e.g. "depth" or "instance_location").""",
 
-    "perception": """You are the Perception Agent. You received:
-- Task type (classified by Head): {task_class}
-- Question: {query}
-
-Describe what you observe or infer from the image that is relevant to answer this question.
-You may mention: object locations, depths, sizes, spatial relationships, counts, etc.
-Keep it concise (2-4 sentences).""",
-
-    "reasoning": """You are the Reasoning Agent. You have:
-- Task type: {task_class}
-- Question: {query}
-- Perception (from Perception Agent): {perception_output}
-
-Based on this, provide the final answer to the question.
-If the question has options (A), (B), (C), (D), reply with the correct letter, e.g. "Answer: (A)".
-Otherwise, reply with the direct answer.""",
+MAS_PIPELINE_PROMPTS = _load_prompts() or {
+    "head": "Question: {query}\n\nClassify into ONE of: depth, distance, relation, existence, count, instance_location, orientation, size, reach.\n\nReply with ONLY the category name.",
+    "perception": "Task: {task_class}\nQuestion: {query}\n\nExtract relevant information from the image. Provide a concise summary (3-6 sentences).",
+    "reasoning": "Task: {task_class}\nQuestion: {query}\n\nExtracted: {perception_output}\n\nReason step by step. If multiple choice, reply 'Answer: (X)'. Otherwise give the direct answer.",
 }
 
 

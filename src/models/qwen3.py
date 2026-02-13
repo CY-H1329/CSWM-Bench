@@ -20,6 +20,7 @@ class Qwen3Runner:
         self,
         model_id: str = "Qwen/Qwen3-VL-4B-Instruct",
         device: Optional[str] = None,
+        use_flash_attn: bool = True,
         **kwargs,
     ):
         if Qwen3VLForConditionalGeneration is None:
@@ -30,13 +31,23 @@ class Qwen3Runner:
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         device_map = "auto" if device == "cuda" and torch.cuda.is_available() else device
 
-        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-        self.model = Qwen3VLForConditionalGeneration.from_pretrained(
-            model_id,
+        load_kwargs = dict(
             torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
             device_map=device_map,
             trust_remote_code=True,
             **kwargs,
+        )
+        if use_flash_attn and device == "cuda":
+            try:
+                import flash_attn  # noqa: F401
+                load_kwargs["attn_implementation"] = "flash_attention_2"
+            except ImportError:
+                pass  # fallback to default attention
+
+        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+        self.model = Qwen3VLForConditionalGeneration.from_pretrained(
+            model_id,
+            **load_kwargs,
         )
         self.model.eval()
         self.device = device
@@ -74,15 +85,14 @@ class Qwen3Runner:
             max_new_tokens=max_new_tokens,
             do_sample=temperature > 0,
             temperature=temperature if temperature > 0 else None,
-            **kwargs,
         )
-        if temperature > 0:
-            if top_k and top_k > 0:
-                gen_kwargs["top_k"] = top_k
-            if top_p and top_p > 0:
-                gen_kwargs["top_p"] = top_p
+        # Qwen3-VL does not support top_k/top_p; omit to avoid generation flags warning
+        for k, v in kwargs.items():
+            if k not in ("top_k", "top_p") and v is not None:
+                gen_kwargs[k] = v
+        gen_kwargs = {k: v for k, v in gen_kwargs.items() if v is not None}
 
-        with torch.no_grad():
+        with torch.inference_mode():
             generated_ids = self.model.generate(**inputs, **gen_kwargs)
 
         input_ids = inputs.get("input_ids", inputs)

@@ -2,6 +2,13 @@
 
 ---
 
+## MAS Prompts
+
+- **Documentation (markdown):** [MAS_PROMPTS.md](./MAS_PROMPTS.md)
+- **Source (YAML):** `src/agents/prompts.yaml`
+
+---
+
 ## 1. Push (Local → GitHub)
 
 ```bash
@@ -9,7 +16,7 @@ cd ~/Desktop/Spatial_MAS
 
 git add .
 git status
-git commit -m "Add Qwen3-4B, Sa2VA, LLaVA4D; MAS pipeline; 4 benchmarks"
+git commit -m "MAS: prompts markdown, mas_temperature/mas_seed fixed, trust_remote_code removed"
 git push origin main
 ```
 

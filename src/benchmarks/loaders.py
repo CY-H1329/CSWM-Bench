@@ -92,9 +92,9 @@ def load_benchmark(
     subset = cfg.get("subset")
 
     if subset:
-        ds = load_dataset(name, subset, split=split, trust_remote_code=True)
+        ds = load_dataset(name, subset, split=split)
     else:
-        ds = load_dataset(name, split=split, trust_remote_code=True)
+        ds = load_dataset(name, split=split)
 
     cat_key = cfg.get("category_key")
     if max_per_category is not None and cat_key and cat_key in ds.features:

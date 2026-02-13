@@ -52,6 +52,13 @@ Ce dossier documente les expériences réalisées sur STVQA-7K (Spatial VQA).
 
 ---
 
+## MAS Prompts
+
+Prompts détaillés (markdown, structurés) : **[MAS_PROMPTS.md](./MAS_PROMPTS.md)**  
+Fichier source utilisé par le code : `src/agents/prompts.yaml`
+
+---
+
 ## Step 1 – Architecture Head → Perception → Reasoning
 
 Voir **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** pour :
