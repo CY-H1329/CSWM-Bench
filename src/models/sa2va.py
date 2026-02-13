@@ -7,6 +7,25 @@ from typing import Optional
 from PIL import Image
 import torch
 from transformers import AutoModel, AutoTokenizer
+from transformers.modeling_utils import PreTrainedModel
+
+
+def _patch_tied_weights_for_sa2va():
+    """Sa2VA uses _tied_weights_keys; newer transformers expect all_tied_weights_keys."""
+    _orig = PreTrainedModel.mark_tied_weights_as_initialized
+
+    def _patched(self):
+        if not hasattr(self, "all_tied_weights_keys"):
+            old = getattr(self, "_tied_weights_keys", None)
+            if old is not None and hasattr(old, "keys"):
+                self.all_tied_weights_keys = old
+            elif isinstance(old, (list, tuple)):
+                self.all_tied_weights_keys = {k: None for x in old for k in (x if isinstance(x, (list, tuple)) else [x])}
+            else:
+                self.all_tied_weights_keys = {}
+        _orig(self)
+
+    PreTrainedModel.mark_tied_weights_as_initialized = _patched
 
 
 def _patch_torch_linspace_for_sa2va():
@@ -44,6 +63,7 @@ class Sa2VARunner:
             use_flash_attn=use_flash_attn,
             device_map=None,
         )
+        _patch_tied_weights_for_sa2va()
         _orig_linspace = _patch_torch_linspace_for_sa2va()
         try:
             self.model = AutoModel.from_pretrained(model_id, **load_kwargs).eval()
