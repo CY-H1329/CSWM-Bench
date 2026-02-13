@@ -96,9 +96,11 @@ def load_benchmark(
     else:
         ds = load_dataset(name, split=split)
 
+    rng = random.Random(seed)
     cat_key = cfg.get("category_key")
+
     if max_per_category is not None and cat_key and cat_key in ds.features:
-        rng = random.Random(seed)
+        # Per-category: N samples per category (균등 분포)
         by_cat = {}
         for i in range(len(ds)):
             c = ds[i].get(cat_key) or "unknown"
@@ -113,7 +115,11 @@ def load_benchmark(
         indices.sort()
         ds = ds.select(indices)
     elif max_samples is not None:
-        ds = ds.select(range(min(max_samples, len(ds))))
+        # Random sampling: N samples from entire dataset (카테고리 무관, 순서 랜덤)
+        n = min(max_samples, len(ds))
+        indices = rng.sample(range(len(ds)), n)
+        indices.sort()  # keep original order for reproducibility of which samples
+        ds = ds.select(indices)
 
     return ds
 

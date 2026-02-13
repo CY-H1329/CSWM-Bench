@@ -138,8 +138,10 @@ def main():
         "--reasoning", default="qwen3_4b",
         help="Reasoning-Agent model: qwen, qwen3_4b, llava, llava4d, sa2va",
     )
-    parser.add_argument("--max_samples", type=int, default=None)
-    parser.add_argument("--max_per_category", type=int, default=None)
+    parser.add_argument("--max_samples", type=int, default=None,
+        help="Random sample N from entire dataset (seed for reproducibility)")
+    parser.add_argument("--max_per_category", type=int, default=None,
+        help="Sample N per category (균등 분포). Use --max_samples for random mix.")
     parser.add_argument("--seed", type=int, default=None, help="Dataset sampling seed (default: config eval.mas_seed)")
     args = parser.parse_args()
 
@@ -158,9 +160,10 @@ def main():
     run_dir = output_dir / "runs" / args.benchmark / run_name / timestamp
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load dataset (seed for reproducible sampling when max_per_category)
+    # Load dataset (seed for reproducible sampling)
     seed = args.seed if args.seed is not None else eval_cfg.get("mas_seed", 42)
-    print(f"Loading {args.benchmark}... (seed={seed})")
+    mode = "random" if args.max_samples else ("per_category" if args.max_per_category else "all")
+    print(f"Loading {args.benchmark}... (seed={seed}, mode={mode})")
     dataset = load_benchmark(
         args.benchmark,
         max_samples=args.max_samples,
@@ -241,15 +244,19 @@ def main():
             return str(s).strip().lower()
         acc = sum(_norm(p) == _norm(g) for p, g in zip(preds, gt_list)) / len(gt_list) if gt_list else 0.0
 
+    sample_mode = "random" if args.max_samples else ("per_category" if args.max_per_category else "all")
     results = {
         "benchmark": args.benchmark,
         "combination": run_name,
         "accuracy": acc,
         "num_samples": len(gt_list),
+        "sample_mode": sample_mode,
+        "max_samples": args.max_samples,
+        "max_per_category": args.max_per_category,
+        "seed": seed,
         "head": args.head,
         "perception": args.perception,
         "reasoning": args.reasoning,
-        "seed": seed,
         "mas_temperature": eval_cfg.get("mas_temperature", 0.0),
     }
 

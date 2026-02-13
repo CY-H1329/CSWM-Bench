@@ -40,13 +40,13 @@ pip install -r requirements.txt
 # Datasets (une fois)
 python scripts/setup_datasets.py
 
-# MAS — agents identiques
-bash scripts/run_h100_mas.sh stvqa7k qwen3_4b qwen3_4b qwen3_4b --max_per_category 10
-bash scripts/run_h100_mas.sh stvqa7k llava4d llava4d llava4d --max_per_category 10
-bash scripts/run_h100_mas.sh stvqa7k sa2va sa2va sa2va --max_per_category 10
+# MAS — agents identiques (random 90 samples)
+bash scripts/run_h100_mas.sh stvqa7k qwen3_4b qwen3_4b qwen3_4b --max_samples 90
+bash scripts/run_h100_mas.sh stvqa7k llava4d llava4d llava4d --max_samples 90
+bash scripts/run_h100_mas.sh stvqa7k sa2va sa2va sa2va --max_samples 90
 
 # MAS — combinaisons
-bash scripts/run_h100_mas.sh stvqa7k qwen3_4b llava4d sa2va
+bash scripts/run_h100_mas.sh stvqa7k qwen3_4b llava4d sa2va --max_samples 90
 ```
 
 ---

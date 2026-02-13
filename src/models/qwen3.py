@@ -84,13 +84,13 @@ class Qwen3Runner:
         gen_kwargs = dict(
             max_new_tokens=max_new_tokens,
             do_sample=temperature > 0,
-            temperature=temperature if temperature > 0 else None,
         )
-        # Qwen3-VL does not support top_k/top_p; omit to avoid generation flags warning
+        if temperature > 0:
+            gen_kwargs["temperature"] = temperature
+        # Qwen3-VL: top_k, top_p, temperature=0 not valid; omit to avoid warning
         for k, v in kwargs.items():
-            if k not in ("top_k", "top_p") and v is not None:
+            if k not in ("top_k", "top_p", "temperature") and v is not None:
                 gen_kwargs[k] = v
-        gen_kwargs = {k: v for k, v in gen_kwargs.items() if v is not None}
 
         with torch.inference_mode():
             generated_ids = self.model.generate(**inputs, **gen_kwargs)
