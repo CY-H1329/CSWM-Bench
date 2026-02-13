@@ -226,7 +226,9 @@ def main():
             details.append({
                 "idx": i,
                 "task_class": out["task_class"],
-                "perception": out["perception_output"][:200],
+                "head_output": out.get("head_output", ""),
+                "perception_output": out["perception_output"],
+                "reasoning_output": final,
                 "pred": letter,
                 "gt": gt,
                 "category": category,

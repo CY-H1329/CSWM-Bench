@@ -69,8 +69,8 @@ def run_mas_pipeline(
 
     # 1. Head-Agent: query + image ONLY (no category)
     head_prompt = MAS_PIPELINE_PROMPTS["head"].format(query=query)
-    task_class_raw = gen(image, head_prompt)
-    task_class = _normalize_task_class(task_class_raw)
+    head_output = gen(image, head_prompt)
+    task_class = _normalize_task_class(head_output)
 
     # 2. Perception Agent: query + task_class
     perc_prompt = MAS_PIPELINE_PROMPTS["perception"].format(
@@ -89,6 +89,7 @@ def run_mas_pipeline(
 
     return {
         "task_class": task_class,
+        "head_output": head_output,
         "perception_output": perception_output,
         "final_answer": final_answer,
     }

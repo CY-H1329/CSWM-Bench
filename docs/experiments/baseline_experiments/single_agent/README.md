@@ -70,6 +70,10 @@ Voir **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** pour :
 
 Organisation des résultats : `runs/<benchmark>/<head>_<perception>_<reasoning>/`
 
+### MAS 실험 세팅 (실행 방법, config, 출력 구조)
+
+**[MAS_EXPERIMENT_README.md](./MAS_EXPERIMENT_README.md)** – run_eval_mas.py, run_eval_mas_full.py, category별 결과, step_outputs
+
 ---
 
 ## Nouvelles expériences
