@@ -10,6 +10,7 @@ Usage:
   python run_eval_mas_full.py --benchmark stvqa7k --seed 42
 """
 import argparse
+import gc
 import json
 import os
 from pathlib import Path
@@ -127,6 +128,21 @@ def make_generate_fn(runner, eval_cfg: dict, use_mas_temperature: bool = True):
     return _generate
 
 
+def _unload_model(runner):
+    """Explicitly unload model to free GPU memory and avoid cross-contamination."""
+    if runner is None:
+        return
+    if hasattr(runner, "model"):
+        del runner.model
+    if hasattr(runner, "processor"):
+        del runner.processor
+    if hasattr(runner, "tokenizer"):
+        del runner.tokenizer
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def run_single_combination(
     args,
     config,
@@ -138,10 +154,14 @@ def run_single_combination(
 ):
     """Run MAS for one combination."""
     eval_cfg = config.get("eval", {})
+    runners_to_unload = []
     if head_name == perc_name == reas_name:
         runner = get_runner(head_name, config)
         if runner is None:
             raise RuntimeError(f"Model not enabled: {head_name}")
+        runners_to_unload = [runner]
+        model_id_used = getattr(runner, "model_id", head_name)
+        print(f"  [load] {model_id_used}")
         gen_fn = make_generate_fn(runner, eval_cfg)
         head_gen = perc_gen = reas_gen = gen_fn
     else:
@@ -150,6 +170,9 @@ def run_single_combination(
         reas_runner = get_runner(reas_name, config)
         if not all([head_runner, perc_runner, reas_runner]):
             raise RuntimeError(f"All agents must be enabled: {head_name}, {perc_name}, {reas_name}")
+        runners_to_unload = [head_runner, perc_runner, reas_runner]
+        model_id_used = f"{getattr(head_runner,'model_id',head_name)} / {getattr(perc_runner,'model_id',perc_name)} / {getattr(reas_runner,'model_id',reas_name)}"
+        print(f"  [load] {model_id_used}")
         head_gen = make_generate_fn(head_runner, eval_cfg)
         perc_gen = make_generate_fn(perc_runner, eval_cfg)
         reas_gen = make_generate_fn(reas_runner, eval_cfg)
@@ -162,6 +185,8 @@ def run_single_combination(
     step_outputs_dir = run_dir / "step_outputs"
     step_outputs_dir.mkdir(parents=True, exist_ok=True)
 
+    # Verification: run 1 sample and log head_output to verify model is correct
+    _first_head_out = None
     for i in tqdm(range(len(dataset)), desc=f"{head_name}_{perc_name}_{reas_name}"):
         example = dataset[i]
         image = get_benchmark_image(example, args.benchmark)
@@ -200,6 +225,8 @@ def run_single_combination(
             by_category[category]["preds"].append(letter)
             by_category[category]["gts"].append(gt)
 
+            if _first_head_out is None:
+                _first_head_out = (out.get("head_output", ""), final[:80])
             details.append({
                 "idx": i,
                 "task_class": out["task_class"],
@@ -261,7 +288,19 @@ def run_single_combination(
             "correct": correct,
         }
 
-    return acc, details, by_category_acc
+    # Verification: print first sample's head_output to verify model differs per combination
+    if _first_head_out is not None:
+        print(f"  [verify] sample0 head_out={repr(_first_head_out[0][:60])}... pred={repr(_first_head_out[1][:40])}...")
+
+    # Explicitly unload model before next combination (avoid GPU memory + cross-contamination)
+    for r in runners_to_unload:
+        _unload_model(r)
+    del runners_to_unload
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    return acc, details, by_category_acc, model_id_used
 
 
 def main():
@@ -297,13 +336,14 @@ def main():
         run_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"\n--- {run_name} ---")
-        acc, details, by_category_acc = run_single_combination(
+        acc, details, by_category_acc, model_id_used = run_single_combination(
             args, config, head_name, perc_name, reas_name, dataset, run_dir
         )
 
         results = {
             "benchmark": args.benchmark,
             "combination": run_name,
+            "model_id": model_id_used,
             "accuracy": acc,
             "num_samples": len(details),
             "sample_mode": "all",
