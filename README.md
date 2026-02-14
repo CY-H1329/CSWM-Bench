@@ -112,8 +112,10 @@ python export_failed_samples.py --run_dir results/20250109_123456
   ```
   자세한 순서·API 키 설정: **[docs/H100_설정_및_실행.md](docs/H100_설정_및_실행.md)**.
 
-**Expériences multi-agent, collab, MAS (Head→Perception→Reasoning)** : **[docs/experiments/baseline_experiments/single_agent/README.md](docs/experiments/baseline_experiments/single_agent/README.md)**  
-**MAS 실험 세팅 (run_eval_mas_full, category별 결과, step_outputs)** : **[docs/experiments/baseline_experiments/single_agent/MAS_EXPERIMENT_README.md](docs/experiments/baseline_experiments/single_agent/MAS_EXPERIMENT_README.md)**
+**Guide d'exécution complet** (scripts par rôle, commandes, prompts) : **[docs/EXECUTION_GUIDE.md](docs/EXECUTION_GUIDE.md)**  
+
+**Expériences multi-agent, collab, MAS** : **[docs/experiments/baseline_experiments/single_agent/README.md](docs/experiments/baseline_experiments/single_agent/README.md)**  
+**MAS 실험 세팅** : **[docs/experiments/baseline_experiments/single_agent/MAS_EXPERIMENT_README.md](docs/experiments/baseline_experiments/single_agent/MAS_EXPERIMENT_README.md)**
 
 ---
 
@@ -157,21 +159,23 @@ Spatial_MAS/
 ├── run_eval_multiagent.py    # Multi-agent (3 agents, 다수결)
 ├── run_eval_unified.py       # Single → Multi 통합 실행
 ├── run_eval_collab.py        # Qwen + LLaVA 협력
-├── run_eval_mas.py           # MAS: Head → Perception → Reasoning (단일 조합)
-├── run_eval_mas_full.py      # MAS 전체: Qwen3/Sa2VA/LLaVA4D X3, 전체 데이터
+├── run_eval_mas.py           # MAS: Head → Perception → Reasoning (1 combinaison)
+├── run_eval_mas_full.py      # MAS Full: Qwen3/Sa2VA/LLaVA4D ×3, données complètes
+├── run_eval_single_3dsrbench.py  # Single 3DSRBench: Qwen3, Sa2VA, LLaVA4D + prompt raisonnement
 ├── analyze_failures.py       # 실패 질문 task별 분석
 ├── export_failed_samples.py  # 틀린 샘플만 이미지+전체 정보 저장
 ├── scripts/
+│   ├── evals/                # Scripts d'évaluation par rôle (voir README)
 │   ├── setup_h100.sh         # H100 환경 설정 (최초 1회)
 │   ├── run_h100.sh           # H100 Single + 분석 + export
 │   ├── run_h100_multiagent.sh # H100 Unified (single → multi)
 │   ├── run_h100_collab.sh    # H100 Collab (Qwen + LLaVA)
 │   └── show_category_distribution.py
-├── README.md
 ├── docs/
+│   ├── EXECUTION_GUIDE.md    # Guide complet: scripts, commandes, prompts
 │   ├── GITHUB_AND_H100.md    # GitHub 푸시 & H100 실행 방법
 │   ├── H100_설정_및_실행.md  # H100 Pull 후 설정·실행 순서
-│   └── experiments/         # Expériences et tests (nouvelle page)
+│   └── experiments/         # Expériences et tests
 │       └── README.md
 ├── src/
 │   ├── data.py
