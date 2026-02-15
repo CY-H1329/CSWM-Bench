@@ -44,6 +44,7 @@ class Qwen3Runner:
             except ImportError:
                 pass  # fallback to default attention
 
+        self.model_id = model_id
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         self.model = Qwen3VLForConditionalGeneration.from_pretrained(
             model_id,
