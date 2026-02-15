@@ -3,6 +3,7 @@ Sa2VA inference (ByteDance/Sa2VA-4B).
 Uses model.predict_forward() for image chat.
 Requires: transformers, trust_remote_code=True
 """
+import warnings
 from typing import Optional
 from PIL import Image
 import torch
@@ -97,5 +98,10 @@ class Sa2VARunner:
             "mask_prompts": None,
             "tokenizer": self.tokenizer,
         }
-        return_dict = self.model.predict_forward(**input_dict)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="Passing `generation_config` together with generation-related arguments",
+            )
+            return_dict = self.model.predict_forward(**input_dict)
         return (return_dict.get("prediction") or "").strip()

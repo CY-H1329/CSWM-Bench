@@ -12,6 +12,7 @@ import argparse
 import gc
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 from datetime import datetime
 
@@ -144,13 +145,17 @@ def main():
     with open(run_dir / "details.jsonl", "w", encoding="utf-8") as f:
         for d in details:
             f.write(json.dumps(d, ensure_ascii=False) + "\n")
+    pred_dist = {k: v for k, v in sorted(Counter(p for p in preds if p).items())}
     with open(run_dir / "results.json", "w", encoding="utf-8") as f:
-        json.dump({"model": model_name, "accuracy": acc, "n": len(details)}, f, indent=2)
+        json.dump({"model": model_name, "accuracy": acc, "n": len(details), "pred_distribution": pred_dist}, f, indent=2)
+
+    pred_dist_str = ", ".join(f"{k}={v}" for k, v in sorted(pred_dist.items()))
 
     print("\n" + "=" * 50)
     print("3DSRBench — Qwen3-4B")
     print("=" * 50)
     print(f"Accuracy: {acc:.4f} ({len(details)} samples)")
+    print(f"Pred distribution: {pred_dist_str or 'N/A'}")
     print("=" * 50)
     print(f"Résultats: {run_dir}")
 
