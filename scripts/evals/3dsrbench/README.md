@@ -14,21 +14,28 @@ L'agent **infère lui-même** la catégorie (STEP 1 — TASK CLASSIFICATION). La
 
 ## Commandes
 
-```bash
-# Depuis la racine du projet
-cd /path/to/Spatial_MAS
+### Dataset complet (3 modèles)
 
+```bash
+# Exécute Qwen3, Sa2VA, LLaVA4D sur le dataset complet (sans --max_samples)
+python scripts/evals/3dsrbench/run_all_models_full.py
+python scripts/evals/3dsrbench/run_all_models_full.py --seed 42
+```
+
+### Par modèle (test rapide ou ciblé)
+
+```bash
 # Qwen3-4B uniquement
-python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py
-python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --max_samples 50 --seed 42
+python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py              # dataset complet
+python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --max_samples 50  # test rapide
 
 # Sa2VA uniquement
 python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py
-python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py --max_samples 50 --seed 42
+python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py --max_samples 50
 
 # LLaVA4D uniquement
 python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py
-python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --max_samples 50 --seed 42
+python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --max_samples 50
 ```
 
 ## Métriques
