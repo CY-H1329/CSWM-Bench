@@ -4,6 +4,7 @@ Dataset: https://huggingface.co/datasets/OX-PIXL/STVQA-7K
 Paper: SpatialThinker (arXiv:2511.07403)
 """
 import random
+import re
 from typing import Optional
 
 from datasets import load_dataset
@@ -74,16 +75,17 @@ def get_prompt_with_reasoning(example: dict) -> str:
 def normalize_answer_only(pred: str) -> str:
     """Extract answer letter (A/B/C/D) from model output for matching."""
     pred = (pred or "").strip().upper()
-    for c in "ABCD":
-        if c in pred:
-            # take first occurrence as answer choice
-            idx = pred.index(c)
-            # accept "(A)" or "A)" or "A."
-            rest = pred[idx : idx + 4]
-            if rest.startswith("(") and len(rest) >= 2:
-                return rest[1]
-            return c
-    return ""
+    # 1) "(A)", "(B)", "(C)", "(D)" — évite "ANSWER" qui contient A
+    matches = re.findall(r"\(([A-D])\)", pred)
+    if matches:
+        return matches[-1]
+    # 2) "Answer: A", "Final Answer: B" etc.
+    m = re.search(r"(?:ANSWER|FINAL\s*ANSWER)[:\s]+([A-D])\b", pred, re.I)
+    if m:
+        return m.group(1).upper()
+    # 3) Dernier A/B/C/D isolé (word boundary)
+    all_matches = re.findall(r"\b([A-D])\b", pred)
+    return all_matches[-1] if all_matches else ""
 
 
 def accuracy(pred_letters: list, gt_letters: list) -> float:
