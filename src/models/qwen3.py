@@ -82,13 +82,22 @@ class Qwen3Runner:
         inputs.pop("token_type_ids", None)
         inputs = {k: v.to(self.model.device) if hasattr(v, "to") else v for k, v in inputs.items()}
 
-        gen_kwargs = dict(
-            max_new_tokens=max_new_tokens,
-            do_sample=temperature > 0,
-        )
-        if temperature > 0:
-            gen_kwargs["temperature"] = temperature
-        # Qwen3-VL: top_k, top_p, temperature=0 not valid; omit to avoid warning
+        # Qwen3-VL: temperature, top_p, top_k are not valid — pass only max_new_tokens, do_sample
+        # Use GenerationConfig to avoid inheriting invalid params from model config
+        try:
+            from transformers import GenerationConfig
+            gen_config = GenerationConfig(
+                max_new_tokens=max_new_tokens,
+                do_sample=temperature > 0,
+            )
+            if temperature > 0:
+                gen_config.temperature = temperature
+            gen_kwargs = {"generation_config": gen_config}
+        except ImportError:
+            gen_kwargs = dict(max_new_tokens=max_new_tokens, do_sample=temperature > 0)
+            if temperature > 0:
+                gen_kwargs["temperature"] = temperature
+
         for k, v in kwargs.items():
             if k not in ("top_k", "top_p", "temperature") and v is not None:
                 gen_kwargs[k] = v

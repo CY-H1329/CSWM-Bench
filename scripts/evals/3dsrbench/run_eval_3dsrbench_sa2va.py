@@ -152,9 +152,9 @@ def main():
     print("=" * 50)
     print(f"Résultats: {run_dir}")
 
-    del runner.model
-    del runner.processor
-    del runner.tokenizer
+    for attr in ("model", "processor"):
+        if hasattr(runner, attr):
+            delattr(runner, attr)
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
