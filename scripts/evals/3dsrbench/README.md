@@ -30,6 +30,11 @@ python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py
 python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --max_samples 50 --seed 42
 ```
 
+## Métriques
+
+- **Answer Accuracy** : précision sur la réponse finale (A/B/C/D)
+- **Category Cls Accuracy** : précision de la classification de tâche (STEP 1) vs GT du dataset (Height, Location, Orientation, Multi-Object)
+
 ## Sorties
 
 ```

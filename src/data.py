@@ -94,3 +94,41 @@ def accuracy(pred_letters: list, gt_letters: list) -> float:
     if not pred_letters:
         return 0.0
     return sum(p == g for p, g in zip(pred_letters, gt_letters)) / len(pred_letters)
+
+
+def normalize_category(cat: str) -> str:
+    """Normalize 3DSRBench category for comparison."""
+    if not cat or not str(cat).strip():
+        return ""
+    s = str(cat).strip().lower().replace(" ", "_").replace("-", "_")
+    if s in ("multi_object", "multiobject"):
+        return "Multi-Object"
+    if s == "height":
+        return "Height"
+    if s == "location":
+        return "Location"
+    if s == "orientation":
+        return "Orientation"
+    return cat.strip()  # keep original if unknown
+
+
+def extract_predicted_category(response: str) -> str:
+    """Extract Task Category from model output (STEP 1 classification)."""
+    if not response or not response.strip():
+        return ""
+    text = response.strip()
+    # Match "Task Category:" or "Task Category" followed by category on same or next line
+    m = re.search(
+        r"Task\s*Category\s*:?\s*\n?\s*([A-Za-z][A-Za-z\s\-_]*?)(?=\n\n|\nReasoning|\nStep-by-Step|$)",
+        text,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if m:
+        raw = m.group(1).strip()
+        return normalize_category(raw) if raw else ""
+    # Fallback: first line that is exactly one of the 4 categories
+    for line in text.split("\n"):
+        line = line.strip()
+        if normalize_category(line) in ("Height", "Location", "Orientation", "Multi-Object"):
+            return normalize_category(line)
+    return ""

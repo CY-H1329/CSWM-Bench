@@ -30,7 +30,7 @@ from src.benchmarks import (
     get_benchmark_image,
     get_benchmark_category,
 )
-from src.data import normalize_answer_only, accuracy
+from src.data import normalize_answer_only, accuracy, extract_predicted_category, normalize_category
 from src.models.qwen3 import Qwen3Runner
 
 # Import common (works when run directly or as module)
@@ -102,7 +102,8 @@ def main():
         if image is None:
             preds.append("")
             gt_list.append(gt)
-            details.append({"idx": i, "error": "no_image", "gt": gt})
+            gt_cat = normalize_category(category) if category and category != "unknown" else ""
+            details.append({"idx": i, "error": "no_image", "gt": gt, "category_gt": gt_cat})
             continue
 
         full_prompt = build_spatial_prompt(query)
@@ -115,6 +116,8 @@ def main():
                 max_new_tokens=args.max_new_tokens,
             )
             letter = normalize_answer_only(response)
+            pred_category = extract_predicted_category(response)
+            gt_category_norm = normalize_category(category) if category and category != "unknown" else ""
             preds.append(letter)
             gt_list.append(gt)
             details.append({
@@ -123,6 +126,8 @@ def main():
                 "gt": gt,
                 "pred": letter,
                 "category": category,
+                "category_gt": gt_category_norm,
+                "pred_category": pred_category,
                 "full_response": response,
             })
             sample_path = responses_dir / f"sample_{i:05d}.txt"
@@ -131,6 +136,8 @@ def main():
                 f.write(query + "\n\n")
                 f.write("=== GT ===\n")
                 f.write(gt + "\n\n")
+                f.write("=== CATEGORY GT / PRED ===\n")
+                f.write(f"{gt_category_norm} / {pred_category}\n\n")
                 f.write("=== FULL RESPONSE ===\n")
                 f.write(response + "\n\n")
                 f.write("=== EXTRACTED PRED ===\n")
@@ -138,23 +145,39 @@ def main():
         except Exception as e:
             preds.append("")
             gt_list.append(gt)
-            details.append({"idx": i, "error": str(e), "gt": gt})
+            gt_cat = normalize_category(category) if category and category != "unknown" else ""
+            details.append({"idx": i, "error": str(e), "gt": gt, "category_gt": gt_cat})
 
     acc = accuracy(preds, gt_list)
+
+    # Category classification accuracy (GT vs predicted)
+    cat_pairs = [(d.get("category_gt", ""), d.get("pred_category", "")) for d in details if d.get("category_gt")]
+    cat_gt_list = [p[0] for p in cat_pairs]
+    cat_pred_list = [p[1] for p in cat_pairs]
+    cat_cls_acc = accuracy(cat_pred_list, cat_gt_list) if cat_pairs else 0.0
+    cat_n = len(cat_pairs)
 
     with open(run_dir / "details.jsonl", "w", encoding="utf-8") as f:
         for d in details:
             f.write(json.dumps(d, ensure_ascii=False) + "\n")
     pred_dist = {k: v for k, v in sorted(Counter(p for p in preds if p).items())}
     with open(run_dir / "results.json", "w", encoding="utf-8") as f:
-        json.dump({"model": model_name, "accuracy": acc, "n": len(details), "pred_distribution": pred_dist}, f, indent=2)
+        json.dump({
+            "model": model_name,
+            "accuracy": acc,
+            "n": len(details),
+            "pred_distribution": pred_dist,
+            "category_cls_accuracy": cat_cls_acc,
+            "category_cls_n": cat_n,
+        }, f, indent=2)
 
     pred_dist_str = ", ".join(f"{k}={v}" for k, v in sorted(pred_dist.items()))
 
     print("\n" + "=" * 50)
     print("3DSRBench — Qwen3-4B")
     print("=" * 50)
-    print(f"Accuracy: {acc:.4f} ({len(details)} samples)")
+    print(f"Answer Accuracy: {acc:.4f} ({len(details)} samples)")
+    print(f"Category Cls Accuracy: {cat_cls_acc:.4f} ({cat_n} samples with GT category)")
     print(f"Pred distribution: {pred_dist_str or 'N/A'}")
     print("=" * 50)
     print(f"Résultats: {run_dir}")
