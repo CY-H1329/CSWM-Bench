@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
 Évaluation single-agent sur 3DSRBench: Qwen3-4B, Sa2VA, LLaVA4D.
-Chaque modèle reçoit image + query avec le prompt de raisonnement spatial.
-Sauvegarde: réponse complète, GT, démarche. Tableau final par accuracy.
+Utilise les catégories réelles 3DSRBench: Height, Location, Orientation, Multi-Object.
 
-Usage:
+Recommandé: exécuter chaque modèle séparément pour éviter toute interférence:
+  python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py
+  python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py
+  python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py
+
+Usage (tous les modèles en une fois):
   python run_eval_single_3dsrbench.py
   python run_eval_single_3dsrbench.py --max_samples 50 --seed 42
 """
@@ -32,7 +36,9 @@ from src.models.llava import LLaVARunner
 from src.models.sa2va import Sa2VARunner
 
 
-SPATIAL_REASONING_PROMPT = """# ROLE
+def _build_3dsrbench_prompt(question: str) -> str:
+    """Agent infers category by itself (Height, Location, Orientation, Multi-Object)."""
+    return """# ROLE
 You are an expert in spatial reasoning.
 Your objective is to solve visual spatial reasoning tasks accurately and systematically.
 
@@ -49,15 +55,10 @@ You will receive:
 
 Classify the question into exactly ONE of the following categories:
 
-- Depth
-- Distance
-- Relation
-- Existence
-- Count
-- Instance_Location
+- Height
+- Location
 - Orientation
-- Size
-- Reach
+- Multi-Object
 
 Rules:
 - Select only one category.
@@ -100,7 +101,7 @@ Provide:
 # OUTPUT FORMAT (MANDATORY)
 
 Task Category:
-<One of the 9 categories>
+<One of the 4 categories>
 
 Reasoning Plan:
 <Brief task-specific plan>
@@ -115,8 +116,7 @@ Final Answer:
 
 # QUESTION
 
-{question}
-"""
+""" + question
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -208,7 +208,7 @@ def run_model_on_benchmark(
             details.append({"idx": i, "error": "no_image", "gt": gt})
             continue
 
-        full_prompt = SPATIAL_REASONING_PROMPT.format(question=query)
+        full_prompt = _build_3dsrbench_prompt(query)
 
         try:
             response = runner.generate(

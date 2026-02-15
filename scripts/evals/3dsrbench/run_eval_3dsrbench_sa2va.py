@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""
+Évaluation 3DSRBench — Sa2VA uniquement.
+Exécution séparée pour éviter toute interférence entre modèles.
+Utilise les catégories réelles 3DSRBench: Height, Location, Orientation, Multi-Object.
+
+Usage:
+  python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py
+  python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py --max_samples 50 --seed 42
+"""
+import argparse
+import gc
+import json
+import sys
+from pathlib import Path
+from datetime import datetime
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+import torch
+import yaml
+from tqdm import tqdm
+
+from src.benchmarks import (
+    load_benchmark,
+    get_benchmark_prompt,
+    get_benchmark_answer,
+    get_benchmark_image,
+    get_benchmark_category,
+)
+from src.data import normalize_answer_only, accuracy
+from src.models.sa2va import Sa2VARunner
+
+import importlib.util
+_spec = importlib.util.spec_from_file_location(
+    "common", Path(__file__).parent / "common.py"
+)
+_common = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_common)
+build_spatial_prompt = _common.build_spatial_prompt
+
+
+def load_config(path: str = "config.yaml") -> dict:
+    root = Path(__file__).resolve().parents[3]
+    cfg_path = root / path
+    with open(cfg_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="3DSRBench eval — Sa2VA only")
+    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--max_samples", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--max_new_tokens", type=int, default=1024)
+    args = parser.parse_args()
+
+    config = load_config(args.config)
+    eval_cfg = config.get("eval", {})
+    output_dir = Path(config.get("output", {}).get("dir", "results"))
+    benchmark = "3dsrbench"
+    model_name = "sa2va"
+
+    if eval_cfg.get("use_tf32", False) and torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = output_dir / "runs" / benchmark / "sa2va" / timestamp
+    run_dir.mkdir(parents=True, exist_ok=True)
+    responses_dir = run_dir / "responses"
+    responses_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Loading {benchmark}... (seed={args.seed})")
+    dataset = load_benchmark(benchmark, max_samples=args.max_samples, seed=args.seed)
+    print(f"  {len(dataset)} samples")
+
+    m_cfg = config.get("models", {}).get("sa2va", {})
+    if not m_cfg.get("enabled", True):
+        raise RuntimeError("sa2va is disabled in config")
+    runner = Sa2VARunner(
+        model_id=m_cfg.get("model_id", "ByteDance/Sa2VA-4B"),
+        device=m_cfg.get("device", "cuda"),
+        use_flash_attn=m_cfg.get("use_flash_attn", False),
+    )
+    print(f"  [load] {model_name} ({runner.model_id})")
+
+    preds = []
+    gt_list = []
+    details = []
+
+    for i in tqdm(range(len(dataset)), desc=model_name):
+        example = dataset[i]
+        image = get_benchmark_image(example, benchmark)
+        query = get_benchmark_prompt(example, benchmark)
+        gt = get_benchmark_answer(example, benchmark)
+        category = get_benchmark_category(example, benchmark) or "unknown"
+
+        if image is None:
+            preds.append("")
+            gt_list.append(gt)
+            details.append({"idx": i, "error": "no_image", "gt": gt})
+            continue
+
+        full_prompt = build_spatial_prompt(query)
+
+        try:
+            response = runner.generate(
+                image,
+                full_prompt,
+                temperature=eval_cfg.get("mas_temperature", 0.0),
+                max_new_tokens=args.max_new_tokens,
+            )
+            letter = normalize_answer_only(response)
+            preds.append(letter)
+            gt_list.append(gt)
+            details.append({
+                "idx": i,
+                "query": query,
+                "gt": gt,
+                "pred": letter,
+                "category": category,
+                "full_response": response,
+            })
+            sample_path = responses_dir / f"sample_{i:05d}.txt"
+            with open(sample_path, "w", encoding="utf-8") as f:
+                f.write("=== QUERY ===\n")
+                f.write(query + "\n\n")
+                f.write("=== GT ===\n")
+                f.write(gt + "\n\n")
+                f.write("=== FULL RESPONSE ===\n")
+                f.write(response + "\n\n")
+                f.write("=== EXTRACTED PRED ===\n")
+                f.write(letter + "\n")
+        except Exception as e:
+            preds.append("")
+            gt_list.append(gt)
+            details.append({"idx": i, "error": str(e), "gt": gt})
+
+    acc = accuracy(preds, gt_list)
+
+    with open(run_dir / "details.jsonl", "w", encoding="utf-8") as f:
+        for d in details:
+            f.write(json.dumps(d, ensure_ascii=False) + "\n")
+    with open(run_dir / "results.json", "w", encoding="utf-8") as f:
+        json.dump({"model": model_name, "accuracy": acc, "n": len(details)}, f, indent=2)
+
+    print("\n" + "=" * 50)
+    print("3DSRBench — Sa2VA")
+    print("=" * 50)
+    print(f"Accuracy: {acc:.4f} ({len(details)} samples)")
+    print("=" * 50)
+    print(f"Résultats: {run_dir}")
+
+    del runner.model
+    del runner.processor
+    del runner.tokenizer
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+if __name__ == "__main__":
+    main()

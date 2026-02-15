@@ -14,7 +14,10 @@ Ce document décrit tous les scripts d'évaluation, leur rôle, les commandes et
 | **Collab** | `run_eval_collab.py` | STVQA-7K | Qwen + LLaVA en collaboration |
 | **MAS (pipeline)** | `run_eval_mas.py` | 4 benchmarks | Head → Perception → Reasoning (1 combinaison) |
 | **MAS Full** | `run_eval_mas_full.py` | 4 benchmarks | Qwen3/Sa2VA/LLaVA4D ×3, données complètes |
-| **Single 3DSRBench** | `run_eval_single_3dsrbench.py` | 3DSRBench | Qwen3, Sa2VA, LLaVA4D avec prompt raisonnement spatial |
+| **Single 3DSRBench** | `run_eval_single_3dsrbench.py` | 3DSRBench | Qwen3, Sa2VA, LLaVA4D (tous en une fois) |
+| **3DSRBench Qwen3** | `scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py` | 3DSRBench | Qwen3-4B uniquement (recommandé) |
+| **3DSRBench Sa2VA** | `scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py` | 3DSRBench | Sa2VA uniquement (recommandé) |
+| **3DSRBench LLaVA4D** | `scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py` | 3DSRBench | LLaVA4D uniquement (recommandé) |
 
 ---
 
@@ -169,21 +172,34 @@ python run_eval_mas_full.py --benchmark 3dsrbench --seed 42
 
 ---
 
-## 7. Single 3DSRBench (`run_eval_single_3dsrbench.py`)
+## 7. 3DSRBench — Scripts par modèle (recommandé)
 
-**Rôle** : Tester Qwen3-4B, Sa2VA, LLaVA4D individuellement sur 3DSRBench avec un prompt de raisonnement spatial structuré. Image + query uniquement.
+**Rôle** : Exécuter chaque modèle **séparément** pour éviter toute interférence (résultats identiques, fuite mémoire). L'agent **infère lui-même** la catégorie (Height, Location, Orientation, Multi-Object).
 
 ```bash
-# Tous les échantillons
-python run_eval_single_3dsrbench.py
+# Qwen3-4B uniquement
+python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py
+python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --max_samples 50 --seed 42
 
-# Test rapide (50 échantillons)
+# Sa2VA uniquement
+python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py
+
+# LLaVA4D uniquement
+python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py
+```
+
+**Sorties** : `results/runs/3dsrbench/<model>/<timestamp>/` avec `responses/sample_*.txt`, `details.jsonl`, `results.json`.
+
+### 7.1. Single 3DSRBench (tous modèles en une fois)
+
+```bash
+python run_eval_single_3dsrbench.py
 python run_eval_single_3dsrbench.py --max_samples 50 --seed 42
 ```
 
-**Sorties** : Tableau d'accuracy, `responses/sample_*.txt` (réponse complète, GT, démarche).
-
 ### Prompt 3DSRBench (raisonnement spatial)
+
+L'agent **infère la catégorie** en STEP 1 (Height, Location, Orientation, Multi-Object). La catégorie n'est pas fournie.
 
 ```
 # ROLE
@@ -203,15 +219,10 @@ You will receive:
 
 Classify the question into exactly ONE of the following categories:
 
-- Depth
-- Distance
-- Relation
-- Existence
-- Count
-- Instance_Location
+- Height
+- Location
 - Orientation
-- Size
-- Reach
+- Multi-Object
 
 Rules:
 - Select only one category.
@@ -254,7 +265,7 @@ Provide:
 # OUTPUT FORMAT (MANDATORY)
 
 Task Category:
-<One of the 9 categories>
+<One of the 4 categories>
 
 Reasoning Plan:
 <Brief task-specific plan>
@@ -298,11 +309,10 @@ results/
 │   │   │   └── all_combinations_summary.txt
 │   │   └── <head>_<perc>_<reas>/<timestamp>/  # MAS single combo
 │   └── 3dsrbench/
-│       └── single_eval/<timestamp>/   # Single 3DSRBench
-│           ├── qwen3_4b/
-│           ├── sa2va/
-│           ├── llava4d/
-│           └── accuracy_table.txt
+│       ├── qwen3_4b/<timestamp>/      # Script séparé Qwen3
+│       ├── sa2va/<timestamp>/        # Script séparé Sa2VA
+│       ├── llava4d/<timestamp>/      # Script séparé LLaVA4D
+│       └── single_eval/<timestamp>/  # run_eval_single_3dsrbench (tous)
 └── YYYYMMDD_HHMMSS/                   # run_eval.py, etc.
 ```
 
