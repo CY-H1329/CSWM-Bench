@@ -174,7 +174,7 @@ python run_eval_mas_full.py --benchmark 3dsrbench --seed 42
 
 ## 7. 3DSRBench — Scripts par modèle (recommandé)
 
-**Rôle** : Exécuter chaque modèle **séparément** pour éviter toute interférence (résultats identiques, fuite mémoire). L'agent **infère lui-même** la catégorie (Height, Location, Orientation, Multi-Object).
+**Rôle** : Exécuter chaque modèle **séparément** pour éviter toute interférence. L'agent **infère lui-même** la catégorie (12 catégories fine-grained).
 
 ```bash
 # Qwen3-4B uniquement
@@ -199,7 +199,9 @@ python run_eval_single_3dsrbench.py --max_samples 50 --seed 42
 
 ### Prompt 3DSRBench (raisonnement spatial)
 
-L'agent **infère la catégorie** en STEP 1 (Height, Location, Orientation, Multi-Object). La catégorie n'est pas fournie.
+L'agent **infère la catégorie** en STEP 1 (12 catégories fine-grained). La catégorie n'est pas fournie.
+
+Catégories : location_above, height_higher, location_closer_to_camera, multi_object_closer_to, orientation_on_the_left, multi_object_facing, multi_object_same_direction, orientation_in_front_of, multi_object_viewpoint_towards_object, orientation_viewpoint, location_next_to, multi_object_parallel.
 
 ```
 # ROLE
@@ -219,10 +221,8 @@ You will receive:
 
 Classify the question into exactly ONE of the following categories:
 
-- Height
-- Location
-- Orientation
-- Multi-Object
+- location_above, height_higher, location_closer_to_camera, ...
+- (12 categories total)
 
 Rules:
 - Select only one category.
@@ -265,7 +265,7 @@ Provide:
 # OUTPUT FORMAT (MANDATORY)
 
 Task Category:
-<One of the 4 categories>
+<One of the 12 categories>
 
 Reasoning Plan:
 <Brief task-specific plan>

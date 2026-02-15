@@ -1,11 +1,24 @@
 """
 Shared logic for 3DSRBench single-model evaluation scripts.
-Agent infers task category by itself (Height, Location, Orientation, Multi-Object).
+Agent infers task category by itself (12 fine-grained categories).
 """
 from typing import Optional
 
-# 3DSRBench official task categories — agent must classify by itself
-DSR3BENCH_TASK_CATEGORIES = ["Height", "Location", "Orientation", "Multi-Object"]
+# 3DSRBench task categories (fine-grained)
+DSR3BENCH_TASK_CATEGORIES = [
+    "location_above",
+    "height_higher",
+    "location_closer_to_camera",
+    "multi_object_closer_to",
+    "orientation_on_the_left",
+    "multi_object_facing",
+    "multi_object_same_direction",
+    "orientation_in_front_of",
+    "multi_object_viewpoint_towards_object",
+    "orientation_viewpoint",
+    "location_next_to",
+    "multi_object_parallel",
+]
 
 
 def build_spatial_prompt(question: str, task_category: Optional[str] = None) -> str:
@@ -13,7 +26,8 @@ def build_spatial_prompt(question: str, task_category: Optional[str] = None) -> 
     Build the spatial reasoning prompt.
     Category is NOT given — agent must infer it in STEP 1.
     """
-    return """# ROLE
+    cats = "\n".join(f"- {c}" for c in DSR3BENCH_TASK_CATEGORIES)
+    return f"""# ROLE
 You are an expert in spatial reasoning.
 Your objective is to solve visual spatial reasoning tasks accurately and systematically.
 
@@ -30,10 +44,7 @@ You will receive:
 
 Classify the question into exactly ONE of the following categories:
 
-- Height
-- Location
-- Orientation
-- Multi-Object
+{cats}
 
 Rules:
 - Select only one category.
@@ -76,7 +87,7 @@ Provide:
 # OUTPUT FORMAT (MANDATORY)
 
 Task Category:
-<One of the 4 categories>
+<One of the 12 categories>
 
 Reasoning Plan:
 <Brief task-specific plan>
@@ -91,4 +102,5 @@ Final Answer:
 
 # QUESTION
 
-""" + question
+{question}
+"""

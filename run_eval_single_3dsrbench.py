@@ -36,9 +36,20 @@ from src.models.llava import LLaVARunner
 from src.models.sa2va import Sa2VARunner
 
 
+# 3DSRBench fine-grained categories (12)
+_3DSRBENCH_CATS = [
+    "location_above", "height_higher", "location_closer_to_camera",
+    "multi_object_closer_to", "orientation_on_the_left", "multi_object_facing",
+    "multi_object_same_direction", "orientation_in_front_of",
+    "multi_object_viewpoint_towards_object", "orientation_viewpoint",
+    "location_next_to", "multi_object_parallel",
+]
+
+
 def _build_3dsrbench_prompt(question: str) -> str:
-    """Agent infers category by itself (Height, Location, Orientation, Multi-Object)."""
-    return """# ROLE
+    """Agent infers category by itself (12 fine-grained categories)."""
+    cats = "\n".join(f"- {c}" for c in _3DSRBENCH_CATS)
+    return f"""# ROLE
 You are an expert in spatial reasoning.
 Your objective is to solve visual spatial reasoning tasks accurately and systematically.
 
@@ -55,10 +66,7 @@ You will receive:
 
 Classify the question into exactly ONE of the following categories:
 
-- Height
-- Location
-- Orientation
-- Multi-Object
+{cats}
 
 Rules:
 - Select only one category.
@@ -101,7 +109,7 @@ Provide:
 # OUTPUT FORMAT (MANDATORY)
 
 Task Category:
-<One of the 4 categories>
+<One of the 12 categories>
 
 Reasoning Plan:
 <Brief task-specific plan>
@@ -116,7 +124,8 @@ Final Answer:
 
 # QUESTION
 
-""" + question
+{question}
+"""
 
 
 def load_config(path: str = "config.yaml") -> dict:

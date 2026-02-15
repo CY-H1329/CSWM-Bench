@@ -15,6 +15,6 @@ Les scripts Python sont à la racine du projet. Ce dossier documente leur organi
 | 3DSRBench Sa2VA | `3dsrbench/run_eval_3dsrbench_sa2va.py` | `python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py` |
 | 3DSRBench LLaVA4D | `3dsrbench/run_eval_3dsrbench_llava4d.py` | `python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py` |
 
-**3DSRBench** : Exécution séparée par modèle recommandée. L'agent infère la catégorie (Height, Location, Orientation, Multi-Object).
+**3DSRBench** : Exécution séparée par modèle recommandée. L'agent infère la catégorie (12 fine-grained).
 
 Voir **[docs/EXECUTION_GUIDE.md](../../docs/EXECUTION_GUIDE.md)** pour les détails, prompts et commandes complètes.

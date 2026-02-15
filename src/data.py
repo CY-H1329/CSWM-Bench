@@ -96,20 +96,24 @@ def accuracy(pred_letters: list, gt_letters: list) -> float:
     return sum(p == g for p, g in zip(pred_letters, gt_letters)) / len(pred_letters)
 
 
+# 3DSRBench fine-grained categories (for normalization)
+_3DSRBENCH_CATS = frozenset({
+    "location_above", "height_higher", "location_closer_to_camera",
+    "multi_object_closer_to", "orientation_on_the_left", "multi_object_facing",
+    "multi_object_same_direction", "orientation_in_front_of",
+    "multi_object_viewpoint_towards_object", "orientation_viewpoint",
+    "location_next_to", "multi_object_parallel",
+})
+
+
 def normalize_category(cat: str) -> str:
-    """Normalize 3DSRBench category for comparison."""
+    """Normalize 3DSRBench category for comparison (12 fine-grained categories)."""
     if not cat or not str(cat).strip():
         return ""
     s = str(cat).strip().lower().replace(" ", "_").replace("-", "_")
-    if s in ("multi_object", "multiobject"):
-        return "Multi-Object"
-    if s == "height":
-        return "Height"
-    if s == "location":
-        return "Location"
-    if s == "orientation":
-        return "Orientation"
-    return cat.strip()  # keep original if unknown
+    if s in _3DSRBENCH_CATS:
+        return s
+    return cat.strip()
 
 
 def extract_predicted_category(response: str) -> str:
@@ -119,16 +123,16 @@ def extract_predicted_category(response: str) -> str:
     text = response.strip()
     # Match "Task Category:" or "Task Category" followed by category on same or next line
     m = re.search(
-        r"Task\s*Category\s*:?\s*\n?\s*([A-Za-z][A-Za-z\s\-_]*?)(?=\n\n|\nReasoning|\nStep-by-Step|$)",
+        r"Task\s*Category\s*:?\s*\n?\s*([A-Za-z][A-Za-z0-9_\s\-]*?)(?=\n\n|\nReasoning|\nStep-by-Step|$)",
         text,
         re.DOTALL | re.IGNORECASE,
     )
     if m:
-        raw = m.group(1).strip()
-        return normalize_category(raw) if raw else ""
-    # Fallback: first line that is exactly one of the 4 categories
+        raw = m.group(1).strip().lower().replace(" ", "_").replace("-", "_")
+        return raw if raw in _3DSRBENCH_CATS else raw
+    # Fallback: first line that matches one of the 12 categories
     for line in text.split("\n"):
-        line = line.strip()
-        if normalize_category(line) in ("Height", "Location", "Orientation", "Multi-Object"):
-            return normalize_category(line)
+        line = line.strip().lower().replace(" ", "_").replace("-", "_")
+        if line in _3DSRBENCH_CATS:
+            return line
     return ""

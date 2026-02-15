@@ -2,12 +2,13 @@
 
 Chaque modèle s'exécute **séparément** pour éviter toute interférence (résultats identiques, fuite de mémoire, etc.).
 
-## Catégories 3DSRBench (officielles)
+## Catégories 3DSRBench (12, fine-grained)
 
-- **Height** — Position verticale des objets en 3D
-- **Location** — Positions et relations spatiales
-- **Orientation** — Orientation des objets en 3D
-- **Multi-Object** — Raisonnement multi-objets
+- location_above, height_higher, location_closer_to_camera
+- multi_object_closer_to, orientation_on_the_left, multi_object_facing
+- multi_object_same_direction, orientation_in_front_of
+- multi_object_viewpoint_towards_object, orientation_viewpoint
+- location_next_to, multi_object_parallel
 
 L'agent **infère lui-même** la catégorie (STEP 1 — TASK CLASSIFICATION). La catégorie n'est pas fournie.
 
@@ -33,7 +34,7 @@ python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --max_samples 50 --
 ## Métriques
 
 - **Answer Accuracy** : précision sur la réponse finale (A/B/C/D)
-- **Category Cls Accuracy** : précision de la classification de tâche (STEP 1) vs GT du dataset (Height, Location, Orientation, Multi-Object)
+- **Category Cls Accuracy** : précision de la classification de tâche (STEP 1) vs GT du dataset (12 catégories fine-grained)
 
 ## Sorties
 
