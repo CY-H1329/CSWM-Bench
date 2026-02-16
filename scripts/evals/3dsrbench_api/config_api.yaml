@@ -1,0 +1,31 @@
+# 3DSRBench API models — 100 samples, separate from existing GPU eval
+# API keys: OPENAI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY
+
+dataset:
+  name: "ccvl/3DSRBench"
+  subset: "benchmark"
+  split: "test"
+  max_samples: 100
+  seed: 42
+
+models:
+  claude_3_5_sonnet:
+    enabled: true
+    model_id: "claude-3-5-sonnet-20241022"
+    api_key_env: "ANTHROPIC_API_KEY"
+  gpt4o:
+    enabled: true
+    model_id: "gpt-4o"
+    api_key_env: "OPENAI_API_KEY"
+  deepseek_vl:
+    enabled: true
+    model_id: "deepseek-vl"
+    api_key_env: "DEEPSEEK_API_KEY"
+    base_url: "https://api.deepseek.com"
+  gemini_robotics_er:
+    enabled: true
+    model_id: "gemini-2.0-flash"  # or gemini-robotics-er when available
+    api_key_env: "GEMINI_API_KEY"
+
+output:
+  dir: "results"

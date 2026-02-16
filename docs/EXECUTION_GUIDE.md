@@ -18,6 +18,7 @@ Ce document décrit tous les scripts d'évaluation, leur rôle, les commandes et
 | **3DSRBench Qwen3** | `scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py` | 3DSRBench | Qwen3-4B uniquement (recommandé) |
 | **3DSRBench Sa2VA** | `scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py` | 3DSRBench | Sa2VA uniquement (recommandé) |
 | **3DSRBench LLaVA4D** | `scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py` | 3DSRBench | LLaVA4D uniquement (recommandé) |
+| **3DSRBench API** | `scripts/evals/3dsrbench_api/run_eval_api.py` | 3DSRBench | Claude, GPT-4o, DeepSeek-VL, Gemini — 100 samples (séparé) |
 
 ---
 
@@ -285,6 +286,24 @@ Final Answer:
 
 ---
 
+## 8. 3DSRBench API (`scripts/evals/3dsrbench_api/run_eval_api.py`)
+
+**Rôle** : Évaluer les modèles API (Claude 3.5 Sonnet, GPT-4o, DeepSeek-VL, Gemini Robotics-ER) sur 3DSRBench. **100 samples**, code séparé du GPU.
+
+```bash
+# 100 samples (défaut)
+python scripts/evals/3dsrbench_api/run_eval_api.py
+
+# 50 samples
+python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 50
+```
+
+**Env** : `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`
+
+**Config** : `scripts/evals/3dsrbench_api/config_api.yaml`
+
+---
+
 ## Benchmarks supportés
 
 | Benchmark | Clé | Split | Options |
@@ -312,7 +331,8 @@ results/
 │       ├── qwen3_4b/<timestamp>/      # Script séparé Qwen3
 │       ├── sa2va/<timestamp>/        # Script séparé Sa2VA
 │       ├── llava4d/<timestamp>/      # Script séparé LLaVA4D
-│       └── single_eval/<timestamp>/  # run_eval_single_3dsrbench (tous)
+│       ├── single_eval/<timestamp>/  # run_eval_single_3dsrbench (tous)
+│       └── api_models/<timestamp>/   # Claude, GPT-4o, DeepSeek-VL, Gemini (100 samples)
 └── YYYYMMDD_HHMMSS/                   # run_eval.py, etc.
 ```
 

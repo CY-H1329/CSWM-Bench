@@ -15,7 +15,9 @@ Les scripts Python sont à la racine du projet. Ce dossier documente leur organi
 | 3DSRBench Sa2VA | `3dsrbench/run_eval_3dsrbench_sa2va.py` | `python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py` |
 | 3DSRBench LLaVA4D | `3dsrbench/run_eval_3dsrbench_llava4d.py` | `python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py` |
 | 3DSRBench Full (3 modèles) | `3dsrbench/run_all_models_full.py` | `python scripts/evals/3dsrbench/run_all_models_full.py` |
+| **3DSRBench API** (100 samples) | `3dsrbench_api/run_eval_api.py` | `python scripts/evals/3dsrbench_api/run_eval_api.py` |
 
-**3DSRBench** : Exécution séparée par modèle recommandée. L'agent infère la catégorie (12 fine-grained).
+**3DSRBench** : GPU (Qwen3, Sa2VA, LLaVA4D) — exécution séparée recommandée.  
+**3DSRBench API** : Claude 3.5 Sonnet, GPT-4o, DeepSeek-VL, Gemini — 100 samples, séparé du code GPU.
 
 Voir **[docs/EXECUTION_GUIDE.md](../../docs/EXECUTION_GUIDE.md)** pour les détails, prompts et commandes complètes.

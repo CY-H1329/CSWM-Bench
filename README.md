@@ -2,8 +2,8 @@
 
 STVQA-7K 데이터셋으로 **Qwen2.5-VL**, **LLaVA**, **GPT** 모델의 공간 추론 성능을 평가하는 프로젝트입니다.
 
-- **데이터셋**: [STVQA-7K](https://huggingface.co/datasets/OX-PIXL/STVQA-7K) (SpatialThinker, arXiv:2511.07403)
-- **목적**: 학습용 데이터셋을 **평가 벤치마크**로 사용해 위 모델들의 성능 비교
+- **데이터셋**: [STVQA-7K](https://huggingface.co/datasets/OX-PIXL/STVQA-7K), [3DSRBench](https://huggingface.co/datasets/ccvl/3DSRBench)
+- **목적**: 학습용 데이터셋을 **평가 벤치마크**로 사용해 모델들의 공간 추론 성능 비교
 
 ---
 
@@ -161,11 +161,13 @@ Spatial_MAS/
 ├── run_eval_collab.py        # Qwen + LLaVA 협력
 ├── run_eval_mas.py           # MAS: Head → Perception → Reasoning (1 combinaison)
 ├── run_eval_mas_full.py      # MAS Full: Qwen3/Sa2VA/LLaVA4D ×3, données complètes
-├── run_eval_single_3dsrbench.py  # Single 3DSRBench: Qwen3, Sa2VA, LLaVA4D + prompt raisonnement
+├── run_eval_single_3dsrbench.py  # Single 3DSRBench: Qwen3, Sa2VA, LLaVA4D (GPU)
 ├── analyze_failures.py       # 실패 질문 task별 분석
 ├── export_failed_samples.py  # 틀린 샘플만 이미지+전체 정보 저장
 ├── scripts/
 │   ├── evals/                # Scripts d'évaluation par rôle (voir README)
+│   │   ├── 3dsrbench/        # 3DSRBench GPU (Qwen3, Sa2VA, LLaVA4D)
+│   │   └── 3dsrbench_api/    # 3DSRBench API (Claude, GPT-4o, DeepSeek-VL, Gemini) — 100 samples
 │   ├── setup_h100.sh         # H100 환경 설정 (최초 1회)
 │   ├── run_h100.sh           # H100 Single + 분석 + export
 │   ├── run_h100_multiagent.sh # H100 Unified (single → multi)
@@ -187,7 +189,25 @@ Spatial_MAS/
 
 ---
 
-## 7. 참고
+## 7. 벤치마크 & 모델
 
-- 데이터셋: [OX-PIXL/STVQA-7K](https://huggingface.co/datasets/OX-PIXL/STVQA-7K) (또는 `hunarbatra/STVQA-7K`)
+### 벤치마크
+| 벤치마크 | 설명 |
+|----------|------|
+| STVQA-7K | [OX-PIXL/STVQA-7K](https://huggingface.co/datasets/OX-PIXL/STVQA-7K) — SpatialThinker |
+| 3DSRBench | [ccvl/3DSRBench](https://huggingface.co/datasets/ccvl/3DSRBench) — 3D spatial reasoning |
+
+### 모델
+| 타입 | 모델 |
+|------|------|
+| **GPU** | Qwen3-4B, Sa2VA, LLaVA4D |
+| **API** | Claude 3.5 Sonnet, GPT-4o, DeepSeek-VL, Gemini Robotics-ER (100 samples) |
+
+3DSRBench API: `python scripts/evals/3dsrbench_api/run_eval_api.py`
+
+---
+
+## 8. 참고
+
+- 데이터셋: [OX-PIXL/STVQA-7K](https://huggingface.co/datasets/OX-PIXL/STVQA-7K), [ccvl/3DSRBench](https://huggingface.co/datasets/ccvl/3DSRBench)
 - 논문: [SpatialThinker: Reinforcing 3D Reasoning in Multimodal LLMs via Spatial Rewards](https://arxiv.org/abs/2511.07403)
