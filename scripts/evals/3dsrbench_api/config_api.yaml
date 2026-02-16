@@ -9,18 +9,20 @@ dataset:
   seed: 42
 
 models:
-  claude_3_5_sonnet:
+  claude_sonnet_4_5:
     enabled: true
-    model_id: "claude-3-5-sonnet-20241022"
+    model_id: "claude-sonnet-4-5-20250929"  # Claude 3.5 Sonnet (20241022) retiré le 2026-01-05
     api_key_env: "ANTHROPIC_API_KEY"
   gpt4o:
     enabled: true
     model_id: "gpt-4o"
     api_key_env: "OPENAI_API_KEY"
   deepseek_vl:
-    enabled: true
+    enabled: false  # API officielle sans vision ; retiré
     model_id: "deepseek-vl"
     api_key_env: "DEEPSEEK_API_KEY"
+    # api.deepseek.com rejette image_url → utilise /v1/vision
+    # Si 404 : base_url: "https://openrouter.ai/api/v1", model_id: "deepseek/deepseek-vl-7b-chat", api_key_env: "OPENROUTER_API_KEY"
     base_url: "https://api.deepseek.com"
   gemini_robotics_er:
     enabled: true

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-3DSRBench — API models (Claude 3.5 Sonnet, GPT-4o, DeepSeek-VL, Gemini Robotics-ER).
+3DSRBench — API models (Claude Sonnet 4.5, GPT-4o, DeepSeek-VL, Gemini Robotics-ER).
 100 samples, separate from GPU eval. Does not modify existing code.
 
 Usage:
@@ -59,7 +59,7 @@ def get_runner(model_key: str, config: dict):
     if not api_key:
         return None
     model_id = cfg.get("model_id", "")
-    if model_key == "claude_3_5_sonnet":
+    if model_key == "claude_sonnet_4_5":
         return ClaudeRunner(model_id=model_id, api_key=api_key)
     if model_key == "gpt4o":
         return GPT4oRunner(model_id=model_id, api_key=api_key)
@@ -98,7 +98,7 @@ def main():
     dataset = load_benchmark("3dsrbench", max_samples=max_samples, seed=seed)
     print(f"  {len(dataset)} samples")
 
-    model_keys = ["claude_3_5_sonnet", "gpt4o", "deepseek_vl", "gemini_robotics_er"]
+    model_keys = ["claude_sonnet_4_5", "gpt4o", "deepseek_vl", "gemini_robotics_er"]
     results_table = []
 
     for model_key in model_keys:

@@ -75,16 +75,29 @@ def get_prompt_with_reasoning(example: dict) -> str:
 def normalize_answer_only(pred: str) -> str:
     """Extract answer letter (A/B/C/D) from model output for matching."""
     pred = (pred or "").strip().upper()
-    # 1) "(A)", "(B)", "(C)", "(D)" — évite "ANSWER" qui contient A
+    # 1) "(A)", "(B)", "(C)", "(D)"
     matches = re.findall(r"\(([A-D])\)", pred)
     if matches:
         return matches[-1]
-    # 2) "Answer: A", "Final Answer: B" etc.
+    # 2) "Answer: A", "Final Answer: B", "The answer is A", "answer is (B)"
     m = re.search(r"(?:ANSWER|FINAL\s*ANSWER)[:\s]+([A-D])\b", pred, re.I)
     if m:
         return m.group(1).upper()
-    # 3) Dernier A/B/C/D isolé (word boundary)
-    all_matches = re.findall(r"\b([A-D])\b", pred)
+    m = re.search(r"(?:THE\s+)?(?:CORRECT\s+)?ANSWER\s+IS\s+(?:\(?([A-D])\)?|OPTION\s+([A-D]))", pred, re.I)
+    if m:
+        return (m.group(1) or m.group(2)).upper()
+    m = re.search(r"OPTION\s+([A-D])\b|CHOICE\s+([A-D])\b|SELECT\s+([A-D])\b", pred, re.I)
+    if m:
+        return (m.group(1) or m.group(2) or m.group(3)).upper()
+    m = re.search(r"(?:I\s+)?(?:WOULD\s+)?(?:CHOOSE|SELECT)\s+(?:OPTION\s+)?\(?([A-D])\)?", pred, re.I)
+    if m:
+        return m.group(1).upper()
+    m = re.search(r"THEREFORE[,:]?\s*\(?([A-D])\)?\.?\s*$", pred, re.I | re.M)
+    if m:
+        return m.group(1).upper()
+    # 3) Last A/B/C/D in final 400 chars (évite "A" dans "ANSWER" au début)
+    tail = pred[-400:] if len(pred) > 400 else pred
+    all_matches = re.findall(r"\b([A-D])\b", tail)
     return all_matches[-1] if all_matches else ""
 
 

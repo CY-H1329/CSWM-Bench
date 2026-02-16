@@ -80,7 +80,7 @@ Follow a strict logical reasoning process:
 
 Provide:
 - A concise final answer.
-- If multiple choices exist, clearly indicate the selected option.
+- For multiple choice (A/B/C/D): reply with **Final Answer: (X)** where X is A, B, C, or D.
 
 ---
 
@@ -96,7 +96,7 @@ Step-by-Step Reasoning:
 <Logical reasoning steps>
 
 Final Answer:
-<Clear final answer>
+(Answer letter in parentheses, e.g. (A), (B), (C), or (D))
 
 ---
 

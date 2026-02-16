@@ -43,7 +43,7 @@ def _sanitize(s: str) -> str:
 
 class ClaudeRunner:
     """Claude 3.5 Sonnet vision via Anthropic API."""
-    def __init__(self, model_id: str = "claude-3-5-sonnet-20241022", api_key: Optional[str] = None):
+    def __init__(self, model_id: str = "claude-sonnet-4-5-20250929", api_key: Optional[str] = None):
         if not ANTHROPIC_AVAILABLE:
             raise ImportError("Install: pip install anthropic")
         key = api_key or os.environ.get("ANTHROPIC_API_KEY", "").strip()
@@ -121,20 +121,32 @@ class GPT4oRunner:
 
 
 class DeepSeekVLRunner:
-    """DeepSeek-VL via OpenAI-compatible API."""
+    """DeepSeek-VL : OpenRouter (image_url) ou api.deepseek.com (/v1/vision)."""
     def __init__(
         self,
         model_id: str = "deepseek-vl",
         api_key: Optional[str] = None,
         base_url: str = "https://api.deepseek.com",
     ):
-        if not OPENAI_AVAILABLE:
-            raise ImportError("Install: pip install openai")
         key = (api_key or os.environ.get("DEEPSEEK_API_KEY", "")).strip()
         if not key:
             raise ValueError("Set DEEPSEEK_API_KEY")
-        self.client = OpenAI(api_key=key, base_url=base_url)
+        self.api_key = key
+        self.base_url = base_url.rstrip("/")
         self.model_id = model_id
+        # OpenRouter accepte image_url ; api.deepseek.com non → on utilise /v1/vision
+        self._use_openrouter = "openrouter" in base_url.lower()
+
+        if self._use_openrouter:
+            if not OPENAI_AVAILABLE:
+                raise ImportError("Install: pip install openai")
+            self.client = OpenAI(api_key=key, base_url=self.base_url)
+        else:
+            try:
+                import requests
+                self._requests = requests
+            except ImportError:
+                raise ImportError("Install: pip install requests")
 
     def generate(
         self,
@@ -146,21 +158,45 @@ class DeepSeekVLRunner:
     ) -> str:
         prompt = _sanitize(prompt)
         b64 = _img_to_base64(image)
-        resp = self.client.chat.completions.create(
-            model=self.model_id,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
-            max_tokens=max_tokens,
-            temperature=max(0.0, temperature),
-        )
-        return (resp.choices[0].message.content or "").strip()
+
+        if self._use_openrouter:
+            resp = self.client.chat.completions.create(
+                model=self.model_id,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                            {"type": "text", "text": prompt},
+                        ],
+                    }
+                ],
+                max_tokens=max_tokens,
+                temperature=max(0.0, temperature),
+            )
+            return (resp.choices[0].message.content or "").strip()
+
+        # api.deepseek.com : endpoint /v1/vision (chat/completions rejette image_url)
+        url = f"{self.base_url}/v1/vision"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model_id,
+            "image": b64,
+            "prompt": prompt,
+            "max_tokens": max_tokens,
+            "temperature": max(0.0, temperature),
+        }
+        r = self._requests.post(url, headers=headers, json=payload, timeout=120)
+        r.raise_for_status()
+        data = r.json()
+        if "choices" in data and data["choices"]:
+            return (data["choices"][0].get("message", {}).get("content") or "").strip()
+        if "text" in data:
+            return (data["text"] or "").strip()
+        return ""
 
 
 class GeminiRunner:
