@@ -1,6 +1,6 @@
-# Push / Pull — 3DSRBench GPU (Qwen3, LLaVA4D, Sa2VA)
+# Push / Pull — 3DSRBench GPU + API
 
-Dataset complet, avec/sans prompt. Chaque commande dans un terminal séparé (GPU parallèle).
+Dataset complet, avec/sans prompt. Chaque commande dans un terminal séparé (GPU ou API parallèle).
 
 ---
 
@@ -86,7 +86,7 @@ python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py --full_dataset --with
 
 ---
 
-## Structure des sorties
+## Structure des sorties GPU
 
 ```
 results/runs/3dsrbench/
@@ -99,4 +99,74 @@ results/runs/3dsrbench/
 └── sa2va/
     ├── full_dataset_with_prompt/
     └── full_dataset_without_prompt/
+```
+
+---
+
+## 4. API — 6 terminaux (dataset complet, parallèle)
+
+Env : `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`
+
+Sortie : `results/runs/3dsrbench/api_models/full_dataset/{model}_{with_prompt|without_prompt}/`
+
+### Terminal 1 — Claude with_prompt
+```bash
+cd /path/to/Spatial_MAS
+conda activate spatial_mas
+
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5 --prompt_variant with_prompt
+```
+
+### Terminal 2 — Claude without_prompt
+```bash
+cd /path/to/Spatial_MAS
+conda activate spatial_mas
+
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5 --without_prompt
+```
+
+### Terminal 3 — GPT-4o with_prompt
+```bash
+cd /path/to/Spatial_MAS
+conda activate spatial_mas
+
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt4o --prompt_variant with_prompt
+```
+
+### Terminal 4 — GPT-4o without_prompt
+```bash
+cd /path/to/Spatial_MAS
+conda activate spatial_mas
+
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt4o --without_prompt
+```
+
+### Terminal 5 — Gemini with_prompt
+```bash
+cd /path/to/Spatial_MAS
+conda activate spatial_mas
+
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gemini_robotics_er --prompt_variant with_prompt
+```
+
+### Terminal 6 — Gemini without_prompt
+```bash
+cd /path/to/Spatial_MAS
+conda activate spatial_mas
+
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gemini_robotics_er --without_prompt
+```
+
+---
+
+## Structure des sorties API
+
+```
+results/runs/3dsrbench/api_models/full_dataset/
+├── claude_sonnet_4_5_with_prompt/
+├── claude_sonnet_4_5_without_prompt/
+├── gpt4o_with_prompt/
+├── gpt4o_without_prompt/
+├── gemini_robotics_er_with_prompt/
+└── gemini_robotics_er_without_prompt/
 ```

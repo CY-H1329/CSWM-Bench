@@ -28,6 +28,10 @@ python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 50
 
 # Dataset complet → sortie dans full_dataset/
 python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset
+
+# Terminaux séparés (6 runs) — voir PUSH_PULL_3DSRBench_GPU.md
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5 --without_prompt
 ```
 
 ## Coût estimé (API)

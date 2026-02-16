@@ -6,7 +6,9 @@
 Usage:
   python scripts/evals/3dsrbench_api/run_eval_api.py
   python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 50
-  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset   # dataset complet → full_dataset/
+  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset   # dataset complet, tous modèles
+  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5  # un modèle, 2 variants
+  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt4o --without_prompt  # un run (terminal séparé)
 
 Env: ANTHROPIC_API_KEY, OPENAI_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY
 """
@@ -78,8 +80,11 @@ def get_runner(model_key: str, config: dict):
 def main():
     parser = argparse.ArgumentParser(description="3DSRBench API models")
     parser.add_argument("--config", default=str(Path(__file__).parent / "config_api.yaml"))
-    parser.add_argument("--max_samples", type=int, default=None, help="Limiter à N samples (défaut: 100 si pas --full_dataset)")
+    parser.add_argument("--max_samples", type=int, default=None, help="Limiter à N samples (défaut: 1000 si pas --full_dataset)")
     parser.add_argument("--full_dataset", action="store_true", help="Dataset complet, sortie dans full_dataset/")
+    parser.add_argument("--model", choices=["claude_sonnet_4_5", "gpt4o", "gemini_robotics_er"], help="Un seul modèle (pour terminaux séparés)")
+    parser.add_argument("--without_prompt", action="store_true", help="Question seule (un seul run)")
+    parser.add_argument("--prompt_variant", choices=["with_prompt", "without_prompt"], help="Une seule variante (exclut l'autre)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_tokens", type=int, default=1024)
     args = parser.parse_args()
@@ -101,11 +106,16 @@ def main():
     dataset = load_benchmark("3dsrbench", max_samples=max_samples, seed=seed)
     print(f"  {len(dataset)} samples")
 
-    model_keys = ["claude_sonnet_4_5", "gpt4o", "deepseek_vl", "gemini_robotics_er"]
-    prompt_variants = [
-        ("with_prompt", lambda q: build_spatial_prompt(q)),
-        ("without_prompt", lambda q: q),
-    ]
+    model_keys = [args.model] if args.model else ["claude_sonnet_4_5", "gpt4o", "deepseek_vl", "gemini_robotics_er"]
+    if args.prompt_variant == "with_prompt":
+        prompt_variants = [("with_prompt", lambda q: build_spatial_prompt(q))]
+    elif args.without_prompt or args.prompt_variant == "without_prompt":
+        prompt_variants = [("without_prompt", lambda q: q)]
+    else:
+        prompt_variants = [
+            ("with_prompt", lambda q: build_spatial_prompt(q)),
+            ("without_prompt", lambda q: q),
+        ]
     results_table = []
 
     for model_key in model_keys:
@@ -199,15 +209,16 @@ def main():
             })
             print(f"  Answer Accuracy: {acc:.4f} | Category Cls: {cat_cls_acc:.4f} | N={len(details)}")
 
-    # Summary
+    # Summary (sauf si run unique --model : évite écrasement en parallèle)
     n_total = len(dataset)
-    with open(run_dir / "summary.txt", "w", encoding="utf-8") as f:
-        f.write(f"# 3DSRBench — API Models ({n_total} samples)\n")
-        f.write("# Chaque modèle : with_prompt (spatial) et without_prompt (question seule)\n\n")
-        f.write("| Model | Answer Acc | Category Cls Acc | N |\n")
-        f.write("|-------|------------|------------------|---|\n")
-        for r in results_table:
-            f.write(f"| {r['model']} | {r['accuracy']:.4f} | {r['category_cls_acc']:.4f} | {r['n']} |\n")
+    if not args.model or len(results_table) > 1:
+        with open(run_dir / "summary.txt", "w", encoding="utf-8") as f:
+            f.write(f"# 3DSRBench — API Models ({n_total} samples)\n")
+            f.write("# Chaque modèle : with_prompt (spatial) et without_prompt (question seule)\n\n")
+            f.write("| Model | Answer Acc | Category Cls Acc | N |\n")
+            f.write("|-------|------------|------------------|---|\n")
+            for r in results_table:
+                f.write(f"| {r['model']} | {r['accuracy']:.4f} | {r['category_cls_acc']:.4f} | {r['n']} |\n")
 
     print("\n" + "=" * 60)
     print("3DSRBench — API Models Summary")
