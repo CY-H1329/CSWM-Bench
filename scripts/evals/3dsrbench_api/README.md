@@ -2,6 +2,12 @@
 
 Évaluation des modèles API sur 3DSRBench. **Séparé** du code GPU existant (Qwen3, Sa2VA, LLaVA4D).
 
+## Dépendances
+
+```bash
+pip install anthropic openai google-genai
+```
+
 ## Modèles
 
 | Modèle | API | Env var |
