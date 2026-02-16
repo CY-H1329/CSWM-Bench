@@ -7,6 +7,8 @@ Utilise les catégories réelles 3DSRBench: Height, Location, Orientation, Multi
 Usage:
   python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py
   python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --max_samples 50 --seed 42
+  python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --full_dataset
+  python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --full_dataset --without_prompt
 """
 import argparse
 import gc
@@ -51,6 +53,8 @@ def main():
     parser = argparse.ArgumentParser(description="3DSRBench eval — LLaVA4D only")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--max_samples", type=int, default=None)
+    parser.add_argument("--full_dataset", action="store_true", help="Dataset complet, sortie full_dataset_with_prompt|without_prompt")
+    parser.add_argument("--without_prompt", action="store_true", help="Question seule (pas de prompt spatial)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_new_tokens", type=int, default=1024)
     args = parser.parse_args()
@@ -60,19 +64,24 @@ def main():
     output_dir = Path(config.get("output", {}).get("dir", "results"))
     benchmark = "3dsrbench"
     model_name = "llava4d"
+    use_prompt = not args.without_prompt
 
     if eval_cfg.get("use_tf32", False) and torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = output_dir / "runs" / benchmark / "llava4d" / timestamp
+    if args.full_dataset:
+        subdir = f"full_dataset_{'with_prompt' if use_prompt else 'without_prompt'}"
+    else:
+        subdir = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = output_dir / "runs" / benchmark / "llava4d" / subdir
     run_dir.mkdir(parents=True, exist_ok=True)
     responses_dir = run_dir / "responses"
     responses_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Loading {benchmark}... (seed={args.seed})")
-    dataset = load_benchmark(benchmark, max_samples=args.max_samples, seed=args.seed)
+    max_samples = None if args.full_dataset else args.max_samples
+    print(f"Loading {benchmark}... (max_samples={'all' if args.full_dataset else max_samples}, seed={args.seed})")
+    dataset = load_benchmark(benchmark, max_samples=max_samples, seed=args.seed)
     print(f"  {len(dataset)} samples")
 
     m_cfg = config.get("models", {}).get("llava4d", {})
@@ -102,7 +111,7 @@ def main():
             details.append({"idx": i, "error": "no_image", "gt": gt, "category_gt": gt_cat})
             continue
 
-        full_prompt = build_spatial_prompt(query)
+        full_prompt = query if args.without_prompt else build_spatial_prompt(query)
 
         try:
             response = runner.generate(
@@ -160,6 +169,7 @@ def main():
     with open(run_dir / "results.json", "w", encoding="utf-8") as f:
         json.dump({
             "model": model_name,
+            "prompt_variant": "without_prompt" if args.without_prompt else "with_prompt",
             "accuracy": acc,
             "n": len(details),
             "pred_distribution": pred_dist,

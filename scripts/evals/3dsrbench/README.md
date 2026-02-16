@@ -20,6 +20,11 @@ L'agent **infère lui-même** la catégorie (STEP 1 — TASK CLASSIFICATION). La
 # Exécute Qwen3, Sa2VA, LLaVA4D sur le dataset complet (sans --max_samples)
 python scripts/evals/3dsrbench/run_all_models_full.py
 python scripts/evals/3dsrbench/run_all_models_full.py --seed 42
+
+# Dataset complet + with/without prompt (6 runs, terminaux séparés)
+# Voir docs/experiments/baseline_experiments/single_agent/PUSH_PULL_3DSRBench_GPU.md
+python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --full_dataset
+python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --full_dataset --without_prompt
 ```
 
 ### Par modèle (test rapide ou ciblé)
