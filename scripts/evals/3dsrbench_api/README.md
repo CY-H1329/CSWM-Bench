@@ -20,12 +20,24 @@ pip install anthropic openai google-genai
 ## Usage
 
 ```bash
-# 100 samples (défaut)
+# 1000 samples (défaut), avec/sans prompt par modèle
 python scripts/evals/3dsrbench_api/run_eval_api.py
 
 # 50 samples
 python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 50
+
+# Dataset complet → sortie dans full_dataset/
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset
 ```
+
+## Coût estimé (API)
+
+| Dataset | Samples | 3 modèles × 2 variants (with/without prompt) |
+|---------|---------|---------------------------------------------|
+| 1000 samples (défaut) | 1000 | ~$20–50 (6 runs) |
+| Full (~2 700) | ~2 700 | ~$100–300 (6 runs) |
+
+Estimation par requête : ~1 500–2 000 tokens input (image + prompt), ~100 tokens output. Tarifs 2025 : GPT-4o $2.50/1M input, Claude $3/1M input, Gemini moins cher.
 
 ## Configuration
 
@@ -36,10 +48,12 @@ python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 50
 ## Sorties
 
 ```
-results/runs/3dsrbench/api_models/<timestamp>/
-├── claude_sonnet_4_5/
-├── gpt4o/
-├── deepseek_vl/
-├── gemini_robotics_er/
+results/runs/3dsrbench/api_models/<timestamp>/   # ou full_dataset/ si --full_dataset
+├── claude_sonnet_4_5_with_prompt/
+├── claude_sonnet_4_5_without_prompt/
+├── gpt4o_with_prompt/
+├── gpt4o_without_prompt/
+├── gemini_robotics_er_with_prompt/
+├── gemini_robotics_er_without_prompt/
 └── summary.txt
 ```
