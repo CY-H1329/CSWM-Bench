@@ -6,10 +6,10 @@ Multi-Agent System evaluation: Head → Perception → Reasoning.
 - Reasoning Agent: reçoit query + task_class + perception → answer
 
 Usage:
-  python run_eval_mas.py --benchmark stvqa7k --head qwen --perception qwen --reasoning qwen
-  python run_eval_mas.py --benchmark stvqa7k --head llava --perception llava --reasoning llava
-  python run_eval_mas.py --benchmark stvqa7k --head qwen --perception llava --reasoning qwen
-  python run_eval_mas.py --benchmark stvqa7k --max_per_category 8  # quick test
+  python run_eval_mas.py --benchmark 3dsrbench --head qwen --perception qwen --reasoning qwen
+  python run_eval_mas.py --benchmark 3dsrbench --head llava --perception llava --reasoning llava
+  python run_eval_mas.py --benchmark 3dsrbench --head qwen --perception llava --reasoning qwen
+  python run_eval_mas.py --benchmark 3dsrbench --max_per_category 8  # quick test
 """
 import argparse
 import json
@@ -126,7 +126,7 @@ def make_generate_fn(runner, eval_cfg: dict, use_mas_temperature: bool = True):
 def main():
     parser = argparse.ArgumentParser(description="MAS evaluation")
     parser.add_argument("--config", default="config.yaml")
-    parser.add_argument("--benchmark", default="stvqa7k", choices=["stvqa7k", "omni3d", "cvbench", "3dsrbench"])
+    parser.add_argument("--benchmark", default="3dsrbench", choices=["omni3d", "cvbench", "3dsrbench"])
     parser.add_argument(
         "--head", default="qwen3_4b",
         help="Head-Agent model: qwen, qwen3_4b, llava, llava4d, sa2va",
@@ -212,7 +212,7 @@ def main():
             )
             final = out["final_answer"]
             # Letter-based benchmarks: extract (A)/(B)/...
-            if args.benchmark in ("stvqa7k", "cvbench", "3dsrbench") and len(gt) == 1 and gt in "ABCDEF":
+            if args.benchmark in ("cvbench", "3dsrbench") and len(gt) == 1 and gt in "ABCDEF":
                 letter = normalize_answer_only(final)
             else:
                 # Free-form: take last line or strip "Answer:"
@@ -239,7 +239,7 @@ def main():
             details.append({"idx": i, "error": str(e)})
 
     # Compute accuracy
-    if args.benchmark in ("stvqa7k", "cvbench", "3dsrbench"):
+    if args.benchmark in ("cvbench", "3dsrbench"):
         acc = accuracy(preds, gt_list)
     else:
         # Omni3D: normalize for comparison (lowercase, strip)

@@ -24,15 +24,6 @@ SPATIAL_TASK_CATEGORIES = [
 ]
 
 BENCHMARK_CONFIGS = {
-    "stvqa7k": {
-        "name": "OX-PIXL/STVQA-7K",
-        "split": "val",
-        "image_key": "images",
-        "question_key": "question_only",
-        "options_key": "options",
-        "answer_key": "answer_only",
-        "category_key": "category",
-    },
     "omni3d": {
         "name": "dmarsili/Omni3D-Bench",
         "split": "train",

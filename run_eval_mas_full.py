@@ -6,8 +6,8 @@ MAS 전체 평가: Qwen3 X3, Sa2VA X3, LLaVA4D X3
 - 각 단계(Head, Perception, Reasoning) 결과를 text로 저장
 
 Usage:
-  python run_eval_mas_full.py --benchmark stvqa7k
-  python run_eval_mas_full.py --benchmark stvqa7k --seed 42
+  python run_eval_mas_full.py --benchmark 3dsrbench
+  python run_eval_mas_full.py --benchmark 3dsrbench --seed 42
 """
 import argparse
 import gc
@@ -211,7 +211,7 @@ def run_single_combination(
                 reasoning_model_fn=reas_gen,
             )
             final = out["final_answer"]
-            if args.benchmark in ("stvqa7k", "cvbench", "3dsrbench") and len(gt) == 1 and gt in "ABCDEF":
+            if args.benchmark in ("cvbench", "3dsrbench") and len(gt) == 1 and gt in "ABCDEF":
                 letter = normalize_answer_only(final)
             else:
                 letter = final.strip()
@@ -262,7 +262,7 @@ def run_single_combination(
             by_category[category]["gts"].append(gt)
 
     # Compute accuracy
-    if args.benchmark in ("stvqa7k", "cvbench", "3dsrbench"):
+    if args.benchmark in ("cvbench", "3dsrbench"):
         acc = accuracy(preds, gt_list)
     else:
         def _norm(s):
@@ -278,7 +278,7 @@ def run_single_combination(
         if not d["gts"]:
             by_category_acc[cat] = {"accuracy": 0.0, "total": 0, "correct": 0}
             continue
-        if args.benchmark in ("stvqa7k", "cvbench", "3dsrbench"):
+        if args.benchmark in ("cvbench", "3dsrbench"):
             correct = sum(1 for p, g in zip(d["preds"], d["gts"]) if p == g)
         else:
             correct = sum(1 for p, g in zip(d["preds"], d["gts"]) if _norm(p) == _norm(g))
@@ -306,7 +306,7 @@ def run_single_combination(
 def main():
     parser = argparse.ArgumentParser(description="MAS full evaluation: Qwen3 X3, Sa2VA X3, LLaVA4D X3")
     parser.add_argument("--config", default="config.yaml")
-    parser.add_argument("--benchmark", default="stvqa7k", choices=["stvqa7k", "omni3d", "cvbench", "3dsrbench"])
+    parser.add_argument("--benchmark", default="3dsrbench", choices=["omni3d", "cvbench", "3dsrbench"])
     parser.add_argument("--seed", type=int, default=None, help="Dataset seed (default: config eval.mas_seed)")
     args = parser.parse_args()
 

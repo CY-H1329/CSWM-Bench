@@ -2,10 +2,10 @@
 # Override on H100: set CUDA_VISIBLE_DEVICES, model paths, GEMINI_API_KEY
 
 dataset:
-  name: "OX-PIXL/STVQA-7K"  # or hunarbatra/STVQA-7K
-  split: "val"               # val (692) for quick eval; "train" for full 6895
-  max_samples: null          # null = all; set e.g. 100 for debugging
-  max_per_category: 7       # 카테고리별 샘플 수 (빠른 테스트용). 9카테고리×7=63개
+  benchmark: "3dsrbench"    # 3dsrbench, cvbench, omni3d
+  split: "test"
+  max_samples: null         # null = all; set e.g. 100 for debugging
+  max_per_category: null   # per-category cap (optional)
 
 eval:
   batch_size: 1              # VLM inference usually 1

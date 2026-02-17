@@ -7,7 +7,7 @@ et réutilisés automatiquement ensuite.
 
 Usage:
   python scripts/setup_datasets.py
-  python scripts/setup_datasets.py --benchmarks stvqa7k omni3d  # subset
+  python scripts/setup_datasets.py --benchmarks 3dsrbench omni3d  # subset
 """
 import argparse
 import os
@@ -19,11 +19,6 @@ CACHE_DIR = os.environ.get("HF_DATASETS_CACHE", os.path.expanduser("~/.cache/hug
 
 
 BENCHMARKS = {
-    "stvqa7k": {
-        "name": "OX-PIXL/STVQA-7K",
-        "split": "val",
-        "desc": "STVQA-7K (Spatial VQA, 692 val)",
-    },
     "omni3d": {
         "name": "dmarsili/Omni3D-Bench",
         "split": "train",

@@ -1,4 +1,4 @@
-# Spatial_MAS: STVQA-7K evaluation (Qwen, LLaVA, GPT)
+# Spatial_MAS: Spatial reasoning evaluation (3DSRBench, CV-Bench, OMNI3D)
 # Conda env for local setup; run on JupyterHub H100 with same deps
 name: spatial_mas
 channels:
