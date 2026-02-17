@@ -14,7 +14,37 @@ python scripts/evals/gqa/explore_categories.py --max_samples 5000
 
 ---
 
-## Two terminals: with_prompt vs without_prompt
+## Push / Pull
+
+See **docs/experiments/baseline_experiments/single_agent/PUSH_PULL_GQA.md** for full workflow.
+
+---
+
+## Test (30 samples) — verify before full run
+
+### Terminal 1 — WITH prompt
+```bash
+cd /path/to/Spatial_MAS
+conda activate spatial_mas
+
+python scripts/evals/gqa/run_eval_gqa_qwen3.py --max_samples 30
+python scripts/evals/gqa/run_eval_gqa_sa2va.py --max_samples 30
+python scripts/evals/gqa/run_eval_gqa_llava4d.py --max_samples 30
+```
+
+### Terminal 2 — WITHOUT prompt
+```bash
+cd /path/to/Spatial_MAS
+conda activate spatial_mas
+
+python scripts/evals/gqa/run_eval_gqa_qwen3.py --max_samples 30 --without_prompt
+python scripts/evals/gqa/run_eval_gqa_sa2va.py --max_samples 30 --without_prompt
+python scripts/evals/gqa/run_eval_gqa_llava4d.py --max_samples 30 --without_prompt
+```
+
+---
+
+## Full dataset — Two terminals: with_prompt vs without_prompt
 
 Run in **parallel** (two terminals) to speed up.
 

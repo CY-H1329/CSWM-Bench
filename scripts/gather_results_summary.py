@@ -63,6 +63,24 @@ def gather_results(results_dir: Path, summary_root: Path) -> int:
                         print(f"  {src.relative_to(results_dir)} -> {dst.relative_to(ROOT)}")
                         n += 1
 
+    # GQA GPU
+    gqa_base = results_dir / "runs" / "gqa"
+    if gqa_base.exists():
+        for model in ["qwen3_4b", "sa2va", "llava4d"]:
+            model_dir = gqa_base / model
+            if not model_dir.exists():
+                continue
+            for run_dir in model_dir.iterdir():
+                if run_dir.is_dir():
+                    for fname in ["results.json"]:
+                        src = run_dir / fname
+                        if src.exists():
+                            dst = summary_root / "gqa" / "gpu" / model / run_dir.name / fname
+                            dst.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(src, dst)
+                            print(f"  {src.relative_to(results_dir)} -> {dst.relative_to(ROOT)}")
+                            n += 1
+
     return n
 
 
@@ -87,6 +105,7 @@ Aggregated results for paper submission. Raw data in `results/` on H100.
 
 - `3dsrbench/api_models/` — Claude, GPT-4o, Gemini (category CSV, summary)
 - `3dsrbench/gpu/` — Qwen3, Sa2VA, LLaVA4D (results.json per run)
+- `gqa/gpu/` — Qwen3, Sa2VA, LLaVA4D (results.json per run)
 """, encoding="utf-8")
     print(f"  {readme.relative_to(ROOT)}")
 
