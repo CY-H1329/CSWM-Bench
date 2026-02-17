@@ -1,6 +1,1 @@
-{
-  "runs": [
-    {"name": "claude_sonnet_4_5_with_prompt", "path": "claude_sonnet_4_5_with_prompt"},
-    {"name": "claude_sonnet_4_5_without_prompt", "path": "claude_sonnet_4_5_without_prompt"}
-  ]
-}
+{"runs":[{"name":"claude_sonnet_4_5_with_prompt","path":"claude_sonnet_4_5_with_prompt/claude_sonnet_4_5_with_prompt"},{"name":"claude_sonnet_4_5_without_prompt","path":"claude_sonnet_4_5_without_prompt/claude_sonnet_4_5_without_prompt"}]}
