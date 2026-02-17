@@ -59,6 +59,8 @@ python run_eval_mas.py --benchmark 3dsrbench --head qwen3_4b --perception qwen3_
 | [docs/EXPERIMENT_SETUP.md](docs/EXPERIMENT_SETUP.md) | Experiment structure, reproducibility |
 | [docs/DATASETS.md](docs/DATASETS.md) | Per-dataset details and usage |
 | [docs/BASELINE_EXPERIMENTS.md](docs/BASELINE_EXPERIMENTS.md) | Baseline experiments, commands, per-model summary |
+| [docs/RESULTS_STRUCTURE.md](docs/RESULTS_STRUCTURE.md) | Results folder structure, gather script |
+| [docs/H100_PUSH_RESULTS.md](docs/H100_PUSH_RESULTS.md) | H100: push results to GitHub |
 
 ---
 
