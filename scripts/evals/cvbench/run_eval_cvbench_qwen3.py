@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-GQA evaluation — LLaVA4D only.
+CV-Bench evaluation — Qwen3-4B only.
 Full dataset, with/without spatial prompt.
 
 Usage:
-  python scripts/evals/gqa/run_eval_gqa_llava4d.py --full_dataset
-  python scripts/evals/gqa/run_eval_gqa_llava4d.py --full_dataset --without_prompt
+  python scripts/evals/cvbench/run_eval_cvbench_qwen3.py --max_samples 30
+  python scripts/evals/cvbench/run_eval_cvbench_qwen3.py --full_dataset
+  python scripts/evals/cvbench/run_eval_cvbench_qwen3.py --full_dataset --without_prompt
 """
 import argparse
 import gc
@@ -28,17 +29,17 @@ from src.benchmarks import (
     get_benchmark_image,
     get_benchmark_category,
 )
-from src.data import normalize_answer_freeform, accuracy_freeform, extract_predicted_category
-from src.benchmarks.loaders import GQA_SEMANTIC_CATEGORIES
-from src.models.llava import LLaVARunner
+from src.data import normalize_answer_only, accuracy, extract_predicted_category
+from src.models.qwen3 import Qwen3Runner
 
 import importlib.util
 _spec = importlib.util.spec_from_file_location("common", Path(__file__).parent / "common.py")
 _common = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_common)
 build_spatial_prompt = _common.build_spatial_prompt
+CVBENCH_TASK_CATEGORIES = _common.CVBENCH_TASK_CATEGORIES
 
-GQA_CATS = frozenset(c.lower().replace(" ", "_") for c in GQA_SEMANTIC_CATEGORIES)
+CVBENCH_CATS = frozenset(c.lower().replace(" ", "_") for c in CVBENCH_TASK_CATEGORIES)
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -48,7 +49,7 @@ def load_config(path: str = "config.yaml") -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GQA eval — LLaVA4D only")
+    parser = argparse.ArgumentParser(description="CV-Bench eval — Qwen3-4B only")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--full_dataset", action="store_true")
@@ -60,8 +61,8 @@ def main():
     config = load_config(args.config)
     eval_cfg = config.get("eval", {})
     output_dir = Path(config.get("output", {}).get("dir", "results"))
-    benchmark = "gqa"
-    model_name = "llava4d"
+    benchmark = "cvbench"
+    model_name = "qwen3_4b"
     use_prompt = not args.without_prompt
 
     if eval_cfg.get("use_tf32", False) and torch.cuda.is_available():
@@ -72,7 +73,7 @@ def main():
         subdir = f"full_dataset_{'with_prompt' if use_prompt else 'without_prompt'}"
     else:
         subdir = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = output_dir / "runs" / benchmark / "llava4d" / subdir
+    run_dir = output_dir / "runs" / benchmark / "qwen3_4b" / subdir
     run_dir.mkdir(parents=True, exist_ok=True)
     responses_dir = run_dir / "responses"
     responses_dir.mkdir(parents=True, exist_ok=True)
@@ -82,12 +83,13 @@ def main():
     dataset = load_benchmark(benchmark, max_samples=max_samples, seed=args.seed)
     print(f"  {len(dataset)} samples")
 
-    m_cfg = config.get("models", {}).get("llava4d", {})
+    m_cfg = config.get("models", {}).get("qwen3_4b", {})
     if not m_cfg.get("enabled", True):
-        raise RuntimeError("llava4d is disabled in config")
-    runner = LLaVARunner(
-        model_id=m_cfg.get("model_id", "llava-hf/llava-v1.6-mistral-7b-hf"),
+        raise RuntimeError("qwen3_4b is disabled in config")
+    runner = Qwen3Runner(
+        model_id=m_cfg.get("model_id", "Qwen/Qwen3-VL-4B-Instruct"),
         device=m_cfg.get("device", "cuda"),
+        use_flash_attn=eval_cfg.get("use_flash_attn", True),
     )
     print(f"  [load] {model_name} ({runner.model_id})")
 
@@ -101,11 +103,11 @@ def main():
         query = get_benchmark_prompt(example, benchmark)
         gt = get_benchmark_answer(example, benchmark)
         category = get_benchmark_category(example, benchmark) or "unknown"
-        gt_cat = str(category).strip().lower() if category and category != "unknown" else ""
 
         if image is None:
             preds.append("")
             gt_list.append(gt)
+            gt_cat = str(category).strip().lower().replace(" ", "_") if category and category != "unknown" else ""
             details.append({"idx": i, "error": "no_image", "gt": gt, "category_gt": gt_cat})
             continue
 
@@ -118,15 +120,16 @@ def main():
                 temperature=eval_cfg.get("mas_temperature", 0.0),
                 max_new_tokens=args.max_new_tokens,
             )
-            pred = normalize_answer_freeform(response)
-            pred_category = extract_predicted_category(response, GQA_CATS)
-            preds.append(pred)
+            letter = normalize_answer_only(response)
+            pred_category = extract_predicted_category(response, CVBENCH_CATS)
+            gt_cat = str(category).strip().lower().replace(" ", "_") if category and category != "unknown" else ""
+            preds.append(letter)
             gt_list.append(gt)
             details.append({
                 "idx": i,
                 "query": query,
                 "gt": gt,
-                "pred": pred,
+                "pred": letter,
                 "category": category,
                 "category_gt": gt_cat,
                 "pred_category": pred_category,
@@ -135,15 +138,16 @@ def main():
             with open(responses_dir / f"sample_{i:05d}.txt", "w", encoding="utf-8") as f:
                 f.write("=== QUERY ===\n" + query + "\n\n=== GT ===\n" + gt + "\n\n")
                 f.write("=== CATEGORY GT / PRED ===\n" + f"{gt_cat} / {pred_category}\n\n")
-                f.write("=== FULL RESPONSE ===\n" + response + "\n\n=== EXTRACTED PRED ===\n" + pred + "\n")
+                f.write("=== FULL RESPONSE ===\n" + response + "\n\n=== EXTRACTED PRED ===\n" + letter + "\n")
         except Exception as e:
             preds.append("")
             gt_list.append(gt)
+            gt_cat = str(category).strip().lower().replace(" ", "_") if category and category != "unknown" else ""
             details.append({"idx": i, "error": str(e), "gt": gt, "category_gt": gt_cat})
 
-    acc = accuracy_freeform(preds, gt_list)
+    acc = accuracy(preds, gt_list)
     cat_pairs = [(d.get("category_gt", ""), d.get("pred_category", "")) for d in details if d.get("category_gt")]
-    cat_cls_acc = accuracy_freeform([p[1] for p in cat_pairs], [p[0] for p in cat_pairs]) if cat_pairs else 0.0
+    cat_cls_acc = accuracy([p[1] for p in cat_pairs], [p[0] for p in cat_pairs]) if cat_pairs else 0.0
 
     with open(run_dir / "details.jsonl", "w", encoding="utf-8") as f:
         for d in details:
@@ -161,7 +165,7 @@ def main():
         }, f, indent=2)
 
     print("\n" + "=" * 50)
-    print("GQA — LLaVA4D")
+    print("CV-Bench — Qwen3-4B")
     print("=" * 50)
     print(f"Answer Accuracy: {acc:.4f} ({len(details)} samples)")
     print(f"Category Cls Accuracy: {cat_cls_acc:.4f} ({len(cat_pairs)} samples)")

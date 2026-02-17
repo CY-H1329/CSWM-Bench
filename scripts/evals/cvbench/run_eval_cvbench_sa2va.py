@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-GQA evaluation — Sa2VA-4B only.
+CV-Bench evaluation — Sa2VA-4B only.
 Full dataset, with/without spatial prompt.
 
 Usage:
-  python scripts/evals/gqa/run_eval_gqa_sa2va.py --full_dataset
-  python scripts/evals/gqa/run_eval_gqa_sa2va.py --full_dataset --without_prompt
+  python scripts/evals/cvbench/run_eval_cvbench_sa2va.py --max_samples 30
+  python scripts/evals/cvbench/run_eval_cvbench_sa2va.py --full_dataset
+  python scripts/evals/cvbench/run_eval_cvbench_sa2va.py --full_dataset --without_prompt
 """
 import argparse
 import gc
@@ -28,8 +29,7 @@ from src.benchmarks import (
     get_benchmark_image,
     get_benchmark_category,
 )
-from src.data import normalize_answer_freeform, accuracy_freeform, extract_predicted_category
-from src.benchmarks.loaders import GQA_SEMANTIC_CATEGORIES
+from src.data import normalize_answer_only, accuracy, extract_predicted_category
 from src.models.sa2va import Sa2VARunner
 
 import importlib.util
@@ -37,8 +37,9 @@ _spec = importlib.util.spec_from_file_location("common", Path(__file__).parent /
 _common = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_common)
 build_spatial_prompt = _common.build_spatial_prompt
+CVBENCH_TASK_CATEGORIES = _common.CVBENCH_TASK_CATEGORIES
 
-GQA_CATS = frozenset(c.lower().replace(" ", "_") for c in GQA_SEMANTIC_CATEGORIES)
+CVBENCH_CATS = frozenset(c.lower().replace(" ", "_") for c in CVBENCH_TASK_CATEGORIES)
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -48,7 +49,7 @@ def load_config(path: str = "config.yaml") -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GQA eval — Sa2VA only")
+    parser = argparse.ArgumentParser(description="CV-Bench eval — Sa2VA only")
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--full_dataset", action="store_true")
@@ -60,7 +61,7 @@ def main():
     config = load_config(args.config)
     eval_cfg = config.get("eval", {})
     output_dir = Path(config.get("output", {}).get("dir", "results"))
-    benchmark = "gqa"
+    benchmark = "cvbench"
     model_name = "sa2va"
     use_prompt = not args.without_prompt
 
@@ -102,11 +103,11 @@ def main():
         query = get_benchmark_prompt(example, benchmark)
         gt = get_benchmark_answer(example, benchmark)
         category = get_benchmark_category(example, benchmark) or "unknown"
-        gt_cat = str(category).strip().lower() if category and category != "unknown" else ""
 
         if image is None:
             preds.append("")
             gt_list.append(gt)
+            gt_cat = str(category).strip().lower().replace(" ", "_") if category and category != "unknown" else ""
             details.append({"idx": i, "error": "no_image", "gt": gt, "category_gt": gt_cat})
             continue
 
@@ -119,15 +120,16 @@ def main():
                 temperature=eval_cfg.get("mas_temperature", 0.0),
                 max_new_tokens=args.max_new_tokens,
             )
-            pred = normalize_answer_freeform(response)
-            pred_category = extract_predicted_category(response, GQA_CATS)
-            preds.append(pred)
+            letter = normalize_answer_only(response)
+            pred_category = extract_predicted_category(response, CVBENCH_CATS)
+            gt_cat = str(category).strip().lower().replace(" ", "_") if category and category != "unknown" else ""
+            preds.append(letter)
             gt_list.append(gt)
             details.append({
                 "idx": i,
                 "query": query,
                 "gt": gt,
-                "pred": pred,
+                "pred": letter,
                 "category": category,
                 "category_gt": gt_cat,
                 "pred_category": pred_category,
@@ -136,15 +138,16 @@ def main():
             with open(responses_dir / f"sample_{i:05d}.txt", "w", encoding="utf-8") as f:
                 f.write("=== QUERY ===\n" + query + "\n\n=== GT ===\n" + gt + "\n\n")
                 f.write("=== CATEGORY GT / PRED ===\n" + f"{gt_cat} / {pred_category}\n\n")
-                f.write("=== FULL RESPONSE ===\n" + response + "\n\n=== EXTRACTED PRED ===\n" + pred + "\n")
+                f.write("=== FULL RESPONSE ===\n" + response + "\n\n=== EXTRACTED PRED ===\n" + letter + "\n")
         except Exception as e:
             preds.append("")
             gt_list.append(gt)
+            gt_cat = str(category).strip().lower().replace(" ", "_") if category and category != "unknown" else ""
             details.append({"idx": i, "error": str(e), "gt": gt, "category_gt": gt_cat})
 
-    acc = accuracy_freeform(preds, gt_list)
+    acc = accuracy(preds, gt_list)
     cat_pairs = [(d.get("category_gt", ""), d.get("pred_category", "")) for d in details if d.get("category_gt")]
-    cat_cls_acc = accuracy_freeform([p[1] for p in cat_pairs], [p[0] for p in cat_pairs]) if cat_pairs else 0.0
+    cat_cls_acc = accuracy([p[1] for p in cat_pairs], [p[0] for p in cat_pairs]) if cat_pairs else 0.0
 
     with open(run_dir / "details.jsonl", "w", encoding="utf-8") as f:
         for d in details:
@@ -162,7 +165,7 @@ def main():
         }, f, indent=2)
 
     print("\n" + "=" * 50)
-    print("GQA — Sa2VA-4B")
+    print("CV-Bench — Sa2VA-4B")
     print("=" * 50)
     print(f"Answer Accuracy: {acc:.4f} ({len(details)} samples)")
     print(f"Category Cls Accuracy: {cat_cls_acc:.4f} ({len(cat_pairs)} samples)")

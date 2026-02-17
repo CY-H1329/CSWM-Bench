@@ -7,7 +7,7 @@ et réutilisés automatiquement ensuite.
 
 Usage:
   python scripts/setup_datasets.py
-  python scripts/setup_datasets.py --benchmarks 3dsrbench gqa  # subset
+  python scripts/setup_datasets.py --benchmarks 3dsrbench cvbench  # subset
 """
 import argparse
 import os
@@ -19,11 +19,6 @@ CACHE_DIR = os.environ.get("HF_DATASETS_CACHE", os.path.expanduser("~/.cache/hug
 
 
 BENCHMARKS = {
-    "gqa": {
-        "name": "lmms-lab/GQA",
-        "split": "validation",
-        "desc": "GQA (visual reasoning, validation)",
-    },
     "cvbench": {
         "name": "nyu-visionx/CV-Bench",
         "split": "test",

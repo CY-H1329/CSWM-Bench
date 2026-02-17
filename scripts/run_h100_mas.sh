@@ -2,7 +2,7 @@
 # Run Multi-Agent System evaluation on H100
 # Usage:
 #   bash scripts/run_h100_mas.sh                    # default: 3dsrbench, qwen_qwen_qwen
-#   bash scripts/run_h100_mas.sh gqa qwen llava qwen
+#   bash scripts/run_h100_mas.sh cvbench qwen llava qwen
 #   bash scripts/run_h100_mas.sh 3dsrbench qwen qwen qwen --max_per_category 10
 
 set -e

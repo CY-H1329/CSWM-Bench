@@ -33,7 +33,7 @@ For H100 or other CUDA 12.x GPUs, you may need to modify `environment.yml` to us
 ```bash
 python scripts/setup_datasets.py
 # Or specific benchmarks:
-python scripts/setup_datasets.py --benchmarks 3dsrbench cvbench gqa
+python scripts/setup_datasets.py --benchmarks 3dsrbench cvbench
 ```
 
 Datasets are cached in `~/.cache/huggingface/datasets/` and reused automatically.

@@ -306,7 +306,7 @@ def run_single_combination(
 def main():
     parser = argparse.ArgumentParser(description="MAS full evaluation: Qwen3 X3, Sa2VA X3, LLaVA4D X3")
     parser.add_argument("--config", default="config.yaml")
-    parser.add_argument("--benchmark", default="3dsrbench", choices=["gqa", "cvbench", "3dsrbench"])
+    parser.add_argument("--benchmark", default="3dsrbench", choices=["cvbench", "3dsrbench"])
     parser.add_argument("--seed", type=int, default=None, help="Dataset seed (default: config eval.mas_seed)")
     args = parser.parse_args()
 

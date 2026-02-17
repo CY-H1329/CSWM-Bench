@@ -57,7 +57,7 @@ python run_eval_mas.py --benchmark stvqa7k --head qwen3_4b --perception qwen3_4b
 python run_eval_mas_full.py --benchmark stvqa7k
 ```
 
-- `--benchmark`: gqa, cvbench, 3dsrbench
+- `--benchmark`: cvbench, 3dsrbench
 - `--seed`: 데이터 샘플링 시드 (기본: config `mas_seed`)
 
 ### 출력 구조

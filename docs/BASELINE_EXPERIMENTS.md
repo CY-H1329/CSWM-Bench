@@ -60,16 +60,15 @@ python run_eval_mas_full.py --benchmark 3dsrbench
 | Dataset | GPU models | API models | MAS |
 |---------|------------|------------|-----|
 | 3DSRBench | ✓ (Qwen3, Sa2VA, LLaVA4D) | ✓ (Claude, GPT-4o, Gemini) | ✓ |
-| CV-Bench | — | — | ✓ |
-| GQA | — | — | ✓ |
+| CV-Bench | ✓ (Qwen3, Sa2VA, LLaVA4D) | — | ✓ |
 
 ## Per-model summary
 
-| Model | 3DSRBench | CV-Bench | GQA |
-|-------|-----------|----------|--------|
-| Qwen3-4B | GPU + MAS | MAS | MAS |
-| Sa2VA-4B | GPU + MAS | MAS | MAS |
-| LLaVA4D | GPU + MAS | MAS | MAS |
+| Model | 3DSRBench | CV-Bench |
+|-------|-----------|----------|
+| Qwen3-4B | GPU + MAS | GPU + MAS |
+| Sa2VA-4B | GPU + MAS | GPU + MAS |
+| LLaVA4D | GPU + MAS | GPU + MAS |
 | Claude Sonnet 4.5 | API | — | — |
 | GPT-4o | API | — | — |
 | Gemini | API | — | — |
