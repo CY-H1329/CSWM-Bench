@@ -30,6 +30,7 @@
 | Doc | Description |
 |-----|-------------|
 | [EXECUTION_GUIDE.md](EXECUTION_GUIDE.md) | Scripts by role, commands, prompts |
+| [COMMANDS_REFERENCE.md](COMMANDS_REFERENCE.md) | All commands (per-model, all-in-one, with/without prompt) |
 | [GITHUB_AND_H100.md](GITHUB_AND_H100.md) | GitHub & H100 (legacy, see GIT_AND_SERVER) |
 
 ## Experiments (detailed)

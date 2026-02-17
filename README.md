@@ -55,6 +55,7 @@ python scripts/evals/cvbench/run_all_models_full.py
 
 | Document | Description |
 |----------|-------------|
+| [COMMANDS_REFERENCE](docs/COMMANDS_REFERENCE.md) | All commands (per-model, all-in-one, with/without prompt) |
 | [ENVIRONMENT](docs/ENVIRONMENT.md) | Setup, installation, API keys |
 | [GIT_AND_SERVER](docs/GIT_AND_SERVER.md) | Git workflow, H100 setup |
 | [METHODOLOGY](docs/METHODOLOGY.md) | Benchmarks, evaluation protocol |
