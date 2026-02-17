@@ -1,0 +1,10 @@
+{
+  "runs": [
+    {"name": "qwen3_4b_with_prompt", "path": "qwen3_4b/20260215_082913"},
+    {"name": "qwen3_4b_without_prompt", "path": "qwen3_4b/full_dataset_without_prompt"},
+    {"name": "llava4d_with_prompt", "path": "llava4d/20260216_081426"},
+    {"name": "llava4d_without_prompt", "path": "llava4d/full_dataset_without_prompt"},
+    {"name": "sa2va_with_prompt", "path": "sa2va/20260215_235003"},
+    {"name": "sa2va_without_prompt", "path": "sa2va/full_dataset_without_prompt"}
+  ]
+}

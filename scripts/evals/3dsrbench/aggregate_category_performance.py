@@ -14,6 +14,9 @@ Usage:
   # GPU (qwen3_4b, llava4d, sa2va avec full_dataset_with/without_prompt)
   python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/runs/3dsrbench --mode gpu
 
+  # GPU — 6 runs exacts (éditer runs_gpu_6.json pour les chemins)
+  python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/runs/3dsrbench --runs_file scripts/evals/3dsrbench/runs_gpu_6.json
+
   # Auto (trouve tous les details.jsonl récursivement)
   python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/runs/3dsrbench --mode auto
 
@@ -55,7 +58,7 @@ def load_details(path: Path) -> List[dict]:
     return out
 
 
-def compute_per_category(details: list[dict]) -> dict[str, dict]:
+def compute_per_category(details: List[dict]) -> dict:
     """Compute accuracy per category. Returns {category: {correct, total, accuracy}}."""
     by_cat = defaultdict(lambda: {"correct": 0, "total": 0})
     for d in details:
@@ -83,7 +86,27 @@ def compute_per_category(details: list[dict]) -> dict[str, dict]:
     return result
 
 
-def find_run_dirs(base: Path, mode: str) -> list[tuple[str, Path]]:
+def load_runs_from_file(runs_file: Path, base_dir: Path) -> List[tuple]:
+    """Load runs from JSON: [{"name": "...", "path": "..."}]. Paths relative to base_dir."""
+    with open(runs_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    runs = []
+    base_dir = Path(base_dir).resolve()
+    for r in data.get("runs", []):
+        name = r.get("name", "")
+        path_str = r.get("path", "")
+        if not name or not path_str:
+            continue
+        full_path = (base_dir / path_str).resolve()
+        details_path = full_path / "details.jsonl"
+        if not details_path.exists():
+            print(f"[!] Ignoré (details.jsonl absent): {path_str}")
+            continue
+        runs.append((name, details_path))
+    return runs
+
+
+def find_run_dirs(base: Path, mode: str) -> List[tuple[str, Path]]:
     """
     Find all (model_name, details_path) under base.
     Returns list of (model_name, path_to_details.jsonl).
@@ -148,6 +171,11 @@ def main():
         default=None,
         help="Répertoire de sortie (défaut: --dir)",
     )
+    parser.add_argument(
+        "--runs_file",
+        default=None,
+        help="JSON avec 6 runs exacts (name, path). Paths relatifs à --dir. Ex: scripts/evals/3dsrbench/runs_gpu_6.json",
+    )
     args = parser.parse_args()
 
     base = Path(args.dir)
@@ -178,7 +206,17 @@ def main():
     else:
         run_dir = base
 
-    runs = find_run_dirs(run_dir, args.mode)
+    if args.runs_file:
+        runs_file = Path(args.runs_file)
+        if not runs_file.exists():
+            root = Path(__file__).resolve().parents[2]
+            runs_file = root / args.runs_file
+        if not runs_file.exists():
+            print(f"[ERREUR] --runs_file introuvable: {args.runs_file}")
+            return 1
+        runs = load_runs_from_file(runs_file, base)
+    else:
+        runs = find_run_dirs(run_dir, args.mode)
     if not runs:
         print(f"[ERREUR] Aucun details.jsonl trouvé sous {run_dir}")
         print("  Vérifiez --dir et --mode")

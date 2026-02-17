@@ -28,6 +28,9 @@ python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/r
 # GPU
 python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/runs/3dsrbench --mode gpu
 
+# GPU — 6 runs exacts (éditer runs_gpu_6.json pour vos chemins)
+python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/runs/3dsrbench --runs_file scripts/evals/3dsrbench/runs_gpu_6.json
+
 # Auto (recherche récursive de tous les details.jsonl)
 python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/runs/3dsrbench --mode auto
 
