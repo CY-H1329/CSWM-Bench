@@ -18,9 +18,11 @@ Les scripts Python sont à la racine du projet. Ce dossier documente leur organi
 | 3DSRBench Full (3 modèles) | `3dsrbench/run_all_models_full.py` | `python scripts/evals/3dsrbench/run_all_models_full.py` |
 | **3DSRBench API** (100 samples) | `3dsrbench_api/run_eval_api.py` | `python scripts/evals/3dsrbench_api/run_eval_api.py` |
 | **CV-Bench** | `cvbench/run_eval_cvbench_*.py` | `python scripts/evals/cvbench/run_eval_cvbench_qwen3.py`, etc. |
+| **CV-Bench API** | `cvbench_api/run_eval_api.py` | `python scripts/evals/cvbench_api/run_eval_api.py --test` / `--full_dataset` |
 
 **3DSRBench** : GPU (Qwen3, Sa2VA, LLaVA4D) — exécution séparée recommandée.  
-**3DSRBench API** : Claude 3.5 Sonnet, GPT-4o, DeepSeek-VL, Gemini — 100 samples, séparé du code GPU.  
-**CV-Bench** : Qwen3, Sa2VA, LLaVA4D — full_dataset, with_prompt / without_prompt. Voir `cvbench/README.md`.
+**3DSRBench API** : Claude, GPT-4o, Gemini — 100 samples.  
+**CV-Bench** : Qwen3, Sa2VA, LLaVA4D — full_dataset, with_prompt / without_prompt. Voir `cvbench/README.md`.  
+**CV-Bench API** : Claude, GPT-4o, Gemini — `--test` (10 samples) / `--full_dataset`. Voir `cvbench_api/README.md`.
 
 Voir **[docs/EXECUTION_GUIDE.md](../../docs/EXECUTION_GUIDE.md)** pour les détails, prompts et commandes complètes.

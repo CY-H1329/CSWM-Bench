@@ -81,6 +81,31 @@ def gather_results(results_dir: Path, summary_root: Path) -> int:
                             print(f"  {src.relative_to(results_dir)} -> {dst.relative_to(ROOT)}")
                             n += 1
 
+    # CV-Bench API
+    cvbench_api_base = results_dir / "runs" / "cvbench" / "api_models"
+    if cvbench_api_base.exists():
+        for sub in sorted(cvbench_api_base.iterdir(), key=lambda p: p.name, reverse=True):
+            if not sub.is_dir():
+                continue
+            for run_sub in sub.iterdir():
+                if run_sub.is_dir():
+                    for fname in ["results.json"]:
+                        src = run_sub / fname
+                        if src.exists():
+                            dst = summary_root / "cvbench" / "api_models" / sub.name / run_sub.name / fname
+                            dst.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(src, dst)
+                            print(f"  {src.relative_to(results_dir)} -> {dst.relative_to(ROOT)}")
+                            n += 1
+            for fname in ["summary.txt"]:
+                src = sub / fname
+                if src.exists():
+                    dst = summary_root / "cvbench" / "api_models" / sub.name / fname
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dst)
+                    print(f"  {src.relative_to(results_dir)} -> {dst.relative_to(ROOT)}")
+                    n += 1
+
     return n
 
 
@@ -106,6 +131,7 @@ Aggregated results for paper submission. Raw data in `results/` on H100.
 - `3dsrbench/api_models/` — Claude, GPT-4o, Gemini (category CSV, summary)
 - `3dsrbench/gpu/` — Qwen3, Sa2VA, LLaVA4D (results.json per run)
 - `cvbench/gpu/` — Qwen3, Sa2VA, LLaVA4D (results.json per run)
+- `cvbench/api_models/` — Claude, GPT-4o, Gemini (results.json, summary.txt)
 """, encoding="utf-8")
     print(f"  {readme.relative_to(ROOT)}")
 

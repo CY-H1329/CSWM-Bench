@@ -1,0 +1,26 @@
+# CV-Bench API models — Claude Sonnet 4.5, GPT-4o, Gemini Robotics-ER
+# API keys: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY (or GOOGLE_API_KEY)
+
+dataset:
+  name: "nyu-visionx/CV-Bench"
+  split: "test"
+  test_samples: 10      # Free API test (무료 한도 테스트)
+  max_samples: 2638    # Full dataset
+  seed: 42
+
+models:
+  claude_sonnet_4_5:
+    enabled: true
+    model_id: "claude-sonnet-4-5-20250929"
+    api_key_env: "ANTHROPIC_API_KEY"
+  gpt4o:
+    enabled: true
+    model_id: "gpt-4o"
+    api_key_env: "OPENAI_API_KEY"
+  gemini_robotics_er:
+    enabled: true
+    model_id: "gemini-2.0-flash"   # Free tier. Use gemini-robotics-er when available.
+    api_key_env: "GEMINI_API_KEY"
+
+output:
+  dir: "results"
