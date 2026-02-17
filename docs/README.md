@@ -6,6 +6,7 @@
 |-----|-------------|
 | [ENVIRONMENT.md](ENVIRONMENT.md) | Environment setup, installation, API keys |
 | [GIT_AND_SERVER.md](GIT_AND_SERVER.md) | Git workflow, clone, push/pull, H100 setup |
+| [GITHUB_PREPARATION.md](GITHUB_PREPARATION.md) | GitHub 업로드: 포함 파일, 코멘트, 명령어 정리 |
 
 ## Methodology & Experiments
 
