@@ -111,14 +111,20 @@ def main():
         run_dir = output_dir / "runs" / "3dsrbench" / "api_models" / subdir
         run_dir.mkdir(parents=True, exist_ok=True)
 
+    if use_resume:
+        start_idx = args.start_idx
+        end_idx = args.end_idx
+    else:
+        start_idx = 0
+        end_idx = None  # set after load
+
     print(f"Loading 3DSRBench... (max_samples={'all' if use_full else max_samples}, seed={seed})")
     dataset = load_benchmark("3dsrbench", max_samples=max_samples, seed=seed)
     print(f"  {len(dataset)} samples")
     if use_resume:
         print(f"  Reprise: indices {start_idx} à {end_idx - 1} ({end_idx - start_idx} samples)")
-
-    start_idx = args.start_idx if use_resume else 0
-    end_idx = args.end_idx if use_resume else len(dataset)
+    else:
+        end_idx = len(dataset)
     if use_resume:
         if "claude" in resume_path.name:
             model_keys = ["claude_sonnet_4_5"]
