@@ -68,12 +68,16 @@ def _parse_category_gt_from_sample(path: Path) -> Tuple[int, str]:
     m = re.search(r"sample_(\d+)\.txt", path.name)
     idx = int(m.group(1)) if m else -1
     category_gt = ""
-    for part in text.split("=== "):
-        if part.startswith("CATEGORY GT / PRED ==="):
-            line = part.replace("CATEGORY GT / PRED ===\n", "").split("\n\n=== ")[0].strip()
-            if " / " in line:
-                category_gt = line.split(" / ", 1)[0].strip()
-            break
+    # Chercher "=== CATEGORY GT / PRED ===" puis la ligne suivante (format: "height_higher / " ou "height_higher /")
+    match = re.search(r"=== CATEGORY GT / PRED ===\s*\n\s*([^\n]+)", text)
+    if match:
+        line = match.group(1).strip()
+        if " /" in line:
+            category_gt = line.split(" /", 1)[0].strip()
+        elif " / " in line:
+            category_gt = line.split(" / ", 1)[0].strip()
+        elif line:
+            category_gt = line.rstrip("/ ").strip()
     return (idx, category_gt)
 
 
@@ -92,11 +96,24 @@ def enrich_details_from_responses(details: List[dict], details_path: Path, model
     need_enrich = any(not d.get("category_gt", "").strip() for d in details)
     if not need_enrich:
         return details
-    responses_dir = details_path.parent / "responses"
-    if not responses_dir.exists():
-        return details
-    idx2cat = _load_category_gt_from_responses(responses_dir)
+    # Essayer flat puis nested: .../run/responses/ ou .../run/run/responses/
+    candidates = [
+        details_path.parent.parent / "responses",    # flat: run/responses/ (API standard)
+        details_path.parent / "responses",           # nested: run/run/responses/
+    ]
+    idx2cat = {}
+    for resp_dir in candidates:
+        if resp_dir.exists():
+            idx2cat = _load_category_gt_from_responses(resp_dir)
+            if idx2cat:
+                break
     if not idx2cat:
+        r0, r1 = candidates[0], candidates[1]
+        info = f"  [!] {model_name}: responses/ vide. Essayer: {r0} ou {r1}"
+        if r0.exists():
+            n = len(list(r0.glob("sample_*.txt")))
+            info += f" ({n} fichiers, category_gt non extrait?)"
+        print(info)
         return details
     n = 0
     for d in details:
