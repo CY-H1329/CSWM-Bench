@@ -25,9 +25,13 @@ Usage:
 """
 import argparse
 import json
+import sys
 from pathlib import Path
 from collections import defaultdict
-from typing import List
+from typing import List, Optional
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
 # 12 catégories 3DSRBench (ordre canonique)
 CATEGORIES = [
@@ -56,6 +60,46 @@ def load_details(path: Path) -> List[dict]:
                 continue
             out.append(json.loads(line))
     return out
+
+
+def _get_idx_to_category(seed: int = 42) -> Optional[dict]:
+    """Load 3DSRBench and return {idx: normalized_category}. Lazy, cached."""
+    if not hasattr(_get_idx_to_category, "_cache"):
+        try:
+            from src.benchmarks import load_benchmark, get_benchmark_category
+            from src.data import normalize_category
+            ds = load_benchmark("3dsrbench", max_samples=None, seed=seed)
+            out = {}
+            for i in range(len(ds)):
+                ex = ds[i]
+                cat = get_benchmark_category(ex, "3dsrbench") or "unknown"
+                norm = normalize_category(cat) if cat and cat != "unknown" else ""
+                out[i] = norm
+            _get_idx_to_category._cache = out
+        except Exception as e:
+            print(f"[!] Impossible de charger 3DSRBench pour enrichir category_gt: {e}")
+            _get_idx_to_category._cache = None
+    return _get_idx_to_category._cache
+
+
+def enrich_details_with_categories(details: List[dict], model_name: str = "") -> List[dict]:
+    """Remplit category_gt vide à partir du benchmark 3DSRBench (idx → category)."""
+    need_enrich = any(not d.get("category_gt", "").strip() for d in details)
+    if not need_enrich:
+        return details
+    idx2cat = _get_idx_to_category()
+    if not idx2cat:
+        return details
+    n = 0
+    for d in details:
+        if not d.get("category_gt", "").strip():
+            idx = d.get("idx", -1)
+            if idx in idx2cat and idx2cat[idx]:
+                d["category_gt"] = idx2cat[idx]
+                n += 1
+    if n:
+        print(f"  [i] {model_name}: {n} category_gt complétés depuis le benchmark")
+    return details
 
 
 def compute_per_category(details: List[dict]) -> dict:
@@ -245,6 +289,7 @@ def main():
     all_results = {}
     for model_name, details_path in runs:
         details = load_details(details_path)
+        details = enrich_details_with_categories(details, model_name)
         per_cat = compute_per_category(details)
         total_with_cat = sum(v["total"] for v in per_cat.values())
         if total_with_cat == 0:
