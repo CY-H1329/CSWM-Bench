@@ -236,7 +236,10 @@ def main():
     # Build output
     out_dir = Path(args.output_dir) if args.output_dir else run_dir
     out_csv = Path(args.output) if args.output else out_dir / "category_performance.csv"
-    out_json = out_dir / "category_performance.json"
+    if args.output and str(out_csv).endswith(".csv"):
+        out_json = out_csv.with_suffix(".json")
+    else:
+        out_json = out_dir / "category_performance.json"
 
     # CSV: rows = (model, category, accuracy, correct, total)
     rows = []

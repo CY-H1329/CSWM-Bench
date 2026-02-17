@@ -1,0 +1,6 @@
+{
+  "runs": [
+    {"name": "gemini_robotics_er_with_prompt", "path": "gemini_robotics_er_with_prompt"},
+    {"name": "gemini_robotics_er_without_prompt", "path": "gemini_robotics_er_without_prompt"}
+  ]
+}

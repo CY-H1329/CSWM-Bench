@@ -1,0 +1,8 @@
+{
+  "runs": [
+    {"name": "gpt4o_with_prompt_1", "path": "gpt4o_with_prompt_1"},
+    {"name": "gpt4o_with_prompt_2", "path": "gpt4o_with_prompt_2"},
+    {"name": "gpt4o_without_prompt_1", "path": "gpt4o_without_prompt_1"},
+    {"name": "gpt4o_without_prompt_2", "path": "gpt4o_without_prompt_2"}
+  ]
+}

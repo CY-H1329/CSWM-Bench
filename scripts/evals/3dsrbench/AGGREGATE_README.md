@@ -31,6 +31,15 @@ python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/r
 # GPU — 6 runs exacts (éditer runs_gpu_6.json pour vos chemins)
 python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/runs/3dsrbench --runs_file scripts/evals/3dsrbench/runs_gpu_6.json
 
+# API — par modèle (quand Claude pas encore fini)
+API_DIR="results/runs/3dsrbench/api_models/20260216_121420"
+python scripts/evals/3dsrbench/aggregate_category_performance.py --dir $API_DIR --runs_file scripts/evals/3dsrbench/runs_api_gpt4o.json --output $API_DIR/category_gpt4o.csv
+python scripts/evals/3dsrbench/aggregate_category_performance.py --dir $API_DIR --runs_file scripts/evals/3dsrbench/runs_api_gemini.json --output $API_DIR/category_gemini.csv
+python scripts/evals/3dsrbench/aggregate_category_performance.py --dir $API_DIR --runs_file scripts/evals/3dsrbench/runs_api_claude.json --output $API_DIR/category_claude.csv
+
+# API — tous (quand Claude fini)
+python scripts/evals/3dsrbench/aggregate_category_performance.py --dir $API_DIR --runs_file scripts/evals/3dsrbench/runs_api_all.json
+
 # Auto (recherche récursive de tous les details.jsonl)
 python scripts/evals/3dsrbench/aggregate_category_performance.py --dir results/runs/3dsrbench --mode auto
 
