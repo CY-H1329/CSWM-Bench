@@ -52,15 +52,15 @@ python run_eval_mas.py --benchmark 3dsrbench --head qwen3_4b --perception qwen3_
 
 ## Documentation
 
+→ **[docs/README.md](docs/README.md)** — Full index
+
 | Document | Description |
 |----------|-------------|
-| [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) | Environment setup, installation, API keys |
-| [docs/METHODOLOGY.md](docs/METHODOLOGY.md) | Methodology, benchmarks, evaluation protocol |
-| [docs/EXPERIMENT_SETUP.md](docs/EXPERIMENT_SETUP.md) | Experiment structure, reproducibility |
-| [docs/DATASETS.md](docs/DATASETS.md) | Per-dataset details and usage |
-| [docs/BASELINE_EXPERIMENTS.md](docs/BASELINE_EXPERIMENTS.md) | Baseline experiments, commands, per-model summary |
-| [docs/RESULTS_STRUCTURE.md](docs/RESULTS_STRUCTURE.md) | Results folder structure, gather script |
-| [docs/H100_PUSH_RESULTS.md](docs/H100_PUSH_RESULTS.md) | H100: push results to GitHub |
+| [ENVIRONMENT](docs/ENVIRONMENT.md) | Setup, installation, API keys |
+| [GIT_AND_SERVER](docs/GIT_AND_SERVER.md) | Git workflow, H100 setup |
+| [METHODOLOGY](docs/METHODOLOGY.md) | Benchmarks, evaluation protocol |
+| [BASELINE_EXPERIMENTS](docs/BASELINE_EXPERIMENTS.md) | Experiments, commands |
+| [RESULTS](docs/RESULTS_STRUCTURE.md) | Results structure, gather script |
 
 ---
 
@@ -68,20 +68,20 @@ python run_eval_mas.py --benchmark 3dsrbench --head qwen3_4b --perception qwen3_
 
 ```
 Spatial_MAS/
-├── config.yaml              # Config (benchmark, models, eval)
-├── run_eval_mas.py          # MAS pipeline
-├── run_eval_mas_full.py     # MAS full (all model combos)
-├── run_eval_single_3dsrbench.py  # 3DSRBench GPU (all models)
+├── config.yaml
+├── run_eval_mas.py              # MAS pipeline
+├── run_eval_mas_full.py         # MAS full
+├── run_eval_single_3dsrbench.py # 3DSRBench GPU
+├── results_summary/             # Aggregated results (tracked)
 ├── scripts/
-│   ├── evals/
-│   │   ├── 3dsrbench/       # 3DSRBench GPU (per-model)
-│   │   └── 3dsrbench_api/   # 3DSRBench API (Claude, GPT-4o, Gemini)
+│   ├── evals/3dsrbench/         # GPU (Qwen3, Sa2VA, LLaVA4D)
+│   ├── evals/3dsrbench_api/     # API (Claude, GPT-4o, Gemini)
+│   ├── gather_results_summary.py
 │   └── setup_datasets.py
-├── src/
-│   ├── benchmarks/         # Dataset loaders
-│   ├── models/             # Model runners
-│   └── agents/             # MAS prompts
-└── docs/
+├── src/benchmarks/              # Dataset loaders
+├── src/models/                  # Model runners
+├── src/agents/                  # MAS prompts
+└── docs/                        # Documentation (see docs/README.md)
 ```
 
 ---
@@ -89,9 +89,8 @@ Spatial_MAS/
 ## GitHub & remote server
 
 - **Push**: `git push origin main`
-- **Pull on server**: `git pull origin main`
-- See [docs/PUSH_PULL_WORKFLOW.md](docs/PUSH_PULL_WORKFLOW.md) for sync workflow.
-- See [docs/GITHUB_AND_H100.md](docs/GITHUB_AND_H100.md) for H100 setup.
+- **Pull**: `git pull origin main`
+- See [docs/GIT_AND_SERVER.md](docs/GIT_AND_SERVER.md) for setup and workflow.
 
 ---
 
