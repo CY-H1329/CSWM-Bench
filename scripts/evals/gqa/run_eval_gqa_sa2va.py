@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""
+GQA evaluation — Sa2VA-4B only.
+Full dataset, with/without spatial prompt.
+
+Usage:
+  python scripts/evals/gqa/run_eval_gqa_sa2va.py --full_dataset
+  python scripts/evals/gqa/run_eval_gqa_sa2va.py --full_dataset --without_prompt
+"""
+import argparse
+import gc
+import json
+import sys
+from collections import Counter
+from pathlib import Path
+from datetime import datetime
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+import torch
+import yaml
+from tqdm import tqdm
+
+from src.benchmarks import (
+    load_benchmark,
+    get_benchmark_prompt,
+    get_benchmark_answer,
+    get_benchmark_image,
+    get_benchmark_category,
+)
+from src.data import normalize_answer_freeform, accuracy_freeform, extract_predicted_category
+from src.benchmarks.loaders import GQA_SEMANTIC_CATEGORIES
+from src.models.sa2va import Sa2VARunner
+
+import importlib.util
+_spec = importlib.util.spec_from_file_location("common", Path(__file__).parent / "common.py")
+_common = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_common)
+build_spatial_prompt = _common.build_spatial_prompt
+
+GQA_CATS = frozenset(c.lower().replace(" ", "_") for c in GQA_SEMANTIC_CATEGORIES)
+
+
+def load_config(path: str = "config.yaml") -> dict:
+    root = Path(__file__).resolve().parents[3]
+    with open(root / path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="GQA eval — Sa2VA only")
+    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--max_samples", type=int, default=None)
+    parser.add_argument("--full_dataset", action="store_true")
+    parser.add_argument("--without_prompt", action="store_true")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--max_new_tokens", type=int, default=1024)
+    args = parser.parse_args()
+
+    config = load_config(args.config)
+    eval_cfg = config.get("eval", {})
+    output_dir = Path(config.get("output", {}).get("dir", "results"))
+    benchmark = "gqa"
+    model_name = "sa2va"
+    use_prompt = not args.without_prompt
+
+    if eval_cfg.get("use_tf32", False) and torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+
+    if args.full_dataset:
+        subdir = f"full_dataset_{'with_prompt' if use_prompt else 'without_prompt'}"
+    else:
+        subdir = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = output_dir / "runs" / benchmark / "sa2va" / subdir
+    run_dir.mkdir(parents=True, exist_ok=True)
+    responses_dir = run_dir / "responses"
+    responses_dir.mkdir(parents=True, exist_ok=True)
+
+    max_samples = None if args.full_dataset else args.max_samples
+    print(f"Loading {benchmark}... (max_samples={'all' if args.full_dataset else max_samples}, seed={args.seed})")
+    dataset = load_benchmark(benchmark, max_samples=max_samples, seed=args.seed)
+    print(f"  {len(dataset)} samples")
+
+    m_cfg = config.get("models", {}).get("sa2va", {})
+    if not m_cfg.get("enabled", True):
+        raise RuntimeError("sa2va is disabled in config")
+    runner = Sa2VARunner(
+        model_id=m_cfg.get("model_id", "ByteDance/Sa2VA-4B"),
+        device=m_cfg.get("device", "cuda"),
+        use_flash_attn=m_cfg.get("use_flash_attn", False),
+    )
+    print(f"  [load] {model_name} ({runner.model_id})")
+
+    preds = []
+    gt_list = []
+    details = []
+
+    for i in tqdm(range(len(dataset)), desc=model_name):
+        example = dataset[i]
+        image = get_benchmark_image(example, benchmark)
+        query = get_benchmark_prompt(example, benchmark)
+        gt = get_benchmark_answer(example, benchmark)
+        category = get_benchmark_category(example, benchmark) or "unknown"
+        gt_cat = str(category).strip().lower() if category and category != "unknown" else ""
+
+        if image is None:
+            preds.append("")
+            gt_list.append(gt)
+            details.append({"idx": i, "error": "no_image", "gt": gt, "category_gt": gt_cat})
+            continue
+
+        full_prompt = query if args.without_prompt else build_spatial_prompt(query)
+
+        try:
+            response = runner.generate(
+                image,
+                full_prompt,
+                temperature=eval_cfg.get("mas_temperature", 0.0),
+                max_new_tokens=args.max_new_tokens,
+            )
+            pred = normalize_answer_freeform(response)
+            pred_category = extract_predicted_category(response, GQA_CATS)
+            preds.append(pred)
+            gt_list.append(gt)
+            details.append({
+                "idx": i,
+                "query": query,
+                "gt": gt,
+                "pred": pred,
+                "category": category,
+                "category_gt": gt_cat,
+                "pred_category": pred_category,
+                "full_response": response,
+            })
+            with open(responses_dir / f"sample_{i:05d}.txt", "w", encoding="utf-8") as f:
+                f.write("=== QUERY ===\n" + query + "\n\n=== GT ===\n" + gt + "\n\n")
+                f.write("=== CATEGORY GT / PRED ===\n" + f"{gt_cat} / {pred_category}\n\n")
+                f.write("=== FULL RESPONSE ===\n" + response + "\n\n=== EXTRACTED PRED ===\n" + pred + "\n")
+        except Exception as e:
+            preds.append("")
+            gt_list.append(gt)
+            details.append({"idx": i, "error": str(e), "gt": gt, "category_gt": gt_cat})
+
+    acc = accuracy_freeform(preds, gt_list)
+    cat_pairs = [(d.get("category_gt", ""), d.get("pred_category", "")) for d in details if d.get("category_gt")]
+    cat_cls_acc = accuracy_freeform([p[1] for p in cat_pairs], [p[0] for p in cat_pairs]) if cat_pairs else 0.0
+
+    with open(run_dir / "details.jsonl", "w", encoding="utf-8") as f:
+        for d in details:
+            f.write(json.dumps(d, ensure_ascii=False) + "\n")
+    pred_dist = dict(sorted(Counter(p for p in preds if p).items()))
+    with open(run_dir / "results.json", "w", encoding="utf-8") as f:
+        json.dump({
+            "model": model_name,
+            "prompt_variant": "without_prompt" if args.without_prompt else "with_prompt",
+            "accuracy": acc,
+            "n": len(details),
+            "pred_distribution": pred_dist,
+            "category_cls_accuracy": cat_cls_acc,
+            "category_cls_n": len(cat_pairs),
+        }, f, indent=2)
+
+    print("\n" + "=" * 50)
+    print("GQA — Sa2VA-4B")
+    print("=" * 50)
+    print(f"Answer Accuracy: {acc:.4f} ({len(details)} samples)")
+    print(f"Category Cls Accuracy: {cat_cls_acc:.4f} ({len(cat_pairs)} samples)")
+    print("=" * 50)
+    print(f"Results: {run_dir}")
+
+    for attr in ("model", "processor"):
+        if hasattr(runner, attr):
+            delattr(runner, attr)
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+if __name__ == "__main__":
+    main()

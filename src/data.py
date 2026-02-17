@@ -101,12 +101,32 @@ def normalize_answer_only(pred: str) -> str:
     return all_matches[-1] if all_matches else ""
 
 
+def normalize_answer_freeform(pred: str) -> str:
+    """Extract free-form answer from model output (for GQA, etc.). Returns normalized string."""
+    pred = (pred or "").strip()
+    # "Answer: X", "The answer is X", "Final Answer: X"
+    m = re.search(r"(?:ANSWER|FINAL\s*ANSWER|THE\s+ANSWER\s+IS)[:\s]+(.+?)(?:\n|$)", pred, re.I | re.DOTALL)
+    if m:
+        return m.group(1).strip().lower()
+    # Last non-empty line
+    lines = [l.strip() for l in pred.split("\n") if l.strip()]
+    return lines[-1].lower() if lines else ""
+
+
 def accuracy(pred_letters: list, gt_letters: list) -> float:
     """Accuracy from list of predicted and ground-truth answer letters."""
     assert len(pred_letters) == len(gt_letters)
     if not pred_letters:
         return 0.0
     return sum(p == g for p, g in zip(pred_letters, gt_letters)) / len(pred_letters)
+
+
+def accuracy_freeform(preds: list, gts: list) -> float:
+    """Accuracy for free-form answers (normalized: lowercase, strip)."""
+    assert len(preds) == len(gts)
+    if not preds:
+        return 0.0
+    return sum(str(p).strip().lower() == str(g).strip().lower() for p, g in zip(preds, gts)) / len(preds)
 
 
 # 3DSRBench fine-grained categories (for normalization)
@@ -129,23 +149,25 @@ def normalize_category(cat: str) -> str:
     return cat.strip()
 
 
-def extract_predicted_category(response: str) -> str:
-    """Extract Task Category from model output (STEP 1 classification)."""
+def extract_predicted_category(response: str, valid_cats: Optional[set] = None) -> str:
+    """Extract Task Category/Type from model output (STEP 1 classification)."""
     if not response or not response.strip():
         return ""
     text = response.strip()
-    # Match "Task Category:" or "Task Category" followed by category on same or next line
+    # Match "Task Category:" or "Task Type:" followed by category
     m = re.search(
-        r"Task\s*Category\s*:?\s*\n?\s*([A-Za-z][A-Za-z0-9_\s\-]*?)(?=\n\n|\nReasoning|\nStep-by-Step|$)",
+        r"Task\s*(?:Category|Type)\s*:?\s*\n?\s*([A-Za-z][A-Za-z0-9_\s\-]*?)(?=\n\n|\nReasoning|\nStep-by-Step|$)",
         text,
         re.DOTALL | re.IGNORECASE,
     )
     if m:
         raw = m.group(1).strip().lower().replace(" ", "_").replace("-", "_")
-        return raw if raw in _3DSRBENCH_CATS else raw
-    # Fallback: first line that matches one of the 12 categories
+        cats = valid_cats or _3DSRBENCH_CATS
+        return raw if raw in cats else raw
+    # Fallback: first line that matches a valid category
+    cats = valid_cats or _3DSRBENCH_CATS
     for line in text.split("\n"):
         line = line.strip().lower().replace(" ", "_").replace("-", "_")
-        if line in _3DSRBENCH_CATS:
+        if line in cats:
             return line
     return ""
