@@ -20,23 +20,81 @@ python scripts/setup_datasets.py
 
 ---
 
-## All-in-one
+## CV-Bench
 
-| Benchmark | GPU | API |
-|-----------|-----|-----|
-| 3DSRBench | `python scripts/evals/3dsrbench/run_all_models_full.py` | `python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset` |
-| CV-Bench | `python scripts/evals/cvbench/run_all_models_full.py` | `python scripts/evals/cvbench_api/run_eval_api.py --full_dataset` |
+### Per-model (with_prompt)
 
-For without_prompt: add `--without_prompt` (CV-Bench GPU). For 3DSRBench GPU without_prompt, run each model separately.
+| Model | Command |
+|-------|---------|
+| Qwen3-4B | `python scripts/evals/cvbench/run_eval_cvbench_qwen3.py --full_dataset` |
+| LLaVA4D | `python scripts/evals/cvbench/run_eval_cvbench_llava4d.py --full_dataset` |
+| Sa2VA | `python scripts/evals/cvbench/run_eval_cvbench_sa2va.py --full_dataset` |
+| GPT-4o | `python scripts/evals/cvbench_api/run_eval_api.py --full_dataset --model gpt4o --prompt_variant with_prompt` |
+| Claude Sonnet 4.5 | `python scripts/evals/cvbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5 --prompt_variant with_prompt` |
+| Gemini Robotics-ER | `python scripts/evals/cvbench_api/run_eval_api.py --full_dataset --model gemini_robotics_er --prompt_variant with_prompt` |
+
+### Per-model (without_prompt)
+
+| Model | Command |
+|-------|---------|
+| Qwen3-4B | `python scripts/evals/cvbench/run_eval_cvbench_qwen3.py --full_dataset --without_prompt` |
+| LLaVA4D | `python scripts/evals/cvbench/run_eval_cvbench_llava4d.py --full_dataset --without_prompt` |
+| Sa2VA | `python scripts/evals/cvbench/run_eval_cvbench_sa2va.py --full_dataset --without_prompt` |
+| GPT-4o | `python scripts/evals/cvbench_api/run_eval_api.py --full_dataset --model gpt4o --without_prompt` |
+| Claude Sonnet 4.5 | `python scripts/evals/cvbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5 --without_prompt` |
+| Gemini Robotics-ER | `python scripts/evals/cvbench_api/run_eval_api.py --full_dataset --model gemini_robotics_er --without_prompt` |
+
+### 3 opensource (GPU)
+
+| Variant | Command |
+|---------|---------|
+| with_prompt | `python scripts/evals/cvbench/run_all_models_full.py` |
+| without_prompt | `python scripts/evals/cvbench/run_all_models_full.py --without_prompt` |
+
+### 3 API
+
+| Variant | Command |
+|---------|---------|
+| with + without | `python scripts/evals/cvbench_api/run_eval_api.py --full_dataset` |
 
 ---
 
-## Per-model
+## 3DSRBench
 
-**GPU**: `run_eval_3dsrbench_*` / `run_eval_cvbench_*` — add `--without_prompt` for variant.  
-**API**: `run_eval_api.py --full_dataset --model {claude_sonnet_4_5,gpt4o,gemini_robotics_er}` — add `--prompt_variant with_prompt` or `--without_prompt`.
+### Per-model (with_prompt)
 
-See [COMMANDS_REFERENCE.md](COMMANDS_REFERENCE.md) for full list.
+| Model | Command |
+|-------|---------|
+| Qwen3-4B | `python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --full_dataset` |
+| LLaVA4D | `python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --full_dataset` |
+| Sa2VA | `python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py --full_dataset` |
+| GPT-4o | `python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt4o --prompt_variant with_prompt` |
+| Claude Sonnet 4.5 | `python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5 --prompt_variant with_prompt` |
+| Gemini Robotics-ER | `python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gemini_robotics_er --prompt_variant with_prompt` |
+
+### Per-model (without_prompt)
+
+| Model | Command |
+|-------|---------|
+| Qwen3-4B | `python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --full_dataset --without_prompt` |
+| LLaVA4D | `python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --full_dataset --without_prompt` |
+| Sa2VA | `python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py --full_dataset --without_prompt` |
+| GPT-4o | `python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt4o --without_prompt` |
+| Claude Sonnet 4.5 | `python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5 --without_prompt` |
+| Gemini Robotics-ER | `python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gemini_robotics_er --without_prompt` |
+
+### 3 opensource (GPU)
+
+| Variant | Command |
+|---------|---------|
+| with_prompt | `python scripts/evals/3dsrbench/run_all_models_full.py` |
+| without_prompt | Run each model separately with `--without_prompt` (no all-in-one script) |
+
+### 3 API
+
+| Variant | Command |
+|---------|---------|
+| with + without | `python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset` |
 
 ---
 
