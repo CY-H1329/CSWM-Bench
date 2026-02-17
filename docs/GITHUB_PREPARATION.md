@@ -11,9 +11,6 @@
 | 경로 | 설명 |
 |------|------|
 | `config.yaml` | 메인 설정 (benchmark, models, eval) |
-| `run_eval_mas.py` | MAS 파이프라인 |
-| `run_eval_mas_full.py` | MAS full |
-| `run_eval_single_3dsrbench.py` | 3DSRBench 단일 실행 |
 | `environment.yml` | Conda 환경 |
 | `requirements.txt` | pip 의존성 (있다면) |
 
@@ -210,6 +207,7 @@ scripts/evals/cvbench/
 ├── run_eval_cvbench_qwen3.py
 ├── run_eval_cvbench_sa2va.py
 ├── run_eval_cvbench_llava4d.py
+├── run_all_models_full.py
 └── README.md
 
 scripts/evals/cvbench_api/

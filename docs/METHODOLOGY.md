@@ -6,8 +6,7 @@ This document describes the methodology used in Spatial_MAS for evaluating spati
 
 Spatial_MAS evaluates multimodal models on spatial reasoning benchmarks through:
 
-1. **Single-agent evaluation**: One model per sample, direct comparison.
-2. **Multi-agent evaluation**: Multiple agents (vote or collaboration).
+1. **Single-agent baseline**: One model per sample, direct comparison (3DSRBench, CV-Bench).
 3. **MAS pipeline**: Head → Perception → Reasoning pipeline with specialized agents.
 
 ## Benchmarks

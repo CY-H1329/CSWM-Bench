@@ -1,47 +1,79 @@
 # Datasets
 
-This project uses the following benchmarks for spatial reasoning evaluation.
-
-## 3DSRBench
-
-- **HuggingFace**: [ccvl/3DSRBench](https://huggingface.co/datasets/ccvl/3DSRBench)
-- **Subset**: `benchmark`
-- **Split**: `test`
-- **Format**: Multiple choice (A/B/C/D), 12 fine-grained categories
-- **Samples**: ~5.1k
-
-### Categories (12)
-
-- location_above, height_higher, location_closer_to_camera
-- multi_object_closer_to, orientation_on_the_left, multi_object_facing
-- multi_object_same_direction, orientation_in_front_of
-- multi_object_viewpoint_towards_object, orientation_viewpoint
-- location_next_to, multi_object_parallel
-
-### Usage
-
-```bash
-# GPU models (Qwen3, Sa2VA, LLaVA4D)
-python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --full_dataset
-python scripts/evals/3dsrbench/run_eval_3dsrbench_sa2va.py --full_dataset
-python scripts/evals/3dsrbench/run_eval_3dsrbench_llava4d.py --full_dataset
-
-# API models (Claude, GPT-4o, Gemini)
-python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset
-```
+This document describes the benchmarks used for **spatial reasoning** evaluation, their characteristics, and why they were selected.
 
 ---
 
-## CV-Bench
+## Dataset Characteristics & Selection Rationale
 
-- **HuggingFace**: [nyu-visionx/CV-Bench](https://huggingface.co/datasets/nyu-visionx/CV-Bench)
-- **Split**: `test`
-- **Format**: Multiple choice (choices)
-- **Samples**: ~2.6k
+### 3DSRBench
 
-### Usage
+| Attribute | Value |
+|-----------|-------|
+| **HuggingFace** | [ccvl/3DSRBench](https://huggingface.co/datasets/ccvl/3DSRBench) |
+| **Split** | test |
+| **Samples** | ~5.1k |
+| **Format** | Multiple choice (A/B/C/D) |
+| **Categories** | 12 fine-grained (location, height, orientation, multi-object) |
+
+**Why selected for spatial reasoning research:**
+
+- **3D-centric**: Questions are explicitly designed for 3D spatial understanding (depth, occlusion, relative position, camera viewpoint).
+- **Fine-grained categories**: 12 task types cover location (above, closer, next_to), height comparison, orientation (left, front, viewpoint), and multi-object relations (parallel, facing, same_direction).
+- **Rigorous evaluation**: Multiple-choice format enables clear accuracy metrics; categories allow per-task analysis.
+- **Complementary to 2D**: Focuses on 3D spatial reasoning that 2D benchmarks often miss.
+
+---
+
+### CV-Bench
+
+| Attribute | Value |
+|-----------|-------|
+| **HuggingFace** | [nyu-visionx/CV-Bench](https://huggingface.co/datasets/nyu-visionx/CV-Bench) |
+| **Split** | test |
+| **Samples** | ~2.6k |
+| **Format** | Multiple choice (choices) |
+| **Tasks** | Count, Relation (2D); Depth, Distance (3D) |
+| **Sources** | ADE20K, COCO (2D); Omni3D (3D) |
+
+**Why selected for spatial reasoning research:**
+
+- **2D + 3D coverage**: Combines 2D spatial relationships & object counting (ADE20K, COCO) with 3D depth order & relative distance (Omni3D).
+- **Vision-centric**: From Cambrian-1 project; probes fundamental visual understanding (spatial layout, occlusion, counting, depth, distance).
+- **Diverse sources**: Repurposes standard vision benchmarks; natural language questions in multimodal context.
+- **Complements 3DSRBench**: 3DSRBench is 3D-focused; CV-Bench adds 2D spatial tasks and broader vision reasoning.
+
+---
+
+## Summary
+
+| Benchmark | 2D / 3D | Focus | Samples |
+|-----------|---------|-------|---------|
+| **3DSRBench** | 3D | Location, height, orientation, multi-object | ~5.1k |
+| **CV-Bench** | 2D + 3D | Count, Relation, Depth, Distance | ~2.6k |
+
+Together, 3DSRBench and CV-Bench provide a broad evaluation of spatial reasoning across 2D and 3D tasks.
+
+---
+
+## Usage
+
+### 3DSRBench
 
 ```bash
-python run_eval_mas.py --benchmark cvbench --head qwen3_4b --perception qwen3_4b --reasoning qwen3_4b
+# GPU
+python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --full_dataset
+
+# API
+python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5
 ```
 
+### CV-Bench
+
+```bash
+# GPU
+python scripts/evals/cvbench/run_eval_cvbench_qwen3.py --full_dataset
+
+# API
+python scripts/evals/cvbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5
+```

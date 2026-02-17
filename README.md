@@ -33,7 +33,7 @@ python scripts/setup_datasets.py
 
 **3DSRBench (GPU)**:
 ```bash
-python scripts/evals/3dsrbench/run_eval_3dsrbench_qwen3.py --full_dataset
+python scripts/evals/3dsrbench/run_all_models_full.py
 ```
 
 **3DSRBench (API)**:
@@ -42,9 +42,9 @@ export ANTHROPIC_API_KEY=sk-ant-...
 python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5
 ```
 
-**MAS pipeline**:
+**CV-Bench (GPU)**:
 ```bash
-python run_eval_mas.py --benchmark 3dsrbench --head qwen3_4b --perception qwen3_4b --reasoning qwen3_4b
+python scripts/evals/cvbench/run_all_models_full.py
 ```
 
 ---
@@ -68,18 +68,16 @@ python run_eval_mas.py --benchmark 3dsrbench --head qwen3_4b --perception qwen3_
 ```
 Spatial_MAS/
 ├── config.yaml
-├── run_eval_mas.py              # MAS pipeline
-├── run_eval_mas_full.py         # MAS full
-├── run_eval_single_3dsrbench.py # 3DSRBench GPU
 ├── results_summary/             # Aggregated results (tracked)
 ├── scripts/
 │   ├── evals/3dsrbench/         # GPU (Qwen3, Sa2VA, LLaVA4D)
 │   ├── evals/3dsrbench_api/     # API (Claude, GPT-4o, Gemini)
+│   ├── evals/cvbench/           # GPU
+│   ├── evals/cvbench_api/       # API
 │   ├── gather_results_summary.py
 │   └── setup_datasets.py
 ├── src/benchmarks/              # Dataset loaders
 ├── src/models/                  # Model runners
-├── src/agents/                  # MAS prompts
 └── docs/                        # Documentation (see docs/README.md)
 ```
 
@@ -90,16 +88,6 @@ Spatial_MAS/
 - **Push**: `git push origin main`
 - **Pull**: `git pull origin main`
 - See [docs/GIT_AND_SERVER.md](docs/GIT_AND_SERVER.md) for setup and workflow.
-
----
-
-## Legacy scripts (deprecated)
-
-The following scripts use the deprecated STVQA-7K format and are kept for backward compatibility:
-- `run_eval.py`, `run_eval_multiagent.py`, `run_eval_unified.py`, `run_eval_collab.py`
-- `analyze_failures.py`, `export_failed_samples.py`
-
-Use the 3DSRBench scripts and MAS pipeline instead.
 
 ---
 
