@@ -1,0 +1,7 @@
+# 3DSRBench — API Models (100 samples)
+
+| Model | Answer Acc | Category Cls Acc | N |
+|-------|------------|------------------|---|
+| claude_sonnet_4_5 | 0.7300 | 0.8800 | 100 |
+| gpt4o | 0.3800 | 0.2900 | 100 |
+| gemini_robotics_er | 0.7100 | 0.7800 | 100 |

@@ -1,0 +1,13 @@
+model,category,accuracy,correct,total
+claude_sonnet_4_5_with_prompt,location_above,0.7308,95,130
+claude_sonnet_4_5_with_prompt,height_higher,0.6741,91,135
+claude_sonnet_4_5_with_prompt,location_closer_to_camera,0.7842,109,139
+claude_sonnet_4_5_with_prompt,multi_object_closer_to,0.7200,54,75
+claude_sonnet_4_5_with_prompt,orientation_on_the_left,0.5636,31,55
+claude_sonnet_4_5_with_prompt,multi_object_facing,0.6250,40,64
+claude_sonnet_4_5_with_prompt,multi_object_same_direction,0.6087,42,69
+claude_sonnet_4_5_with_prompt,orientation_in_front_of,0.7714,54,70
+claude_sonnet_4_5_with_prompt,multi_object_viewpoint_towards_object,0.3538,23,65
+claude_sonnet_4_5_with_prompt,orientation_viewpoint,0.4516,28,62
+claude_sonnet_4_5_with_prompt,location_next_to,0.7887,56,71
+claude_sonnet_4_5_with_prompt,multi_object_parallel,0.6615,43,65

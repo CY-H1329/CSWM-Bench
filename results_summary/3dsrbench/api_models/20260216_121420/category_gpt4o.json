@@ -1,0 +1,126 @@
+{
+  "gpt4o_with_prompt_1": {
+    "location_above": {
+      "correct": 68,
+      "total": 130,
+      "accuracy": 0.5230769230769231
+    },
+    "height_higher": {
+      "correct": 33,
+      "total": 135,
+      "accuracy": 0.24444444444444444
+    },
+    "location_closer_to_camera": {
+      "correct": 62,
+      "total": 139,
+      "accuracy": 0.4460431654676259
+    },
+    "multi_object_closer_to": {
+      "correct": 35,
+      "total": 75,
+      "accuracy": 0.4666666666666667
+    },
+    "orientation_on_the_left": {
+      "correct": 22,
+      "total": 55,
+      "accuracy": 0.4
+    },
+    "multi_object_facing": {
+      "correct": 21,
+      "total": 64,
+      "accuracy": 0.328125
+    },
+    "multi_object_same_direction": {
+      "correct": 24,
+      "total": 69,
+      "accuracy": 0.34782608695652173
+    },
+    "orientation_in_front_of": {
+      "correct": 35,
+      "total": 70,
+      "accuracy": 0.5
+    },
+    "multi_object_viewpoint_towards_object": {
+      "correct": 14,
+      "total": 65,
+      "accuracy": 0.2153846153846154
+    },
+    "orientation_viewpoint": {
+      "correct": 16,
+      "total": 62,
+      "accuracy": 0.25806451612903225
+    },
+    "location_next_to": {
+      "correct": 29,
+      "total": 71,
+      "accuracy": 0.4084507042253521
+    },
+    "multi_object_parallel": {
+      "correct": 31,
+      "total": 65,
+      "accuracy": 0.47692307692307695
+    }
+  },
+  "gpt4o_without_prompt_1": {
+    "location_above": {
+      "correct": 90,
+      "total": 130,
+      "accuracy": 0.6923076923076923
+    },
+    "height_higher": {
+      "correct": 70,
+      "total": 135,
+      "accuracy": 0.5185185185185185
+    },
+    "location_closer_to_camera": {
+      "correct": 93,
+      "total": 139,
+      "accuracy": 0.6690647482014388
+    },
+    "multi_object_closer_to": {
+      "correct": 51,
+      "total": 75,
+      "accuracy": 0.68
+    },
+    "orientation_on_the_left": {
+      "correct": 35,
+      "total": 55,
+      "accuracy": 0.6363636363636364
+    },
+    "multi_object_facing": {
+      "correct": 27,
+      "total": 64,
+      "accuracy": 0.421875
+    },
+    "multi_object_same_direction": {
+      "correct": 33,
+      "total": 69,
+      "accuracy": 0.4782608695652174
+    },
+    "orientation_in_front_of": {
+      "correct": 45,
+      "total": 70,
+      "accuracy": 0.6428571428571429
+    },
+    "multi_object_viewpoint_towards_object": {
+      "correct": 25,
+      "total": 65,
+      "accuracy": 0.38461538461538464
+    },
+    "orientation_viewpoint": {
+      "correct": 31,
+      "total": 62,
+      "accuracy": 0.5
+    },
+    "location_next_to": {
+      "correct": 53,
+      "total": 71,
+      "accuracy": 0.7464788732394366
+    },
+    "multi_object_parallel": {
+      "correct": 35,
+      "total": 65,
+      "accuracy": 0.5384615384615384
+    }
+  }
+}

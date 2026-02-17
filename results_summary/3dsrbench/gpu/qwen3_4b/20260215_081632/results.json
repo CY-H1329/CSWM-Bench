@@ -1,0 +1,13 @@
+{
+  "model": "qwen3_4b",
+  "accuracy": 0.68,
+  "n": 50,
+  "pred_distribution": {
+    "A": 24,
+    "B": 24,
+    "C": 1,
+    "D": 1
+  },
+  "category_cls_accuracy": 0.36,
+  "category_cls_n": 50
+}

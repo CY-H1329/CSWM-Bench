@@ -1,0 +1,10 @@
+{
+  "model": "llava4d",
+  "accuracy": 0.52,
+  "n": 50,
+  "pred_distribution": {
+    "A": 28,
+    "B": 19,
+    "D": 1
+  }
+}

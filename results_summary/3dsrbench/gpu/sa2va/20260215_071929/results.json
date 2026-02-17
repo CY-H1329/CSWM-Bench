@@ -1,0 +1,10 @@
+{
+  "model": "sa2va",
+  "accuracy": 0.56,
+  "n": 50,
+  "pred_distribution": {
+    "A": 29,
+    "B": 19,
+    "C": 1
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "model": "llava4d",
+  "accuracy": 0.49641264300950166,
+  "n": 5157,
+  "pred_distribution": {
+    "A": 2587,
+    "B": 2408,
+    "C": 101,
+    "D": 61
+  },
+  "category_cls_accuracy": 0.3744425053325577,
+  "category_cls_n": 5157
+}

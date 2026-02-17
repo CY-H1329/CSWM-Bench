@@ -1,0 +1,11 @@
+# 3DSRBench — API Models (1000 samples)
+# Chaque modèle : with_prompt (spatial) et without_prompt (question seule)
+
+| Model | Answer Acc | Category Cls Acc | N |
+|-------|------------|------------------|---|
+| claude_sonnet_4_5_with_prompt | 0.3300 | 0.4380 | 1000 |
+| claude_sonnet_4_5_without_prompt | 0.0000 | 0.0000 | 1000 |
+| gpt4o_with_prompt | 0.3900 | 0.4130 | 1000 |
+| gpt4o_without_prompt | 0.5880 | 0.0000 | 1000 |
+| gemini_robotics_er_with_prompt | 0.6420 | 0.7090 | 1000 |
+| gemini_robotics_er_without_prompt | 0.4290 | 0.0000 | 1000 |

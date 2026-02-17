@@ -1,0 +1,11 @@
+{
+  "model": "qwen3_4b",
+  "accuracy": 0.68,
+  "n": 50,
+  "pred_distribution": {
+    "A": 21,
+    "B": 25,
+    "C": 2,
+    "D": 1
+  }
+}
