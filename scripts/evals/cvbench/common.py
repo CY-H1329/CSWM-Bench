@@ -5,13 +5,13 @@ Agent infers task category by itself.
 """
 from typing import Optional
 
-# CV-Bench task categories (run explore_categories.py to discover actual values)
-# Default from Cambrian paper: 2D (spatial, counting) + 3D (depth, distance)
+# CV-Bench task categories (from explore_categories.py)
+# 2D: Count, Relation | 3D: Depth, Distance
 CVBENCH_TASK_CATEGORIES = [
-    "spatial_relationship",
-    "object_counting",
-    "depth_order",
-    "relative_distance",
+    "Count",
+    "Relation",
+    "Depth",
+    "Distance",
 ]
 
 
