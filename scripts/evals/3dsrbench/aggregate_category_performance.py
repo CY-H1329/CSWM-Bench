@@ -87,7 +87,8 @@ def compute_per_category(details: List[dict]) -> dict:
 
 
 def load_runs_from_file(runs_file: Path, base_dir: Path) -> List[tuple]:
-    """Load runs from JSON: [{"name": "...", "path": "..."}]. Paths relative to base_dir."""
+    """Load runs from JSON: [{"name": "...", "path": "..."}]. Paths relative to base_dir.
+    Returns (name, details_path). Si path = A/B, essaie aussi A/ (flat vs nested)."""
     with open(runs_file, "r", encoding="utf-8") as f:
         data = json.load(f)
     runs = []
@@ -99,10 +100,15 @@ def load_runs_from_file(runs_file: Path, base_dir: Path) -> List[tuple]:
             continue
         full_path = (base_dir / path_str).resolve()
         details_path = full_path / "details.jsonl"
-        if not details_path.exists():
+        parent_path = full_path.parent / "details.jsonl" if full_path.parent != base_dir else None
+        # Priorité: path donné, puis parent (flat)
+        candidates = [details_path]
+        if parent_path and parent_path != details_path and parent_path.exists():
+            candidates.append(parent_path)
+        if not details_path.exists() and not (parent_path and parent_path.exists()):
             print(f"[!] Ignoré (details.jsonl absent): {path_str}")
             continue
-        runs.append((name, details_path))
+        runs.append((name, candidates))
     return runs
 
 
@@ -214,7 +220,15 @@ def main():
         if not runs_file.exists():
             print(f"[ERREUR] --runs_file introuvable: {args.runs_file}")
             return 1
-        runs = load_runs_from_file(runs_file, base)
+        raw_runs = load_runs_from_file(runs_file, base)
+        # Résoudre les candidats (path vs parent): prendre celui avec le plus de records
+        runs = []
+        for name, candidates in raw_runs:
+            paths = [c for c in (candidates if isinstance(candidates, list) else [candidates]) if c.exists()]
+            if not paths:
+                continue
+            best_path = max(paths, key=lambda p: sum(1 for d in load_details(p) if d.get("category_gt", "").strip()))
+            runs.append((name, best_path))
     else:
         runs = find_run_dirs(run_dir, args.mode)
     if not runs:
@@ -223,14 +237,19 @@ def main():
         return 1
 
     print(f"Trouvé {len(runs)} runs:")
-    for name, _ in runs:
-        print(f"  - {name}")
+    for name, details_path in runs:
+        n = sum(1 for d in load_details(details_path) if d.get("category_gt", "").strip())
+        print(f"  - {name} ({n} samples)")
 
     # Compute per-category for each model
     all_results = {}
     for model_name, details_path in runs:
         details = load_details(details_path)
         per_cat = compute_per_category(details)
+        total_with_cat = sum(v["total"] for v in per_cat.values())
+        if total_with_cat == 0:
+            print(f"[!] {model_name}: 0 samples avec category_gt dans {details_path}")
+            print(f"    Vérifiez que le run est terminé et que details.jsonl contient des prédictions.")
         all_results[model_name] = per_cat
 
     # Build output
