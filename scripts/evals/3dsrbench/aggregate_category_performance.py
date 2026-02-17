@@ -25,13 +25,10 @@ Usage:
 """
 import argparse
 import json
-import sys
+import re
 from pathlib import Path
 from collections import defaultdict
-from typing import List, Optional
-
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
+from typing import Dict, List, Optional, Tuple
 
 # 12 catégories 3DSRBench (ordre canonique)
 CATEGORIES = [
@@ -62,43 +59,54 @@ def load_details(path: Path) -> List[dict]:
     return out
 
 
-def _get_idx_to_category(seed: int = 42) -> Optional[dict]:
-    """Load 3DSRBench and return {idx: normalized_category}. Lazy, cached."""
-    if not hasattr(_get_idx_to_category, "_cache"):
-        try:
-            from src.benchmarks import load_benchmark, get_benchmark_category
-            from src.data import normalize_category
-            ds = load_benchmark("3dsrbench", max_samples=None, seed=seed)
-            out = {}
-            for i in range(len(ds)):
-                ex = ds[i]
-                cat = get_benchmark_category(ex, "3dsrbench") or "unknown"
-                norm = normalize_category(cat) if cat and cat != "unknown" else ""
-                out[i] = norm
-            _get_idx_to_category._cache = out
-        except Exception as e:
-            print(f"[!] Impossible de charger 3DSRBench pour enrichir category_gt: {e}")
-            _get_idx_to_category._cache = None
-    return _get_idx_to_category._cache
+def _parse_category_gt_from_sample(path: Path) -> Tuple[int, str]:
+    """Parse sample_XXXXX.txt, return (idx, category_gt). Category from '=== CATEGORY GT / PRED ==='."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return (-1, "")
+    m = re.search(r"sample_(\d+)\.txt", path.name)
+    idx = int(m.group(1)) if m else -1
+    category_gt = ""
+    for part in text.split("=== "):
+        if part.startswith("CATEGORY GT / PRED ==="):
+            line = part.replace("CATEGORY GT / PRED ===\n", "").split("\n\n=== ")[0].strip()
+            if " / " in line:
+                category_gt = line.split(" / ", 1)[0].strip()
+            break
+    return (idx, category_gt)
 
 
-def enrich_details_with_categories(details: List[dict], model_name: str = "") -> List[dict]:
-    """Remplit category_gt vide à partir du benchmark 3DSRBench (idx → category)."""
+def _load_category_gt_from_responses(responses_dir: Path) -> Dict[int, str]:
+    """Parse responses/sample_*.txt, return {idx: category_gt}."""
+    out = {}
+    for p in sorted(responses_dir.glob("sample_*.txt")):
+        idx, cat = _parse_category_gt_from_sample(p)
+        if idx >= 0 and cat:
+            out[idx] = cat
+    return out
+
+
+def enrich_details_from_responses(details: List[dict], details_path: Path, model_name: str = "") -> List[dict]:
+    """Remplit category_gt vide à partir de responses/sample_*.txt (ligne CATEGORY GT / PRED)."""
     need_enrich = any(not d.get("category_gt", "").strip() for d in details)
     if not need_enrich:
         return details
-    idx2cat = _get_idx_to_category()
+    responses_dir = details_path.parent / "responses"
+    if not responses_dir.exists():
+        return details
+    idx2cat = _load_category_gt_from_responses(responses_dir)
     if not idx2cat:
         return details
     n = 0
     for d in details:
         if not d.get("category_gt", "").strip():
             idx = d.get("idx", -1)
-            if idx in idx2cat and idx2cat[idx]:
+            if idx in idx2cat:
                 d["category_gt"] = idx2cat[idx]
                 n += 1
     if n:
-        print(f"  [i] {model_name}: {n} category_gt complétés depuis le benchmark")
+        print(f"  [i] {model_name}: {n} category_gt depuis responses/")
     return details
 
 
@@ -289,7 +297,7 @@ def main():
     all_results = {}
     for model_name, details_path in runs:
         details = load_details(details_path)
-        details = enrich_details_with_categories(details, model_name)
+        details = enrich_details_from_responses(details, details_path, model_name)
         per_cat = compute_per_category(details)
         total_with_cat = sum(v["total"] for v in per_cat.values())
         if total_with_cat == 0:
