@@ -1,6 +1,6 @@
 """
 Benchmark loaders for Spatial Reasoning evaluation.
-- OMNI3D-BENCH, CV-Bench, 3DSRBench
+- GQA, CV-Bench, 3DSRBench
 """
 from .loaders import (
     load_benchmark,

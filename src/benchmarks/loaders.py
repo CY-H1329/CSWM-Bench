@@ -24,9 +24,9 @@ SPATIAL_TASK_CATEGORIES = [
 ]
 
 BENCHMARK_CONFIGS = {
-    "omni3d": {
-        "name": "dmarsili/Omni3D-Bench",
-        "split": "train",
+    "gqa": {
+        "name": "lmms-lab/GQA",
+        "split": "validation",
         "image_key": "image",
         "question_key": "question",
         "answer_key": "answer",

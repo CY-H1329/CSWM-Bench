@@ -7,7 +7,7 @@ et réutilisés automatiquement ensuite.
 
 Usage:
   python scripts/setup_datasets.py
-  python scripts/setup_datasets.py --benchmarks 3dsrbench omni3d  # subset
+  python scripts/setup_datasets.py --benchmarks 3dsrbench gqa  # subset
 """
 import argparse
 import os
@@ -19,10 +19,10 @@ CACHE_DIR = os.environ.get("HF_DATASETS_CACHE", os.path.expanduser("~/.cache/hug
 
 
 BENCHMARKS = {
-    "omni3d": {
-        "name": "dmarsili/Omni3D-Bench",
-        "split": "train",
-        "desc": "OMNI3D-BENCH (501 samples)",
+    "gqa": {
+        "name": "lmms-lab/GQA",
+        "split": "validation",
+        "desc": "GQA (visual reasoning, validation)",
     },
     "cvbench": {
         "name": "nyu-visionx/CV-Bench",

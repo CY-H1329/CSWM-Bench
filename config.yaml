@@ -2,7 +2,7 @@
 # Override on H100: set CUDA_VISIBLE_DEVICES, model paths, GEMINI_API_KEY
 
 dataset:
-  benchmark: "3dsrbench"    # 3dsrbench, cvbench, omni3d
+  benchmark: "3dsrbench"    # 3dsrbench, cvbench, gqa
   split: "test"
   max_samples: null         # null = all; set e.g. 100 for debugging
   max_per_category: null   # per-category cap (optional)

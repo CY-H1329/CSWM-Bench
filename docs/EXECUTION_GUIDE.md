@@ -83,7 +83,7 @@ python run_eval_mas.py --benchmark stvqa7k --head llava4d --perception llava4d -
 python run_eval_mas.py --benchmark stvqa7k --head qwen3_4b --perception qwen3_4b --reasoning qwen3_4b --max_samples 100 --seed 123
 ```
 
-**Benchmarks** : `stvqa7k`, `omni3d`, `cvbench`, `3dsrbench`
+**Benchmarks** : `gqa`, `cvbench`, `3dsrbench`
 
 ### Prompts MAS (src/agents/prompts.yaml)
 
@@ -309,7 +309,7 @@ python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 50
 | Benchmark | Clé | Split | Options |
 |-----------|-----|-------|---------|
 | STVQA-7K | `stvqa7k` | val | Oui (A/B/C/D) |
-| Omni3D-Bench | `omni3d` | train | Non |
+| GQA | `gqa` | validation | Free-form |
 | CV-Bench | `cvbench` | test | Oui |
 | 3DSRBench | `3dsrbench` | test | Oui (A/B/C/D) |
 

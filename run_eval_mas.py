@@ -126,7 +126,7 @@ def make_generate_fn(runner, eval_cfg: dict, use_mas_temperature: bool = True):
 def main():
     parser = argparse.ArgumentParser(description="MAS evaluation")
     parser.add_argument("--config", default="config.yaml")
-    parser.add_argument("--benchmark", default="3dsrbench", choices=["omni3d", "cvbench", "3dsrbench"])
+    parser.add_argument("--benchmark", default="3dsrbench", choices=["gqa", "cvbench", "3dsrbench"])
     parser.add_argument(
         "--head", default="qwen3_4b",
         help="Head-Agent model: qwen, qwen3_4b, llava, llava4d, sa2va",

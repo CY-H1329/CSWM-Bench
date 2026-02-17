@@ -16,7 +16,7 @@ Spatial_MAS evaluates multimodal models on spatial reasoning benchmarks through:
 |-----------|-------------|-------|---------|
 | **3DSRBench** | 3D spatial reasoning (ccvl/3DSRBench) | test | A/B/C/D |
 | **CV-Bench** | Computer vision reasoning (nyu-visionx/CV-Bench) | test | Multiple choice |
-| **OMNI3D-BENCH** | 3D understanding (dmarsili/Omni3D-Bench) | train | Free-form |
+| **GQA** | Visual reasoning, compositional QA (lmms-lab/GQA) | validation | Free-form |
 
 ## Models
 

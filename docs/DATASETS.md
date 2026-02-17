@@ -47,21 +47,15 @@ python run_eval_mas.py --benchmark cvbench --head qwen3_4b --perception qwen3_4b
 
 ---
 
-## OMNI3D-BENCH
+## GQA
 
-- **HuggingFace**: [dmarsili/Omni3D-Bench](https://huggingface.co/datasets/dmarsili/Omni3D-Bench)
-- **Split**: `train`
-- **Format**: Free-form answer
-- **Samples**: ~501
+- **HuggingFace**: [lmms-lab/GQA](https://huggingface.co/datasets/lmms-lab/GQA)
+- **Split**: `validation`
+- **Format**: Free-form answer (normalized for comparison)
+- **Samples**: ~24M (use `--max_samples` for subset)
 
 ### Usage
 
 ```bash
-python run_eval_mas.py --benchmark omni3d --head qwen3_4b --perception qwen3_4b --reasoning qwen3_4b
+python run_eval_mas.py --benchmark gqa --head qwen3_4b --perception qwen3_4b --reasoning qwen3_4b --max_samples 1000
 ```
-
----
-
-## GQA (planned)
-
-GQA may be added in future experiments. Check the repository for updates.

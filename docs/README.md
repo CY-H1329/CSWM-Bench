@@ -13,7 +13,7 @@
 |-----|-------------|
 | [METHODOLOGY.md](METHODOLOGY.md) | Methodology, benchmarks, evaluation protocol |
 | [EXPERIMENT_SETUP.md](EXPERIMENT_SETUP.md) | Experiment structure, reproducibility |
-| [DATASETS.md](DATASETS.md) | Per-dataset details (3DSRBench, CV-Bench, OMNI3D) |
+| [DATASETS.md](DATASETS.md) | Per-dataset details (3DSRBench, CV-Bench, GQA) |
 | [BASELINE_EXPERIMENTS.md](BASELINE_EXPERIMENTS.md) | Baseline experiments, commands, per-model summary |
 
 ## Results

@@ -61,11 +61,11 @@ python run_eval_mas_full.py --benchmark 3dsrbench
 |---------|------------|------------|-----|
 | 3DSRBench | ✓ (Qwen3, Sa2VA, LLaVA4D) | ✓ (Claude, GPT-4o, Gemini) | ✓ |
 | CV-Bench | — | — | ✓ |
-| OMNI3D | — | — | ✓ |
+| GQA | — | — | ✓ |
 
 ## Per-model summary
 
-| Model | 3DSRBench | CV-Bench | OMNI3D |
+| Model | 3DSRBench | CV-Bench | GQA |
 |-------|-----------|----------|--------|
 | Qwen3-4B | GPU + MAS | MAS | MAS |
 | Sa2VA-4B | GPU + MAS | MAS | MAS |

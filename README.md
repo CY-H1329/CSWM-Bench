@@ -1,6 +1,6 @@
 # Spatial_MAS
 
-Spatial reasoning evaluation for vision-language models on **3DSRBench**, **CV-Bench**, and **OMNI3D-BENCH**.
+Spatial reasoning evaluation for vision-language models on **3DSRBench**, **CV-Bench**, and **GQA**.
 
 ## Benchmarks
 
@@ -8,7 +8,7 @@ Spatial reasoning evaluation for vision-language models on **3DSRBench**, **CV-B
 |-----------|-------------|------|
 | **3DSRBench** | 3D spatial reasoning (12 categories) | [ccvl/3DSRBench](https://huggingface.co/datasets/ccvl/3DSRBench) |
 | **CV-Bench** | Computer vision reasoning | [nyu-visionx/CV-Bench](https://huggingface.co/datasets/nyu-visionx/CV-Bench) |
-| **OMNI3D-BENCH** | 3D understanding | [dmarsili/Omni3D-Bench](https://huggingface.co/datasets/dmarsili/Omni3D-Bench) |
+| **GQA** | Visual reasoning, compositional QA | [lmms-lab/GQA](https://huggingface.co/datasets/lmms-lab/GQA) |
 
 ## Models
 

@@ -17,7 +17,7 @@ Spatial_MAS/
 │   ├── setup_datasets.py    # Download benchmarks
 │   └── run_h100_*.sh        # H100 execution scripts
 ├── src/
-│   ├── benchmarks/         # Dataset loaders (3DSRBench, CV-Bench, OMNI3D)
+│   ├── benchmarks/         # Dataset loaders (3DSRBench, CV-Bench, GQA)
 │   ├── models/             # Model runners (Qwen, LLaVA, Sa2VA, GPT, Gemini)
 │   └── agents/             # MAS prompts and pipeline
 └── results/                # Run outputs (timestamped)
