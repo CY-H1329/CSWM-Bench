@@ -152,3 +152,4 @@ bash scripts/run_h100_mas.sh stvqa7k qwen qwen qwen --max_per_category 10
 ## Step 2 & Step 3
 
 À définir.
+\
