@@ -9,6 +9,7 @@ Usage:
   python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset   # dataset complet, tous modèles
   python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5  # un modèle, 2 variants
   python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt4o --without_prompt  # un run (terminal séparé)
+  python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 1000 --model claude_sonnet_4_5 --without_prompt --start_idx 466 --end_idx 1000 --resume_dir results/runs/3dsrbench/api_models/20260217_060437/claude_sonnet_4_5_without_prompt  # reprise 466-999
 
 Env: ANTHROPIC_API_KEY, OPENAI_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY
 """
@@ -85,6 +86,9 @@ def main():
     parser.add_argument("--model", choices=["claude_sonnet_4_5", "gpt4o", "gemini_robotics_er"], help="Un seul modèle (pour terminaux séparés)")
     parser.add_argument("--without_prompt", action="store_true", help="Question seule (un seul run)")
     parser.add_argument("--prompt_variant", choices=["with_prompt", "without_prompt"], help="Une seule variante (exclut l'autre)")
+    parser.add_argument("--start_idx", type=int, default=None, help="Reprise : indices à partir de (ex: 466)")
+    parser.add_argument("--end_idx", type=int, default=None, help="Reprise : indices jusqu'à exclu (ex: 1000)")
+    parser.add_argument("--resume_dir", default=None, help="Reprise : dossier du run existant (ex: .../claude_sonnet_4_5_without_prompt)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_tokens", type=int, default=1024)
     args = parser.parse_args()
@@ -98,24 +102,46 @@ def main():
     seed = args.seed or ds_cfg.get("seed", 42)
     output_dir = Path(config.get("output", {}).get("dir", "results"))
 
-    subdir = "full_dataset" if use_full else datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = output_dir / "runs" / "3dsrbench" / "api_models" / subdir
-    run_dir.mkdir(parents=True, exist_ok=True)
+    use_resume = args.resume_dir and args.start_idx is not None and args.end_idx is not None
+    resume_path = Path(args.resume_dir).resolve() if args.resume_dir else None
+    if use_resume:
+        run_dir = resume_path.parent
+    else:
+        subdir = "full_dataset" if use_full else datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = output_dir / "runs" / "3dsrbench" / "api_models" / subdir
+        run_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loading 3DSRBench... (max_samples={'all' if use_full else max_samples}, seed={seed})")
     dataset = load_benchmark("3dsrbench", max_samples=max_samples, seed=seed)
     print(f"  {len(dataset)} samples")
+    if use_resume:
+        print(f"  Reprise: indices {start_idx} à {end_idx - 1} ({end_idx - start_idx} samples)")
 
-    model_keys = [args.model] if args.model else ["claude_sonnet_4_5", "gpt4o", "deepseek_vl", "gemini_robotics_er"]
-    if args.prompt_variant == "with_prompt":
-        prompt_variants = [("with_prompt", lambda q: build_spatial_prompt(q))]
-    elif args.without_prompt or args.prompt_variant == "without_prompt":
-        prompt_variants = [("without_prompt", lambda q: q)]
+    start_idx = args.start_idx if use_resume else 0
+    end_idx = args.end_idx if use_resume else len(dataset)
+    if use_resume:
+        if "claude" in resume_path.name:
+            model_keys = ["claude_sonnet_4_5"]
+        elif "gpt4o" in resume_path.name:
+            model_keys = ["gpt4o"]
+        elif "gemini" in resume_path.name:
+            model_keys = ["gemini_robotics_er"]
+        else:
+            model_keys = ["claude_sonnet_4_5"]
+        variant_name = "without_prompt" if "without" in resume_path.name else "with_prompt"
+        prompt_fn = (lambda q: q) if variant_name == "without_prompt" else (lambda q: build_spatial_prompt(q))
+        prompt_variants = [(variant_name, prompt_fn)]
     else:
-        prompt_variants = [
-            ("with_prompt", lambda q: build_spatial_prompt(q)),
-            ("without_prompt", lambda q: q),
-        ]
+        model_keys = [args.model] if args.model else ["claude_sonnet_4_5", "gpt4o", "deepseek_vl", "gemini_robotics_er"]
+        if args.prompt_variant == "with_prompt":
+            prompt_variants = [("with_prompt", lambda q: build_spatial_prompt(q))]
+        elif args.without_prompt or args.prompt_variant == "without_prompt":
+            prompt_variants = [("without_prompt", lambda q: q)]
+        else:
+            prompt_variants = [
+                ("with_prompt", lambda q: build_spatial_prompt(q)),
+                ("without_prompt", lambda q: q),
+            ]
     results_table = []
 
     for model_key in model_keys:
@@ -125,9 +151,12 @@ def main():
             continue
 
         for variant_name, prompt_fn in prompt_variants:
-            run_key = f"{model_key}_{variant_name}"
+            run_key = f"{model_key}_{variant_name}" if not use_resume else resume_path.name
             print(f"\n--- {run_key} ---")
-            model_dir = run_dir / run_key
+            if not use_resume:
+                model_dir = run_dir / run_key
+            else:
+                model_dir = resume_path
             model_dir.mkdir(parents=True, exist_ok=True)
             responses_dir = model_dir / "responses"
             responses_dir.mkdir(parents=True, exist_ok=True)
@@ -135,8 +164,25 @@ def main():
             preds = []
             gt_list = []
             details = []
+            if use_resume:
+                existing_details_path = model_dir / "details.jsonl"
+                if existing_details_path.exists():
+                    with open(existing_details_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.strip():
+                                d = json.loads(line)
+                                if d.get("idx", -1) < start_idx:
+                                    details.append(d)
+                                    preds.append(d.get("pred", ""))
+                                    gt_list.append(d.get("gt", ""))
+                    print(f"  Chargé {len(details)} samples existants (idx < {start_idx})")
+                else:
+                    print(f"  [ERREUR] details.jsonl absent. Exécutez d'abord recover:")
+                    print(f"    python scripts/evals/3dsrbench_api/recover_from_responses.py --dir {model_dir}")
+                    sys.exit(1)
 
-            for i in tqdm(range(len(dataset)), desc=run_key):
+            indices = list(range(start_idx, min(end_idx, len(dataset))))
+            for i in tqdm(indices, desc=run_key):
                 example = dataset[i]
                 image = get_benchmark_image(example, "3dsrbench")
                 query = get_benchmark_prompt(example, "3dsrbench")
@@ -182,6 +228,8 @@ def main():
                     gt_list.append(gt)
                     details.append({"idx": i, "error": str(e), "gt": gt, "category_gt": gt_category_norm})
 
+            if use_resume and details:
+                details.sort(key=lambda d: d.get("idx", 0))
             acc = accuracy(preds, gt_list)
             cat_pairs = [(d.get("category_gt", ""), d.get("pred_category", "")) for d in details if d.get("category_gt")]
             cat_cls_acc = accuracy([p[1] for p in cat_pairs], [p[0] for p in cat_pairs]) if cat_pairs else 0.0
