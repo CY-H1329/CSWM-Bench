@@ -29,11 +29,13 @@ class DeepSeekVLRunner:
             raise ImportError("DeepSeek-VL requires transformers. pip install transformers>=4.45")
         device = device or (0 if torch.cuda.is_available() else "cpu")
         self.model_id = model_id
+        # Use float16 to avoid dtype mismatch (SAM vision encoder: input float vs bias bfloat16)
+        dtype = torch.float16 if device != "cpu" else torch.float32
         self.pipe = pipeline(
             task="image-text-to-text",
             model=model_id,
             device=device,
-            torch_dtype=torch.bfloat16 if device != "cpu" else torch.float32,
+            torch_dtype=dtype,
             trust_remote_code=True,
             **kwargs,
         )
