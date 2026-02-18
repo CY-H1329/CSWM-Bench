@@ -34,13 +34,13 @@ def get_runner(model_key, config):
         return _runners.GPT4oRunner(model_id=model_id, api_key=api_key)
     if model_key == "glm5":
         base_url = cfg.get("base_url", "https://openrouter.ai/api/v1")
-        return _runners.OpenRouterRunner(model_id=model_id, api_key=api_key, base_url=base_url)
+        return _runners.OpenRouterRunner(model_id=model_id, api_key=api_key, base_url=base_url, text_only=True)
     return None
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=["gpt5_2", "glm5", "claude_opus_4_5"], default="gpt5_2")
+    parser.add_argument("--model", choices=["gpt5_2", "claude_opus_4_5", "glm5"], default="gpt5_2")
     parser.add_argument("--config", default=str(Path(__file__).parent / "config.yaml"))
     args = parser.parse_args()
 
@@ -63,6 +63,7 @@ def main():
         image = Image.new("RGB", (1, 1), color="white")
 
     print(f"=== {args.model} raw response (GT={gt}) ===\n")
+    # GPT-5.2 uses max_completion_tokens; runner handles it
     resp = runner.generate(image, prompt, temperature=0.0, max_tokens=512)
     print(repr(resp))
     print("\n--- full text ---")

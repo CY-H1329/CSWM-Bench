@@ -192,7 +192,7 @@ def get_runner(model_key: str, config: dict):
         return GPT4oRunner(model_id=model_id, api_key=api_key)
     if model_key == "glm5":
         base_url = cfg.get("base_url", "https://openrouter.ai/api/v1")
-        return OpenRouterRunner(model_id=model_id, api_key=api_key, base_url=base_url)
+        return OpenRouterRunner(model_id=model_id, api_key=api_key, base_url=base_url, text_only=True)
     return None
 
 
@@ -201,7 +201,7 @@ def main():
     parser.add_argument("--config", default=str(Path(__file__).parent / "config.yaml"))
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--full_dataset", action="store_true")
-    parser.add_argument("--model", choices=["gpt5_2", "glm5", "claude_opus_4_5"])
+    parser.add_argument("--model", choices=["gpt5_2", "claude_opus_4_5", "glm5"])
     parser.add_argument("--benchmark", choices=["cvbench", "3dsrbench", "all"], default="all",
                         help="all = run both cvbench (4 cats) and 3dsrbench (12 cats)")
     parser.add_argument("--text_only", action="store_true", help="Question only (no image) for routing")
@@ -225,7 +225,7 @@ def main():
 
     benchmarks = ["cvbench", "3dsrbench"] if args.benchmark == "all" else [args.benchmark]
     subdir = datetime.now().strftime("%Y%m%d_%H%M%S")
-    model_keys = [args.model] if args.model else ["gpt5_2", "glm5", "claude_opus_4_5"]
+    model_keys = [args.model] if args.model else ["gpt5_2", "claude_opus_4_5", "glm5"]
 
     for benchmark in benchmarks:
         _run_benchmark(

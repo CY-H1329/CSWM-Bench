@@ -103,6 +103,8 @@ class GPT4oRunner:
     ) -> str:
         prompt = _sanitize(prompt)
         b64 = _img_to_base64(image)
+        # GPT-5.x uses max_completion_tokens instead of max_tokens
+        tok_param = {"max_completion_tokens": max_tokens} if "gpt-5" in (self.model_id or "").lower() else {"max_tokens": max_tokens}
         resp = self.client.chat.completions.create(
             model=self.model_id,
             messages=[
@@ -114,8 +116,8 @@ class GPT4oRunner:
                     ],
                 }
             ],
-            max_tokens=max_tokens,
             temperature=max(0.0, temperature),
+            **tok_param,
         )
         return (resp.choices[0].message.content or "").strip()
 
@@ -200,12 +202,13 @@ class DeepSeekVLRunner:
 
 
 class OpenRouterRunner:
-    """Generic OpenRouter runner (OpenAI-compatible API). Supports vision models like GLM-5."""
+    """Generic OpenRouter runner (OpenAI-compatible API). GLM-5 is text-only (no vision)."""
     def __init__(
         self,
         model_id: str,
         api_key: Optional[str] = None,
         base_url: str = "https://openrouter.ai/api/v1",
+        text_only: bool = False,
     ):
         if not OPENAI_AVAILABLE:
             raise ImportError("Install: pip install openai")
@@ -214,6 +217,7 @@ class OpenRouterRunner:
             raise ValueError("Set OPENROUTER_API_KEY")
         self.client = OpenAI(api_key=key, base_url=base_url)
         self.model_id = model_id
+        self.text_only = text_only
 
     def generate(
         self,
@@ -224,18 +228,17 @@ class OpenRouterRunner:
         **kwargs,
     ) -> str:
         prompt = _sanitize(prompt)
-        b64 = _img_to_base64(image)
+        if self.text_only:
+            content = [{"type": "text", "text": prompt}]
+        else:
+            b64 = _img_to_base64(image)
+            content = [
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                {"type": "text", "text": prompt},
+            ]
         resp = self.client.chat.completions.create(
             model=self.model_id,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
+            messages=[{"role": "user", "content": content}],
             max_tokens=max_tokens,
             temperature=max(0.0, temperature),
         )
