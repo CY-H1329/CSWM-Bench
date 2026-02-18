@@ -1,0 +1,18 @@
+{
+  "model": "gpt5_2",
+  "metric": "category_routing_accuracy",
+  "accuracy": 0.0,
+  "n": 100,
+  "by_category": {
+    "Count": 0.0,
+    "Relation": 0.0,
+    "Depth": 0.0,
+    "Distance": 0.0
+  },
+  "by_category_n": {
+    "Count": 35,
+    "Relation": 25,
+    "Depth": 17,
+    "Distance": 23
+  }
+}
