@@ -340,6 +340,13 @@ def _run_benchmark(benchmark, max_samples, seed, output_dir, subdir, model_keys,
         for cat, v in sorted(by_cat.items()):
             c_acc = v["correct"] / v["total"] if v["total"] else 0
             print(f"    {cat}: {c_acc:.2f} ({v['correct']}/{v['total']})")
+        # Debug: when 0%, print sample responses to diagnose extraction
+        if acc == 0 and details:
+            print(f"\n  [DEBUG {model_key} 0% - sample responses for extraction fix]")
+            for i, d in enumerate(details[:2]):
+                resp = d.get("full_response", "")[:500]
+                pred = d.get("pred", "")
+                print(f"    sample {i} pred={pred!r} | response: {resp!r}...")
 
     with open(run_dir / "summary.txt", "w", encoding="utf-8") as f:
         f.write(f"# Head-Agent Category Routing — {benchmark.upper()}\n\n")
