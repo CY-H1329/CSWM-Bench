@@ -177,10 +177,11 @@ You are the Reasoning Agent. You receive the outputs of 3 specialist agents who 
 ## Instructions
 
 1. Compare the 3 agents' reasoning and answers.
-2. Consider which agent's approach is most reliable for this task type.
-3. Select the final answer (or synthesize if they agree).
-4. Provide a brief justification for your choice.
-5. Note any discrepancies for trust/score update.
+2. **When 2 or more agents agree on the same answer, strongly prefer that answer** — consensus is a strong signal.
+3. When only one agent gives an answer with detailed CoT and high confidence, consider it carefully.
+4. Select the final answer (or synthesize if they agree).
+5. Provide a brief justification for your choice.
+6. Note any discrepancies for trust/score update.
 
 ## Output Format
 

@@ -326,6 +326,7 @@ def main():
     # 3. Run MAS
     print("\n--- MAS Pipeline ---")
     head_runner, specialist_runners, reason_runner = build_mas_runners(config)
+    score_history = []
     if not head_runner or not reason_runner:
         print("ERROR: Head or Reasoning runner required (OPENAI_API_KEY, etc.)")
         mas_results = [{"idx": i, "error": "no_runner", "gt": get_benchmark_answer(ds[i], "3dsrbench"), "correct": False} for i in range(len(ds))]
@@ -352,6 +353,7 @@ def main():
         score_manager = ScoreManager()
         category_seen = {c: False for c in TASK_CATEGORIES}
         mas_results = []
+        score_history = [score_manager.to_dict()]  # Turn 0: initial (all 0.5)
 
         for i in tqdm(range(len(ds)), desc="MAS"):
             ex = ds[i]
@@ -381,9 +383,18 @@ def main():
                 correct = _canonical_letter(pred) == _canonical_letter(gt)
                 cat = out.get("predicted_category", "")
                 category_seen[cat] = True
+                # agent_results: strategy, cot, answer, confidence, log per agent
+                agent_results = [
+                    {k: v for k, v in r.items() if k != "raw"}
+                    for r in out.get("agent_results", [])
+                ]
+                score_history.append(score_manager.to_dict())
                 mas_results.append({
                     "idx": i, "gt": gt, "pred": pred_norm, "correct": correct,
                     "predicted_category": cat, "selected_agents": out.get("selected_agents", []),
+                    "agent_results": agent_results,
+                    "reasoning_justification": out.get("reasoning_justification", ""),
+                    "score_table_after_turn": score_manager.to_dict(),
                 })
             except Exception as e:
                 mas_results.append({"idx": i, "error": str(e), "gt": gt, "correct": False})
@@ -426,6 +437,7 @@ def main():
         "qwen3_4b": {"correct": qwen_correct, "total": qwen_total, "accuracy": qwen_acc},
         "mas": {"correct": mas_correct, "total": mas_total, "accuracy": mas_acc},
         "delta": mas_acc - qwen_acc,
+        "score_history": score_history,
     }
     with open(run_dir / "summary.json", "w") as f:
         json.dump(summary, f, indent=2)

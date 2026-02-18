@@ -197,6 +197,7 @@ def main():
 
     score_manager = ScoreManager()
     category_seen = {c: False for c in TASK_CATEGORIES}
+    score_history = [score_manager.to_dict()]
 
     results = []
     correct = 0
@@ -236,6 +237,11 @@ def main():
         cat = out.get("predicted_category", "")
         category_seen[cat] = True
 
+        agent_results = [
+            {k: v for k, v in r.items() if k != "raw"}
+            for r in out.get("agent_results", [])
+        ]
+        score_history.append(score_manager.to_dict())
         results.append({
             "idx": i,
             "predicted_category": cat,
@@ -243,6 +249,9 @@ def main():
             "final_answer": pred,
             "gt": gt,
             "correct": is_correct,
+            "agent_results": agent_results,
+            "reasoning_justification": out.get("reasoning_justification", ""),
+            "score_table_after_turn": score_manager.to_dict(),
         })
 
         if (i + 1) % 10 == 0:
@@ -264,6 +273,7 @@ def main():
         "benchmark": benchmark,
         "max_samples": max_samples,
         "score_table": score_manager.to_dict(),
+        "score_history": score_history,
     }
     with open(run_dir / "summary.json", "w") as f:
         json.dump(summary, f, indent=2)
