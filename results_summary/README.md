@@ -12,6 +12,13 @@ Aggregated results for paper submission. Raw data remains in `results/` on H100.
 - `cvbench/api_models/` — Claude, GPT-4o, Gemini (results.json, summary.txt)
 - `head_agent/cvbench/`, `head_agent/3dsrbench/` — Head-Agent category routing (GPT-5.2, Claude Opus 4.5, GLM-5)
 
+## Baseline & Head-Agent Tables
+
+- **Spatial_MAS_baseline_and_head_agent.xlsx** — SOTA baseline results and Head-Agent selection scores (from experiments)
+- **HEAD_AGENT_SUMMARY.md** — Auto-generated Head-Agent category routing summary
+
+See `docs/HEAD_AGENT_SELECTION_PROTOCOL.md` for how the Head-Agent was selected and tested (English).
+
 ## Update
 
 On H100: `python scripts/gather_results_summary.py` then commit and push.
