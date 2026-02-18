@@ -1,0 +1,14 @@
+{
+  "model": "qwen3_4b",
+  "prompt_variant": "with_prompt",
+  "accuracy": 0.8134950720242609,
+  "n": 2638,
+  "pred_distribution": {
+    "A": 1152,
+    "B": 1114,
+    "C": 163,
+    "D": 177
+  },
+  "category_cls_accuracy": 0.7934040940106141,
+  "category_cls_n": 2638
+}

@@ -1,0 +1,14 @@
+{
+  "model": "gpt4o_without_prompt",
+  "prompt_variant": "without_prompt",
+  "accuracy": 0.8,
+  "n": 10,
+  "pred_distribution": {
+    "A": 4,
+    "B": 4,
+    "C": 1,
+    "D": 1
+  },
+  "category_cls_accuracy": 0.0,
+  "category_cls_n": 10
+}

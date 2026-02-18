@@ -1,0 +1,13 @@
+{
+  "model": "gemini_robotics_er_with_prompt",
+  "prompt_variant": "with_prompt",
+  "accuracy": 0.8,
+  "n": 10,
+  "pred_distribution": {
+    "A": 5,
+    "B": 3,
+    "C": 2
+  },
+  "category_cls_accuracy": 0.7,
+  "category_cls_n": 10
+}

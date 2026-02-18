@@ -1,0 +1,14 @@
+{
+  "model": "llava4d",
+  "prompt_variant": "without_prompt",
+  "accuracy": 0.28430629264594387,
+  "n": 2638,
+  "pred_distribution": {
+    "A": 626,
+    "B": 266,
+    "C": 164,
+    "D": 162
+  },
+  "category_cls_accuracy": 0.0,
+  "category_cls_n": 2638
+}

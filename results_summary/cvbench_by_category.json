@@ -1,0 +1,188 @@
+{
+  "llava4d_with_prompt": {
+    "model": "llava4d",
+    "prompt_variant": "with_prompt",
+    "per_category": {
+      "Count": {
+        "correct": 424,
+        "total": 788,
+        "accuracy": 0.5380710659898477
+      },
+      "Relation": {
+        "correct": 437,
+        "total": 650,
+        "accuracy": 0.6723076923076923
+      },
+      "Depth": {
+        "correct": 428,
+        "total": 600,
+        "accuracy": 0.7133333333333334
+      },
+      "Distance": {
+        "correct": 344,
+        "total": 600,
+        "accuracy": 0.5733333333333334
+      }
+    },
+    "overall": {
+      "correct": 1633,
+      "total": 2638,
+      "accuracy": 0.6190295678544352
+    }
+  },
+  "llava4d_without_prompt": {
+    "model": "llava4d",
+    "prompt_variant": "without_prompt",
+    "per_category": {
+      "Count": {
+        "correct": 474,
+        "total": 788,
+        "accuracy": 0.6015228426395939
+      },
+      "Relation": {
+        "correct": 94,
+        "total": 650,
+        "accuracy": 0.14461538461538462
+      },
+      "Depth": {
+        "correct": 34,
+        "total": 600,
+        "accuracy": 0.056666666666666664
+      },
+      "Distance": {
+        "correct": 148,
+        "total": 600,
+        "accuracy": 0.24666666666666667
+      }
+    },
+    "overall": {
+      "correct": 750,
+      "total": 2638,
+      "accuracy": 0.28430629264594387
+    }
+  },
+  "qwen3_4b_with_prompt": {
+    "model": "qwen3_4b",
+    "prompt_variant": "with_prompt",
+    "per_category": {
+      "Count": {
+        "correct": 510,
+        "total": 788,
+        "accuracy": 0.6472081218274112
+      },
+      "Relation": {
+        "correct": 571,
+        "total": 650,
+        "accuracy": 0.8784615384615385
+      },
+      "Depth": {
+        "correct": 563,
+        "total": 600,
+        "accuracy": 0.9383333333333334
+      },
+      "Distance": {
+        "correct": 502,
+        "total": 600,
+        "accuracy": 0.8366666666666667
+      }
+    },
+    "overall": {
+      "correct": 2146,
+      "total": 2638,
+      "accuracy": 0.8134950720242609
+    }
+  },
+  "qwen3_4b_without_prompt": {
+    "model": "qwen3_4b",
+    "prompt_variant": "without_prompt",
+    "per_category": {
+      "Count": {
+        "correct": 514,
+        "total": 788,
+        "accuracy": 0.6522842639593909
+      },
+      "Relation": {
+        "correct": 611,
+        "total": 650,
+        "accuracy": 0.94
+      },
+      "Depth": {
+        "correct": 574,
+        "total": 600,
+        "accuracy": 0.9566666666666667
+      },
+      "Distance": {
+        "correct": 511,
+        "total": 600,
+        "accuracy": 0.8516666666666667
+      }
+    },
+    "overall": {
+      "correct": 2210,
+      "total": 2638,
+      "accuracy": 0.8377558756633814
+    }
+  },
+  "sa2va_with_prompt": {
+    "model": "sa2va",
+    "prompt_variant": "with_prompt",
+    "per_category": {
+      "Count": {
+        "correct": 456,
+        "total": 788,
+        "accuracy": 0.5786802030456852
+      },
+      "Relation": {
+        "correct": 507,
+        "total": 650,
+        "accuracy": 0.78
+      },
+      "Depth": {
+        "correct": 479,
+        "total": 600,
+        "accuracy": 0.7983333333333333
+      },
+      "Distance": {
+        "correct": 382,
+        "total": 600,
+        "accuracy": 0.6366666666666667
+      }
+    },
+    "overall": {
+      "correct": 1824,
+      "total": 2638,
+      "accuracy": 0.6914329037149356
+    }
+  },
+  "sa2va_without_prompt": {
+    "model": "sa2va",
+    "prompt_variant": "without_prompt",
+    "per_category": {
+      "Count": {
+        "correct": 316,
+        "total": 788,
+        "accuracy": 0.4010152284263959
+      },
+      "Relation": {
+        "correct": 50,
+        "total": 650,
+        "accuracy": 0.07692307692307693
+      },
+      "Depth": {
+        "correct": 480,
+        "total": 600,
+        "accuracy": 0.8
+      },
+      "Distance": {
+        "correct": 283,
+        "total": 600,
+        "accuracy": 0.4716666666666667
+      }
+    },
+    "overall": {
+      "correct": 1129,
+      "total": 2638,
+      "accuracy": 0.4279757391963609
+    }
+  }
+}

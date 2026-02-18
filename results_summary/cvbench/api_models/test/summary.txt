@@ -1,0 +1,5 @@
+# CV-Bench — API Models (10 samples)
+
+| Model | Answer Acc | Category Cls Acc | N |
+|-------|------------|------------------|---|
+| gemini_robotics_er_without_prompt | 0.8000 | 0.0000 | 10 |

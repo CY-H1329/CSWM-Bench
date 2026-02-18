@@ -1,0 +1,14 @@
+{
+  "model": "sa2va",
+  "prompt_variant": "with_prompt",
+  "accuracy": 0.6666666666666666,
+  "n": 30,
+  "pred_distribution": {
+    "A": 18,
+    "B": 8,
+    "C": 2,
+    "D": 2
+  },
+  "category_cls_accuracy": 0.6666666666666666,
+  "category_cls_n": 30
+}

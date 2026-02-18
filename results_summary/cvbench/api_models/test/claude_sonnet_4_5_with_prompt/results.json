@@ -1,0 +1,14 @@
+{
+  "model": "claude_sonnet_4_5_with_prompt",
+  "prompt_variant": "with_prompt",
+  "accuracy": 0.7,
+  "n": 10,
+  "pred_distribution": {
+    "A": 5,
+    "B": 3,
+    "C": 1,
+    "D": 1
+  },
+  "category_cls_accuracy": 1.0,
+  "category_cls_n": 10
+}
