@@ -60,11 +60,15 @@ def load_benchmark(
     benchmark: str,
     max_samples: Optional[int] = None,
     max_per_category: Optional[int] = None,
+    category_filter: Optional[List[str]] = None,
     seed: int = 42,
 ):
     """
     Load a benchmark dataset. Uses HuggingFace cache (from setup_datasets.py).
     Returns dataset with normalized access via get_benchmark_* helpers.
+
+    Args:
+        category_filter: If set, keep only samples whose category is in this list.
     """
     if benchmark not in BENCHMARK_CONFIGS:
         raise ValueError(f"Unknown benchmark: {benchmark}. Choose from {list(BENCHMARK_CONFIGS.keys())}")
@@ -81,6 +85,11 @@ def load_benchmark(
 
     rng = random.Random(seed)
     cat_key = cfg.get("category_key")
+
+    if category_filter is not None and cat_key and cat_key in ds.features:
+        cats_set = set(category_filter)
+        indices = [i for i in range(len(ds)) if (ds[i].get(cat_key) or "").strip() in cats_set]
+        ds = ds.select(indices)
 
     if max_per_category is not None and cat_key and cat_key in ds.features:
         by_cat = {}
