@@ -107,21 +107,23 @@ def compute_per_category(details: List[dict]) -> Dict[str, dict]:
     return result
 
 
-def find_cvbench_runs(base: Path) -> List[Tuple[str, str, Path]]:
+def find_cvbench_runs(base: Path, full_dataset_only: bool = True) -> List[Tuple[str, str, Path]]:
     """
-    Find all (model, prompt_variant, details_path).
-    Returns: [(model, with_prompt|without_prompt, path), ...]
+    Find (model, prompt_variant, details_path).
+    full_dataset_only: only full_dataset_with_prompt, full_dataset_without_prompt, api_models/full_dataset
     """
     runs = []
     base = Path(base).resolve()
 
-    # GPU: llava4d/, qwen3_4b/, sa2va/ → full_dataset_with_prompt, full_dataset_without_prompt
+    # GPU: llava4d/, qwen3_4b/, sa2va/ → full_dataset_with_prompt, full_dataset_without_prompt only
     for model_dir in ["llava4d", "qwen3_4b", "sa2va"]:
         model_path = base / model_dir
         if not model_path.is_dir():
             continue
         for sub in model_path.iterdir():
             if not sub.is_dir():
+                continue
+            if full_dataset_only and "full_dataset" not in sub.name:
                 continue
             details_path = sub / "details.jsonl"
             if not details_path.exists():
@@ -135,11 +137,16 @@ def find_cvbench_runs(base: Path) -> List[Tuple[str, str, Path]]:
                 variant = name
             runs.append((model_dir, variant, details_path))
 
-    # API: api_models/xxx/ → claude_sonnet_4_5_with_prompt, gpt4o_without_prompt, etc.
+    # API: api_models/full_dataset/ only (skip timestamp dirs)
     api_base = base / "api_models"
     if api_base.exists():
-        for ts_dir in sorted(api_base.iterdir(), key=lambda p: p.name, reverse=True):
-            if not ts_dir.is_dir():
+        # Prefer full_dataset dir
+        full_dir = api_base / "full_dataset"
+        ts_dirs = [full_dir] if full_dir.exists() else []
+        if not ts_dirs:
+            ts_dirs = [d for d in api_base.iterdir() if d.is_dir()]
+        for ts_dir in ts_dirs:
+            if full_dataset_only and ts_dir.name != "full_dataset":
                 continue
             for sub in ts_dir.iterdir():
                 if not sub.is_dir():
@@ -157,8 +164,8 @@ def find_cvbench_runs(base: Path) -> List[Tuple[str, str, Path]]:
                 model = name.replace("_with_prompt", "").replace("_without_prompt", "").strip("_")
                 runs.append((model, variant, details_path))
 
-    # Auto: recursive
-    if not runs:
+    # Auto: recursive (only if no runs and full_dataset_only=False)
+    if not runs and not full_dataset_only:
         for details_path in base.rglob("details.jsonl"):
             rel = details_path.relative_to(base)
             parts = list(rel.parts[:-1])
@@ -180,6 +187,7 @@ def main():
     parser.add_argument("--dir", default="results/runs/cvbench", help="Répertoire racine cvbench")
     parser.add_argument("--output", default=None, help="Fichier CSV de sortie")
     parser.add_argument("--output_dir", default=None, help="Répertoire de sortie (défaut: --dir)")
+    parser.add_argument("--all_runs", action="store_true", help="Inclure tous les runs (défaut: full_dataset uniquement)")
     args = parser.parse_args()
 
     base = Path(args.dir)
@@ -187,7 +195,7 @@ def main():
         print(f"[ERREUR] --dir n'existe pas: {base}")
         return 1
 
-    runs = find_cvbench_runs(base)
+    runs = find_cvbench_runs(base, full_dataset_only=not args.all_runs)
     if not runs:
         print(f"[ERREUR] Aucun details.jsonl trouvé sous {base}")
         return 1

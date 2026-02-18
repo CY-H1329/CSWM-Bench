@@ -25,12 +25,17 @@ results/runs/cvbench/
 ## Usage
 
 ```bash
-# Depuis la racine du projet
+# Full dataset만 (기본)
 python scripts/evals/cvbench/aggregate_category_results.py --dir results/runs/cvbench
+
+# 모든 runs 포함
+python scripts/evals/cvbench/aggregate_category_results.py --dir results/runs/cvbench --all_runs
 
 # Sortie personnalisée
 python scripts/evals/cvbench/aggregate_category_results.py --dir results/runs/cvbench --output results/analysis/cvbench_by_category.csv
 ```
+
+**기본**: `full_dataset_with_prompt`, `full_dataset_without_prompt`, `api_models/full_dataset/` 만 포함.
 
 ## Output
 
