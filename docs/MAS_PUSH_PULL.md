@@ -37,11 +37,11 @@ python scripts/setup_datasets.py
 | Variable | Required | Use |
 |---------|----------|-----|
 | `OPENAI_API_KEY` | Yes | Head (GPT-5.2), GPT-4o specialist |
-| `DEEPSEEK_API_KEY` | Yes | Reasoning Agent |
+| `DEEPSEEK_API_KEY` | No | Reasoning Agent (API fallback; default: GPU open-source) |
 | `ANTHROPIC_API_KEY` | Optional | Claude Sonnet specialist |
 | `GEMINI_API_KEY` | Optional | Gemini specialist |
 
-GPU specialists (qwen3_4b, sa2va, llava4d) run locally on H100 — no API key.
+GPU specialists (qwen3_4b, sa2va, llava4d) and Reasoning (DeepSeek-VL) run locally on H100 — no API key.
 
 ---
 

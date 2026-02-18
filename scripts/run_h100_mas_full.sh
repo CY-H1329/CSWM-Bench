@@ -33,7 +33,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 echo "[MAS Full] Benchmark=$BENCHMARK"
 echo "  Head: GPT-5.2 (API)"
 echo "  Specialists: qwen3_4b, sa2va, llava4d (GPU) + claude, gpt4o, gemini (API)"
-echo "  Reasoning: DeepSeek-VL (API)"
+echo "  Reasoning: DeepSeek-VL (GPU, open-source)"
 echo ""
 
 python scripts/evals/mas_pipeline/run_eval_mas.py \

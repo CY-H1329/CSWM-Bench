@@ -55,9 +55,10 @@ try:
     from src.models.qwen3 import Qwen3Runner
     from src.models.sa2va import Sa2VARunner
     from src.models.llava import LLaVARunner
+    from src.models.deepseek_vl import DeepSeekVLRunner as DeepSeekVLGPURunner
     GPU_AVAILABLE = True
 except ImportError:
-    Qwen3Runner = Sa2VARunner = LLaVARunner = None
+    Qwen3Runner = Sa2VARunner = LLaVARunner = DeepSeekVLGPURunner = None
     GPU_AVAILABLE = False
 
 
@@ -82,12 +83,23 @@ def build_runners(config: dict):
     ) if head_key else None
 
     reason_cfg = config.get("reasoning_agent", {})
-    reason_key = os.environ.get(reason_cfg.get("api_key_env", ""), "").strip()
-    reason_runner = DeepSeekVLRunner(
-        model_id=reason_cfg.get("model_id", "deepseek-vl"),
-        api_key=reason_key,
-        base_url=reason_cfg.get("base_url", "https://api.deepseek.com"),
-    ) if reason_key else None
+    reason_runner = None
+    if reason_cfg.get("runner") == "gpu" and GPU_AVAILABLE and DeepSeekVLGPURunner:
+        try:
+            reason_runner = DeepSeekVLGPURunner(
+                model_id=reason_cfg.get("model_id", "deepseek-community/deepseek-vl-7b-chat"),
+                device=reason_cfg.get("device", "cuda"),
+            )
+        except Exception as e:
+            print(f"[skip] Reasoning GPU (DeepSeek-VL): {e}")
+    else:
+        reason_key = os.environ.get(reason_cfg.get("api_key_env", ""), "").strip()
+        if reason_key:
+            reason_runner = DeepSeekVLRunner(
+                model_id=reason_cfg.get("model_id", "deepseek-vl"),
+                api_key=reason_key,
+                base_url=reason_cfg.get("base_url", "https://api.deepseek.com"),
+            )
 
     specialists_cfg = config.get("specialists", {})
     specialist_runners = {}
@@ -147,7 +159,7 @@ def main():
         print("ERROR: Head runner (OPENAI_API_KEY) required.")
         sys.exit(1)
     if not reason_runner:
-        print("ERROR: Reasoning runner (DEEPSEEK_API_KEY) required.")
+        print("ERROR: Reasoning runner required. Set runner: gpu in config or DEEPSEEK_API_KEY for API.")
         sys.exit(1)
 
     ds_cfg = config.get("dataset", {})
@@ -178,6 +190,9 @@ def main():
         return r.generate(img, prompt, max_tokens=2048)
 
     def reason_gen(img: Image.Image, prompt: str) -> str:
+        mod = type(reason_runner).__module__ or ""
+        if "src.models" in mod:
+            return reason_runner.generate(img, prompt, max_new_tokens=1024)
         return reason_runner.generate(img, prompt, max_tokens=1024)
 
     score_manager = ScoreManager()

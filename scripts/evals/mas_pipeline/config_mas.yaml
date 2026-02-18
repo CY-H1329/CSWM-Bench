@@ -6,9 +6,9 @@ head_agent:
   api_key_env: "OPENAI_API_KEY"
 
 reasoning_agent:
-  model_id: "deepseek-vl"
-  api_key_env: "DEEPSEEK_API_KEY"
-  base_url: "https://api.deepseek.com"
+  runner: "gpu"  # open-source DeepSeek-VL on GPU (no API key)
+  model_id: "deepseek-community/deepseek-vl-7b-chat"
+  device: "cuda"
 
 # Specialists: GPU (H100) or API. GPU takes precedence when CUDA available.
 specialists:
