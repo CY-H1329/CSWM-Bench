@@ -1,0 +1,45 @@
+{
+  "name": "sa2va",
+  "full_name": "Sa2VA-4B",
+  "description": "Sa2VA: spatial-aware vision-language model.",
+  "3dsrbench_overall": 0.2042,
+  "3dsrbench_per_category": {
+    "location_above": 0.302,
+    "height_higher": 0.4884,
+    "location_closer_to_camera": 0.1165,
+    "multi_object_closer_to": 0.2971,
+    "orientation_on_the_left": 0.0802,
+    "multi_object_facing": 0.1879,
+    "multi_object_same_direction": 0.3547,
+    "orientation_in_front_of": 0.2267,
+    "multi_object_viewpoint_towards_object": 0.0845,
+    "orientation_viewpoint": 0.0701,
+    "location_next_to": 0.0767,
+    "multi_object_parallel": 0.1652
+  },
+  "unified_per_category": {
+    "depth": 0.2042,
+    "distance": 0.207,
+    "relation": 0.0767,
+    "existence": 0.2042,
+    "count": 0.2042,
+    "instance_location": 0.2042,
+    "orientation": 0.218,
+    "size": 0.2042,
+    "reach": 0.2042
+  },
+  "category_ranking": {
+    "distance": 1,
+    "orientation": 2,
+    "relation": 6,
+    "depth": 3,
+    "existence": 4,
+    "count": 4,
+    "instance_location": 4,
+    "size": 4,
+    "reach": 4
+  },
+  "initial_weight": 0.5,
+  "runner_type": "gpu",
+  "model_id": "ByteDance/Sa2VA-4B"
+}

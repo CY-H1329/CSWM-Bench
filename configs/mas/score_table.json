@@ -1,0 +1,74 @@
+{
+  "_comment": "Per-model per-category weights. Initial: 0.5. Correct: +0.05, Wrong: -0.02. Updated at runtime.",
+  "initial_weight": 0.5,
+  "delta_correct": 0.05,
+  "delta_wrong": -0.02,
+  "weights": {
+    "qwen3_4b": {
+      "depth": 0.5,
+      "distance": 0.5,
+      "relation": 0.5,
+      "existence": 0.5,
+      "count": 0.5,
+      "instance_location": 0.5,
+      "orientation": 0.5,
+      "size": 0.5,
+      "reach": 0.5
+    },
+    "sa2va": {
+      "depth": 0.5,
+      "distance": 0.5,
+      "relation": 0.5,
+      "existence": 0.5,
+      "count": 0.5,
+      "instance_location": 0.5,
+      "orientation": 0.5,
+      "size": 0.5,
+      "reach": 0.5
+    },
+    "llava4d": {
+      "depth": 0.5,
+      "distance": 0.5,
+      "relation": 0.5,
+      "existence": 0.5,
+      "count": 0.5,
+      "instance_location": 0.5,
+      "orientation": 0.5,
+      "size": 0.5,
+      "reach": 0.5
+    },
+    "claude_sonnet_4_5": {
+      "depth": 0.5,
+      "distance": 0.5,
+      "relation": 0.5,
+      "existence": 0.5,
+      "count": 0.5,
+      "instance_location": 0.5,
+      "orientation": 0.5,
+      "size": 0.5,
+      "reach": 0.5
+    },
+    "gpt4o": {
+      "depth": 0.5,
+      "distance": 0.5,
+      "relation": 0.5,
+      "existence": 0.5,
+      "count": 0.5,
+      "instance_location": 0.5,
+      "orientation": 0.5,
+      "size": 0.5,
+      "reach": 0.5
+    },
+    "gemini_robotics_er": {
+      "depth": 0.5,
+      "distance": 0.5,
+      "relation": 0.5,
+      "existence": 0.5,
+      "count": 0.5,
+      "instance_location": 0.5,
+      "orientation": 0.5,
+      "size": 0.5,
+      "reach": 0.5
+    }
+  }
+}

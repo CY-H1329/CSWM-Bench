@@ -1,0 +1,46 @@
+{
+  "name": "claude_sonnet_4_5",
+  "full_name": "Claude Sonnet 4.5",
+  "description": "Claude 4.5 V Sonnet: proprietary multimodal model.",
+  "3dsrbench_overall": 0.6439,
+  "3dsrbench_per_category": {
+    "location_above": 0.7385,
+    "height_higher": 0.7111,
+    "location_closer_to_camera": 0.8201,
+    "multi_object_closer_to": 0.5867,
+    "orientation_on_the_left": 0.5455,
+    "multi_object_facing": 0.6719,
+    "multi_object_same_direction": 0.6522,
+    "orientation_in_front_of": 0.7143,
+    "multi_object_viewpoint_towards_object": 0.2923,
+    "orientation_viewpoint": 0.5645,
+    "location_next_to": 0.8451,
+    "multi_object_parallel": 0.5846
+  },
+  "unified_per_category": {
+    "depth": 0.6439,
+    "distance": 0.703,
+    "relation": 0.8451,
+    "existence": 0.6439,
+    "count": 0.6439,
+    "instance_location": 0.6439,
+    "orientation": 0.608,
+    "size": 0.6439,
+    "reach": 0.6439
+  },
+  "category_ranking": {
+    "relation": 1,
+    "distance": 2,
+    "orientation": 3,
+    "depth": 4,
+    "existence": 5,
+    "count": 5,
+    "instance_location": 5,
+    "size": 5,
+    "reach": 5
+  },
+  "initial_weight": 0.5,
+  "runner_type": "api",
+  "model_id": "claude-sonnet-4-5-20250929",
+  "api_key_env": "ANTHROPIC_API_KEY"
+}

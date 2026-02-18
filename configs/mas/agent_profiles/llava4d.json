@@ -1,0 +1,45 @@
+{
+  "name": "llava4d",
+  "full_name": "LLaVA-4D",
+  "description": "LLaVA-4D: open-source generalist VLM.",
+  "3dsrbench_overall": 0.2965,
+  "3dsrbench_per_category": {
+    "location_above": 0.5679,
+    "height_higher": 0.4435,
+    "location_closer_to_camera": 0.0988,
+    "multi_object_closer_to": 0.0971,
+    "orientation_on_the_left": 0.0716,
+    "multi_object_facing": 0.104,
+    "multi_object_same_direction": 0.5262,
+    "orientation_in_front_of": 0.4506,
+    "multi_object_viewpoint_towards_object": 0.1749,
+    "orientation_viewpoint": 0.3003,
+    "location_next_to": 0.531,
+    "multi_object_parallel": 0.1917
+  },
+  "unified_per_category": {
+    "depth": 0.2965,
+    "distance": 0.098,
+    "relation": 0.531,
+    "existence": 0.2965,
+    "count": 0.2965,
+    "instance_location": 0.2965,
+    "orientation": 0.315,
+    "size": 0.2965,
+    "reach": 0.2965
+  },
+  "category_ranking": {
+    "relation": 1,
+    "orientation": 2,
+    "distance": 6,
+    "depth": 3,
+    "existence": 4,
+    "count": 4,
+    "instance_location": 4,
+    "size": 4,
+    "reach": 4
+  },
+  "initial_weight": 0.5,
+  "runner_type": "gpu",
+  "model_id": "llava-hf/llava-v1.6-mistral-7b-hf"
+}

@@ -1,0 +1,36 @@
+# Spatial MAS Main Architecture
+# Head (GPT-5.2) → 3 Specialists → Reasoning (DeepSeek-VL)
+
+head_agent:
+  model_id: "gpt-4o"  # or gpt-5.2 when available
+  api_key_env: "OPENAI_API_KEY"
+  fixed: true  # MUST NOT be replaced
+
+reasoning_agent:
+  model_id: "deepseek-vl"
+  api_key_env: "DEEPSEEK_API_KEY"
+  base_url: "https://api.deepseek.com"
+
+# 6 candidate specialists (profiles in agent_profiles/*.json)
+candidate_agents:
+  - qwen3_4b
+  - sa2va
+  - llava4d
+  - claude_sonnet_4_5
+  - gpt4o
+  - gemini_robotics_er
+
+# Score update
+score_delta_correct: 0.05
+score_delta_wrong: -0.02
+initial_weight: 0.5
+
+# Paths (relative to configs/mas/)
+agent_profiles_dir: "agent_profiles"
+score_table_file: "score_table.json"
+
+# H100 / execution
+device: "cuda"
+use_flash_attn: true
+use_tf32: true
+max_tokens: 2048

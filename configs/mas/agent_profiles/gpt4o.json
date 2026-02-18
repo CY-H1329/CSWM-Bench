@@ -1,0 +1,46 @@
+{
+  "name": "gpt4o",
+  "full_name": "GPT-4o",
+  "description": "GPT-4o: proprietary multimodal model.",
+  "3dsrbench_overall": 0.5758,
+  "3dsrbench_per_category": {
+    "location_above": 0.6923,
+    "height_higher": 0.5185,
+    "location_closer_to_camera": 0.6691,
+    "multi_object_closer_to": 0.68,
+    "orientation_on_the_left": 0.6364,
+    "multi_object_facing": 0.4219,
+    "multi_object_same_direction": 0.4783,
+    "orientation_in_front_of": 0.6429,
+    "multi_object_viewpoint_towards_object": 0.3846,
+    "orientation_viewpoint": 0.50,
+    "location_next_to": 0.7465,
+    "multi_object_parallel": 0.5385
+  },
+  "unified_per_category": {
+    "depth": 0.5758,
+    "distance": 0.675,
+    "relation": 0.7465,
+    "existence": 0.5758,
+    "count": 0.5758,
+    "instance_location": 0.5758,
+    "orientation": 0.568,
+    "size": 0.5758,
+    "reach": 0.5758
+  },
+  "category_ranking": {
+    "relation": 1,
+    "distance": 2,
+    "orientation": 3,
+    "depth": 4,
+    "existence": 5,
+    "count": 5,
+    "instance_location": 5,
+    "size": 5,
+    "reach": 5
+  },
+  "initial_weight": 0.5,
+  "runner_type": "api",
+  "model_id": "gpt-4o",
+  "api_key_env": "OPENAI_API_KEY"
+}
