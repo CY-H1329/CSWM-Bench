@@ -1,6 +1,6 @@
 # Results Summary
 
-Generated: 2026-02-18T09:15:10.613817
+Generated: 2026-02-18T09:22:04.434823
 
 Aggregated results for paper submission. Raw data in `results/` on H100.
 
