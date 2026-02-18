@@ -81,6 +81,33 @@ def gather_results(results_dir: Path, summary_root: Path) -> int:
                             print(f"  {src.relative_to(results_dir)} -> {dst.relative_to(ROOT)}")
                             n += 1
 
+    # Head-Agent (CV-Bench + 3DSRBench category routing)
+    head_base = results_dir / "runs" / "head_agent"
+    if head_base.exists():
+        for benchmark in ["cvbench", "3dsrbench"]:
+            cat_dir = head_base / benchmark / "category_routing"
+            if not cat_dir.exists():
+                continue
+            for ts_dir in sorted(cat_dir.iterdir(), key=lambda p: p.name, reverse=True):
+                if not ts_dir.is_dir():
+                    continue
+                for model_dir in ts_dir.iterdir():
+                    if model_dir.is_dir() and (model_dir / "results.json").exists():
+                        src = model_dir / "results.json"
+                        dst = summary_root / "head_agent" / benchmark / ts_dir.name / model_dir.name / "results.json"
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(src, dst)
+                        print(f"  {src.relative_to(results_dir)} -> {dst.relative_to(ROOT)}")
+                        n += 1
+                summary_src = ts_dir / "summary.txt"
+                if summary_src.exists():
+                    dst = summary_root / "head_agent" / benchmark / ts_dir.name / "summary.txt"
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(summary_src, dst)
+                    print(f"  {summary_src.relative_to(results_dir)} -> {dst.relative_to(ROOT)}")
+                    n += 1
+                break  # only latest timestamp per benchmark
+
     # CV-Bench API
     cvbench_api_base = results_dir / "runs" / "cvbench" / "api_models"
     if cvbench_api_base.exists():
@@ -132,6 +159,7 @@ Aggregated results for paper submission. Raw data in `results/` on H100.
 - `3dsrbench/gpu/` — Qwen3, Sa2VA, LLaVA4D (results.json per run)
 - `cvbench/gpu/` — Qwen3, Sa2VA, LLaVA4D (results.json per run)
 - `cvbench/api_models/` — Claude, GPT-4o, Gemini (results.json, summary.txt)
+- `head_agent/cvbench/`, `head_agent/3dsrbench/` — Head-Agent category routing (GPT-5.2, Claude Opus 4.5, GLM-5)
 """, encoding="utf-8")
     print(f"  {readme.relative_to(ROOT)}")
 
