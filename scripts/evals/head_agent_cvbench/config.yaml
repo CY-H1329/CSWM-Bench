@@ -1,0 +1,27 @@
+# Head-Agent Category Routing — CV-Bench / 3DSRBench
+# Candidats Head-Agent: GPT-5.2, GLM-5, Claude Opus 4.5
+# API keys: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY
+
+dataset:
+  benchmark: cvbench   # or 3dsrbench
+  max_samples: 100    # Mini-protocol: 100 samples for Head-Agent selection
+  seed: 42
+
+models:
+  gpt5_2:
+    enabled: true
+    model_id: "gpt-5.2"
+    api_key_env: "OPENAI_API_KEY"
+  glm5:
+    enabled: true
+    model_id: "z-ai/glm-5"
+    base_url: "https://openrouter.ai/api/v1"
+    api_key_env: "OPENROUTER_API_KEY"
+    # Note: GLM-5 may be text-only; use --text_only if vision fails
+  claude_opus_4_5:
+    enabled: true
+    model_id: "claude-opus-4-5-20251101"
+    api_key_env: "ANTHROPIC_API_KEY"
+
+output:
+  dir: "results"

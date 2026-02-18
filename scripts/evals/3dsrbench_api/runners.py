@@ -199,6 +199,49 @@ class DeepSeekVLRunner:
         return ""
 
 
+class OpenRouterRunner:
+    """Generic OpenRouter runner (OpenAI-compatible API). Supports vision models like GLM-5."""
+    def __init__(
+        self,
+        model_id: str,
+        api_key: Optional[str] = None,
+        base_url: str = "https://openrouter.ai/api/v1",
+    ):
+        if not OPENAI_AVAILABLE:
+            raise ImportError("Install: pip install openai")
+        key = (api_key or os.environ.get("OPENROUTER_API_KEY", "")).strip()
+        if not key:
+            raise ValueError("Set OPENROUTER_API_KEY")
+        self.client = OpenAI(api_key=key, base_url=base_url)
+        self.model_id = model_id
+
+    def generate(
+        self,
+        image: Image.Image,
+        prompt: str,
+        temperature: float = 0.0,
+        max_tokens: int = 1024,
+        **kwargs,
+    ) -> str:
+        prompt = _sanitize(prompt)
+        b64 = _img_to_base64(image)
+        resp = self.client.chat.completions.create(
+            model=self.model_id,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
+            max_tokens=max_tokens,
+            temperature=max(0.0, temperature),
+        )
+        return (resp.choices[0].message.content or "").strip()
+
+
 class GeminiRunner:
     """Gemini (Gemini Robotics-ER or gemini-2.0-flash) via Google GenAI."""
     def __init__(self, model_id: str = "gemini-2.0-flash", api_key: Optional[str] = None):
