@@ -3,8 +3,8 @@
 # API keys: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY
 
 dataset:
-  benchmark: cvbench   # or 3dsrbench
-  max_samples: 100    # Mini-protocol: 100 samples for Head-Agent selection
+  # --benchmark all (default): cvbench (4 cats) + 3dsrbench (12 cats)
+  max_samples: 100    # per benchmark
   seed: 42
 
 models:
