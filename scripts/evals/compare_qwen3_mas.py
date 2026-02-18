@@ -8,10 +8,12 @@ and compare results.
 Usage:
   python scripts/evals/compare_qwen3_mas.py
   python scripts/evals/compare_qwen3_mas.py --num_samples 10 --seed 42
+  python scripts/evals/compare_qwen3_mas.py --qwen_only   # Verify Qwen first, skip MAS
 """
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -155,6 +157,17 @@ def _norm_answer(s: str) -> str:
     return s
 
 
+def _canonical_letter(s: str) -> str:
+    """Extract A/B/C/D for comparison. Handles both 'A' and '(A)' formats."""
+    if not s:
+        return ""
+    s = str(s).strip().upper()
+    if s in "ABCD":
+        return s
+    m = re.search(r"\(([A-D])\)", s)
+    return m.group(1) if m else ""
+
+
 def build_mas_runners(config: dict):
     """Build Head, Specialist, Reasoning runners."""
     head_cfg = config.get("head_agent", {})
@@ -227,6 +240,7 @@ def main():
     parser.add_argument("--num_samples", type=int, default=10)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output_dir", default=None, help="Output directory (default: results/comparison_qwen3_mas)")
+    parser.add_argument("--qwen_only", action="store_true", help="Run only Qwen3-4B to verify it works (no MAS)")
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
@@ -272,8 +286,7 @@ def main():
             try:
                 resp = qwen_runner.generate(img, _build_qwen3_prompt(query), max_new_tokens=1024)
                 pred = normalize_answer_only(resp)
-                gt_norm = _norm_answer(gt)
-                correct = pred == gt_norm
+                correct = _canonical_letter(pred) == _canonical_letter(gt)
                 qwen_results.append({
                     "idx": i, "query": query[:200], "gt": gt, "pred": pred,
                     "full_response": resp[:500], "correct": correct,
@@ -285,6 +298,30 @@ def main():
     qwen_total = len(qwen_results)
     qwen_acc = qwen_correct / qwen_total if qwen_total else 0
     print(f"  Qwen3-4B: {qwen_correct}/{qwen_total} = {qwen_acc:.2%}")
+
+    if args.qwen_only:
+        print("\n[--qwen_only] Skipping MAS. Qwen verification complete.")
+        print("\nPer-sample results:")
+        print(f"{'Idx':<5} {'GT':<6} {'Qwen3':<8} {'Qwen✓':<6}")
+        print("-" * 35)
+        for i in range(len(ds)):
+            qr = next((r for r in qwen_results if r.get("idx") == i), {})
+            q_pred = qr.get("pred", "err")
+            q_ok = "✓" if qr.get("correct") else "✗"
+            gt = qr.get("gt", "?")
+            print(f"{i:<5} {gt:<6} {q_pred:<8} {q_ok:<6}")
+        with open(run_dir / "summary.json", "w") as f:
+            json.dump({
+                "category": TARGET_CATEGORY,
+                "num_samples": n_take,
+                "seed": args.seed,
+                "qwen3_4b": {"correct": qwen_correct, "total": qwen_total, "accuracy": qwen_acc},
+            }, f, indent=2)
+        with open(run_dir / "qwen3_results.jsonl", "w") as f:
+            for r in qwen_results:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(f"\nResults saved to {run_dir}")
+        return
 
     # 3. Run MAS
     print("\n--- MAS Pipeline ---")
@@ -341,7 +378,7 @@ def main():
                     continue
                 pred = out.get("final_answer", "")
                 pred_norm = _norm_answer(pred)
-                correct = pred_norm == gt_norm
+                correct = _canonical_letter(pred) == _canonical_letter(gt)
                 cat = out.get("predicted_category", "")
                 category_seen[cat] = True
                 mas_results.append({
