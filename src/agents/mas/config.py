@@ -10,11 +10,16 @@ from typing import Dict, List, Optional
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _CONFIGS_MAS = _PROJECT_ROOT / "configs" / "mas"
 
-# 6 candidate specialist agents
+# MAS roles (Direct, 3D, SceneGraph)
+MAS_ROLES = ["Direct", "3D", "SceneGraph"]
+
+# Candidate specialist agents (GPU: qwen3_4b, sa2va, llava4d, spatialrgpt, spatialreasoner)
 CANDIDATE_AGENTS = [
-    "llava4d",
     "qwen3_4b",
     "sa2va",
+    "llava4d",
+    "spatialrgpt",
+    "spatialreasoner",
     "claude_sonnet_4_5",
     "gpt4o",
     "gemini_robotics_er",
@@ -138,6 +143,32 @@ AGENT_PROFILES: Dict[str, Dict[str, float]] = {
         "instance_location": 0.72,
         "size": 0.66,
         "reach": 0.70,
+    },
+    "spatialrgpt": {
+        "description": "SpatialRGPT: VILA 1.5, grounded spatial reasoning (NeurIPS'24).",
+        "3dsrbench_overall": 0.45,
+        "depth": 0.70,
+        "relation": 0.55,
+        "distance": 0.60,
+        "count": 0.50,
+        "orientation": 0.55,
+        "existence": 0.55,
+        "instance_location": 0.50,
+        "size": 0.55,
+        "reach": 0.50,
+    },
+    "spatialreasoner": {
+        "description": "SpatialReasoner: Qwen2.5-VL, 3D spatial SOTA on 3DSRBench (NeurIPS'25).",
+        "3dsrbench_overall": 0.603,
+        "depth": 0.75,
+        "relation": 0.65,
+        "distance": 0.70,
+        "count": 0.60,
+        "orientation": 0.68,
+        "existence": 0.65,
+        "instance_location": 0.62,
+        "size": 0.64,
+        "reach": 0.60,
     },
 }
 

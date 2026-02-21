@@ -16,6 +16,7 @@ from .prompts import (
     format_score_table_full,
 )
 from .score_manager import ScoreManager
+from .role_assignment import assign_roles_from_scores, agent_to_role_mapping
 
 
 def _parse_head_output(text: str) -> Optional[Dict]:
@@ -63,10 +64,11 @@ def run_spatial_mas_pipeline(
     query: str,
     gt_answer: Optional[str] = None,
     head_generate: Callable[[Image.Image, str], str] = None,
-    specialist_generate: Callable[[str, Image.Image, str], str] = None,
+    specialist_generate: Callable[..., str] = None,
     reasoning_generate: Callable[[Image.Image, str], str] = None,
     score_manager: Optional[ScoreManager] = None,
     category_seen: Optional[Dict[str, bool]] = None,
+    use_role_assignment: bool = True,
 ) -> Dict:
     """
     Run full Spatial MAS pipeline.
@@ -76,10 +78,13 @@ def run_spatial_mas_pipeline(
         query: Question
         gt_answer: Ground truth (for score update)
         head_generate: fn(image, prompt) -> str
-        specialist_generate: fn(model_name, image, prompt) -> str
+        specialist_generate: fn(agent_name, image, prompt, role=None) -> str.
+            When use_role_assignment=True, role is passed (Direct/3D/SceneGraph).
+            Use runner.generate_by_role(image, prompt, role) for tool-augmented inference.
         reasoning_generate: fn(image, prompt) -> str
         score_manager: ScoreManager for weight updates
         category_seen: {category: bool} — whether each category was seen before
+        use_role_assignment: If True, assign roles by score and pass to specialist_generate.
 
     Returns:
         {
@@ -99,7 +104,7 @@ def run_spatial_mas_pipeline(
     # 1. Head-Agent
     agent_profiles = load_agent_profiles()
     profiles_text = format_agent_profiles(agent_profiles)
-    score_text = format_score_table_full(score_manager.to_dict(), TASK_CATEGORIES)
+    score_text = format_score_table_full(score_manager.to_dict_flat(), TASK_CATEGORIES)
 
     head_prompt = build_head_agent_prompt(
         query=query,
@@ -132,7 +137,7 @@ def run_spatial_mas_pipeline(
         "You may use tools if they meaningfully reduce uncertainty.",
     ])
 
-    # 2. Specialist Agents
+    # 2. Specialist Agents (role assignment by score)
     specialist_prompt = build_specialist_agent_prompt(
         query=query,
         predicted_category=pred_cat,
@@ -141,11 +146,25 @@ def run_spatial_mas_pipeline(
         shared_rules=shared_rules,
     )
 
+    role_to_agent = {}
+    agent_to_role = {}
+    if use_role_assignment:
+        role_to_agent = assign_roles_from_scores(score_manager, pred_cat, selected)
+        agent_to_role = agent_to_role_mapping(role_to_agent)
+
     agent_results = []
     for agent_name in selected:
-        out = specialist_generate(agent_name, image, specialist_prompt) if specialist_generate else ""
+        role = agent_to_role.get(agent_name, "Direct") if use_role_assignment else "Direct"
+        if specialist_generate:
+            try:
+                out = specialist_generate(agent_name, image, specialist_prompt, role=role)
+            except TypeError:
+                out = specialist_generate(agent_name, image, specialist_prompt)
+        else:
+            out = ""
         parsed = _parse_specialist_output(out)
         parsed["agent_name"] = agent_name
+        parsed["role"] = role
         parsed["raw"] = out[:500]
         agent_results.append(parsed)
 
@@ -171,13 +190,15 @@ def run_spatial_mas_pipeline(
         gt_norm = _norm(gt_answer)
         for r in agent_results:
             agent_name = r.get("agent_name", "")
+            role = r.get("role", "Direct")
             ans = r.get("answer", "")
             correct = _norm(ans) == gt_norm
-            score_manager.update(agent_name, pred_cat, correct)
+            score_manager.update(agent_name, pred_cat, correct, role=role)
 
     return {
         "predicted_category": pred_cat,
         "selected_agents": selected,
+        "role_assignment": role_to_agent,
         "agent_results": agent_results,
         "final_answer": final_answer,
         "reasoning_justification": reasoning_parsed.get("justification", ""),

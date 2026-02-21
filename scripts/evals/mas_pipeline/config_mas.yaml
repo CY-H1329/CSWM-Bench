@@ -24,6 +24,14 @@ specialists:
     runner: "gpu"
     model_id: "llava-hf/llava-v1.6-mistral-7b-hf"
     device: "cuda"
+  spatialrgpt:
+    runner: "gpu"
+    model_id: "a8cheng/SpatialRGPT-VILA1.5-8B"
+    device: "cuda"
+  spatialreasoner:
+    runner: "gpu"
+    model_id: "ccvl/SpatialReasoner"
+    device: "cuda"
   claude_sonnet_4_5:
     runner: "api"
     api_runner: "claude"
