@@ -1,0 +1,20 @@
+# H100 eval - pip install -r eval_h100/requirements_h100.txt
+# Use with: conda activate spatial_mas (or your env)
+
+torch>=2.1.0
+torchvision
+transformers>=4.51.0
+datasets
+huggingface_hub
+accelerate
+qwen-vl-utils
+pillow
+tqdm
+pyyaml
+pandas
+numpy
+
+# Optional: API-based runners
+openai>=1.0.0
+google-genai
+anthropic
