@@ -52,23 +52,28 @@ Provide your final answer as (A), (B), (C), or (D)."""
 
 
 def load_spatial_reasoner(model_id: str, device: str = "cuda"):
-    """Load SpatialReasoner (Qwen2.5-VL based) via pipeline."""
+    """Load SpatialReasoner (Qwen2.5-VL based) — direct model+processor."""
     try:
-        from transformers import pipeline
+        from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
     except ImportError:
         raise ImportError("SpatialReasoner requires transformers>=4.50. pip install transformers>=4.50")
 
     import torch
 
     dtype = torch.bfloat16 if device == "cuda" else torch.float32
-    pipe = pipeline(
-        task="image-text-to-text",
-        model=model_id,
-        device=0 if device == "cuda" else -1,
+    # Processor: ccvl/SpatialReasoner* has compat issues with AutoProcessor; use base Qwen2.5-VL
+    if "ccvl/SpatialReasoner" in model_id:
+        processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", trust_remote_code=True)
+    else:
+        processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        model_id,
         torch_dtype=dtype,
+        device_map="auto" if device == "cuda" else None,
         trust_remote_code=True,
     )
-    return pipe
+    model.eval()
+    return model, processor
 
 
 def main():
@@ -85,8 +90,9 @@ def main():
     print(f"  {len(ds)} samples")
 
     print(f"Loading {args.model_id}...")
-    pipe = load_spatial_reasoner(args.model_id, args.device)
+    model, processor = load_spatial_reasoner(args.model_id, args.device)
 
+    import torch
     out_dir = Path(args.output_dir)
     run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = out_dir / run_name
@@ -118,12 +124,23 @@ def main():
         ]
 
         try:
-            out = pipe(text=messages, max_new_tokens=512, do_sample=False, return_full_text=False)
-            response = out[0]
-            if isinstance(response, dict):
-                response = response.get("generated_text", response.get("text", str(response)))
-            else:
-                response = str(response)
+            inputs = processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt",
+            )
+            inputs = {k: v.to(model.device) if hasattr(v, "to") else v for k, v in inputs.items()}
+            pad_id = processor.tokenizer.pad_token_id or processor.tokenizer.eos_token_id
+            with torch.no_grad():
+                out = model.generate(
+                    **inputs,
+                    max_new_tokens=512,
+                    do_sample=False,
+                    pad_token_id=pad_id,
+                )
+            response = processor.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
             pred = normalize_answer_only(response)
             is_correct = _canonical_letter(pred) == _canonical_letter(gt)
             if is_correct:
