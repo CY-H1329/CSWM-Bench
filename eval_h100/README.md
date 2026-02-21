@@ -70,7 +70,8 @@ git push origin main
 
 - Python 3.10, Conda
 - CUDA (H100)
-- HuggingFace 로그인 (모델 다운로드): `huggingface-cli login`
+- HuggingFace 로그인 (gated 모델): `huggingface-cli login`
+- 첫 실행 시 모델 자동 다운로드 (~4–8GB per model)
 
 ## 선택 사항
 
