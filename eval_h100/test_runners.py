@@ -87,7 +87,7 @@ def main():
     if args.all:
         print("[2/3] Testing all available models (local only, no API) ...")
         import os
-        to_test = ["qwen3_4b", "sa2va", "llava4d", "spatialllm", "deepseek_r1"]
+        to_test = ["qwen3_4b", "sa2va", "llava4d", "spatialreasoner", "deepseek_r1"]
         if os.environ.get("SPATIALRGPT_PATH"):
             to_test.append("spatialrgpt")
         ok = 0

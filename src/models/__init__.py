@@ -18,9 +18,9 @@ try:
 except ImportError:
     SpatialRGPTRunner = None
 try:
-    from .spatialllm import SpatialLLMRunner
+    from .spatialreasoner import SpatialReasonerRunner
 except ImportError:
-    SpatialLLMRunner = None
+    SpatialReasonerRunner = None
 
 from .registry import get_runner, list_agents, AGENT_REGISTRY
 
@@ -37,7 +37,7 @@ __all__ = [
     "GeminiRunner",
     "ClaudeRunner",
     "SpatialRGPTRunner",
-    "SpatialLLMRunner",
+    "SpatialReasonerRunner",
     "get_runner",
     "list_agents",
     "AGENT_REGISTRY",

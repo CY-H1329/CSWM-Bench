@@ -29,9 +29,9 @@ try:
 except ImportError:
     SpatialRGPTRunner = None
 try:
-    from .spatialllm import SpatialLLMRunner
+    from .spatialreasoner import SpatialReasonerRunner
 except ImportError:
-    SpatialLLMRunner = None
+    SpatialReasonerRunner = None
 
 # Agent name -> (RunnerClass, default_model_id, is_vision)
 AGENT_REGISTRY: Dict[str, tuple] = {
@@ -44,8 +44,8 @@ AGENT_REGISTRY: Dict[str, tuple] = {
     "spatialrgpt": (SpatialRGPTRunner, "a8cheng/SpatialRGPT-VILA1.5-8B", True)
     if SpatialRGPTRunner
     else (None, None, True),
-    "spatialllm": (SpatialLLMRunner, "ccvl/SpatialReasoner", True)
-    if SpatialLLMRunner
+    "spatialreasoner": (SpatialReasonerRunner, "ccvl/SpatialReasoner", True)
+    if SpatialReasonerRunner
     else (None, None, True),
     # API-based
     "gpt4o": (GPTRunner, "gpt-4o", True),
@@ -70,7 +70,7 @@ def get_runner(
     Instantiate a runner for the given agent name.
 
     Args:
-        agent_name: Config key (e.g. qwen3_4b, sa2va, llava4d, spatialrgpt, spatialllm)
+        agent_name: Config key (e.g. qwen3_4b, sa2va, llava4d, spatialrgpt, spatialreasoner)
         model_id: Override default model ID
         device: cuda/cpu
         **kwargs: Passed to runner __init__
@@ -93,8 +93,20 @@ def get_runner(
     return cls(model_id=mid, **init_kw)
 
 
+# HuggingFace URLs per agent (model_id -> HF page)
+AGENT_HF_URLS = {
+    "qwen3_4b": "https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct",
+    "sa2va": "https://huggingface.co/ByteDance/Sa2VA-4B",
+    "llava4d": "https://huggingface.co/llava-hf/llava-v1.6-mistral-7b-hf",
+    "spatialrgpt": "https://huggingface.co/a8cheng/SpatialRGPT-VILA1.5-8B",
+    "spatialreasoner": "https://huggingface.co/ccvl/SpatialReasoner",
+    "deepseek_r1": "https://huggingface.co/deepseek-ai/DeepSeek-R1",
+    "deepseek_vl": "https://huggingface.co/deepseek-ai/deepseek-vl-7b-chat",
+}
+
+
 def list_agents() -> Dict[str, Dict[str, Any]]:
-    """Return agent name -> {runner, model_id, is_vision}."""
+    """Return agent name -> {runner, model_id, is_vision, hf_url}."""
     out = {}
     for name, entry in AGENT_REGISTRY.items():
         cls, mid, is_vision = entry if isinstance(entry, tuple) else (None, None, True)
@@ -102,5 +114,6 @@ def list_agents() -> Dict[str, Dict[str, Any]]:
             "runner": cls.__name__ if cls else None,
             "model_id": mid,
             "is_vision": is_vision,
+            "hf_url": AGENT_HF_URLS.get(name),
         }
     return out

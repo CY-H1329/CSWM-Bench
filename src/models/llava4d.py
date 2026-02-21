@@ -1,15 +1,22 @@
 """
-LLaVA-4D inference for MAS Perception Agent.
+LLaVA-4D Runner pour Spatial MAS.
 
-LLaVA-4D (ICLR 2026) is not yet publicly released.
-This runner uses LLaVA-1.6-NeXT (llava-v1.6-mistral-7b-hf) as a proxy:
-- Same LLaVA family, strong on spatial/relation tasks
-- Replace model_id when LLaVA-4D is released on HuggingFace
+Rôle MAS: Perception Agent — Direct / relation-focused.
+LLaVA-4D (ICLR 2026) n'est pas encore public. Ce runner utilise LLaVA-1.6-NeXT
+(llava-v1.6-mistral-7b-hf) comme proxy: même famille LLaVA, fort sur tâches spatiales/relation.
 
-Ref: https://openreview.net/forum?id=URpbmVEsqB
-Proxy: https://huggingface.co/llava-hf/llava-v1.6-mistral-7b-hf
+Refs:
+- https://openreview.net/forum?id=URpbmVEsqB (LLaVA-4D)
+- https://arxiv.org/html/2503.04954v1 (Trust-based MAS)
+- https://huggingface.co/llava-hf/llava-v1.6-mistral-7b-hf
+
+Requires: transformers>=4.45 (LlavaNextForConditionalGeneration)
 """
-from typing import Optional
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, List, Optional
+
 from PIL import Image
 import torch
 from transformers import AutoProcessor
@@ -19,33 +26,54 @@ try:
 except ImportError:
     LlavaNextForConditionalGeneration = None
 
+from .base import BaseVLM
 
-class LLaVA4DRunner:
+logger = logging.getLogger(__name__)
+
+# HuggingFace: https://huggingface.co/llava-hf/llava-v1.6-mistral-7b-hf (proxy LLaVA-4D)
+LLAVA4D_HF_URL = "https://huggingface.co/llava-hf/llava-v1.6-mistral-7b-hf"
+LLAVA4D_MAS_ROLES = ["Direct", "3D", "SceneGraph"]
+
+
+class LLaVA4DRunner(BaseVLM):
     """
-    Runner for LLaVA-4D (proxy: LLaVA-1.6-NeXT until release).
-    For role-based MAS: Direct / relation-focused perception.
+    Runner pour LLaVA-4D (proxy: LLaVA-1.6-NeXT jusqu'à release).
+
+    HuggingFace: https://huggingface.co/llava-hf/llava-v1.6-mistral-7b-hf
+
+    Perception Agent MAS: Direct / relation-focused.
+    Format LLaVA: conversation avec image + text.
     """
 
     def __init__(
         self,
         model_id: str = "llava-hf/llava-v1.6-mistral-7b-hf",
         device: Optional[str] = None,
+        torch_dtype: Optional[torch.dtype] = None,
         **kwargs,
     ):
         if LlavaNextForConditionalGeneration is None:
             raise ImportError(
-                "LLaVA-4D (proxy) requires transformers with LlavaNext. "
+                "LLaVA-4D (proxy) requiert transformers avec LlavaNext. "
                 "pip install transformers>=4.45"
             )
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         device_map = "auto" if device == "cuda" and torch.cuda.is_available() else device
+        dtype = torch_dtype or (
+            torch.bfloat16 if device == "cuda" else torch.float32
+        )
+
         self.model_id = model_id
         self.device = device
+        self.mas_roles = LLAVA4D_MAS_ROLES
+        self.hf_url = LLAVA4D_HF_URL
 
-        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+        self.processor = AutoProcessor.from_pretrained(
+            model_id, trust_remote_code=True
+        )
         self.model = LlavaNextForConditionalGeneration.from_pretrained(
             model_id,
-            torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
+            torch_dtype=dtype,
             device_map=device_map,
             trust_remote_code=True,
             **kwargs,
@@ -60,9 +88,14 @@ class LLaVA4DRunner:
         max_new_tokens: int = 512,
         top_k: int = 0,
         top_p: float = 0.0,
+        return_full_output: bool = False,
         **kwargs,
-    ) -> str:
-        """Generate answer from image + prompt."""
+    ) -> str | Dict[str, Any]:
+        """
+        Génère une réponse à partir de (image, prompt).
+
+        Format LLaVA: conversation avec content [image, text].
+        """
         conversation = [
             {
                 "role": "user",
@@ -72,9 +105,11 @@ class LLaVA4DRunner:
                 ],
             }
         ]
+
         prompt_str = self.processor.apply_chat_template(
             conversation, tokenize=False, add_generation_prompt=True
         )
+
         try:
             inputs = self.processor(image, prompt_str, return_tensors="pt").to(
                 self.model.device
@@ -103,5 +138,38 @@ class LLaVA4DRunner:
             start = inputs.input_ids.shape[1]
         else:
             start = 0
+
         answer = self.processor.decode(out[0][start:], skip_special_tokens=True)
-        return answer.strip()
+        answer = answer.strip()
+
+        if return_full_output:
+            return {
+                "answer": answer,
+                "raw": answer,
+                "cot": self._extract_cot(answer),
+            }
+        return answer
+
+    def _extract_cot(self, text: str) -> str:
+        """Extrait le chain-of-thought pour shared memory (z_i)."""
+        for marker in ["CoT:", "Chain-of-thought:", "Reasoning:", "Strategy:"]:
+            if marker in text:
+                idx = text.find(marker) + len(marker)
+                return text[idx:].strip()[:2000]
+        return text[:1000]
+
+    def run_batch(
+        self,
+        images: List[Image.Image],
+        prompts: List[str],
+        **kwargs,
+    ) -> List[str]:
+        """Exécute une série de (image, prompt) séquentiellement."""
+        return [
+            self.generate(img, p, **kwargs)
+            for img, p in zip(images, prompts)
+        ]
+
+    def get_mas_role_preference(self) -> str:
+        """Rôle MAS préféré (relation-focused)."""
+        return "Direct"
