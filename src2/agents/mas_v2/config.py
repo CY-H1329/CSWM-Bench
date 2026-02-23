@@ -30,75 +30,75 @@ HEAD_AGENT_MODEL = "qwen3_4b"           # Qwen3-VL-4B (VLM, image+text category 
 REASONING_AGENT_MODEL = "deepseek_r1"   # DeepSeek-R1 (text-only, final reasoning)
 
 # ---------------------------------------------------------------------------
-# Unified spatial category taxonomy (16 categories, benchmark-agnostic)
+# Unified spatial category taxonomy — 5 categories
 #
-# The Head Agent classifies ANY incoming question into the most fitting
-# category from this fixed list.  The score map has one 5×3 sheet per
-# category regardless of which benchmark the question came from.
+# Grounded in cognitive neuroscience:
+#   1. spatial_relation  — Categorical spatial processing (left parietal)
+#   2. distance_depth    — Coordinate spatial processing (right parietal)
+#   3. size              — Magnitude processing (IPS)
+#   4. orientation       — Mental rotation / direction (parietal)
+#   5. counting          — Numerosity processing (IPS)
+#
+# References:
+#   - Kosslyn 1987: categorical vs coordinate spatial representations
+#   - Walsh 2003 (ATOM): shared magnitude system for size/number
+#   - Levinson 2003: frames of reference (intrinsic/relative/absolute)
+#   - SpatialBench, VSI-Bench, SpatialRGPT-Bench: benchmark convergence
 # ---------------------------------------------------------------------------
 ALL_CATEGORIES = [
-    # --- 3D spatial location ---
-    "location_above",
-    "height_higher",
-    "location_closer_to_camera",
-    "multi_object_closer_to",
-    "location_next_to",
-    # --- orientation / direction ---
-    "orientation_on_the_left",
-    "orientation_in_front_of",
-    "orientation_viewpoint",
-    "multi_object_facing",
-    "multi_object_same_direction",
-    "multi_object_viewpoint_towards_object",
-    "multi_object_parallel",
-    # --- counting / relation / depth / distance ---
-    "count",
-    "relation",
-    "depth",
-    "distance",
+    "spatial_relation",
+    "distance_depth",
+    "size",
+    "orientation",
+    "counting",
 ]
 
 CATEGORY_DESCRIPTIONS = {
-    # 3D spatial location
-    "location_above":
-        "Object A is above/below object B in 3D space (vertical positioning).",
-    "height_higher":
-        "Comparing the height or vertical extent of objects (which is taller/higher).",
-    "location_closer_to_camera":
-        "Which single object is closer to or farther from the camera viewpoint.",
-    "multi_object_closer_to":
-        "Among multiple objects, which one is closest to a reference object or point.",
-    "location_next_to":
-        "Whether two objects are adjacent or next to each other (proximity in horizontal plane).",
-    # Orientation / direction
-    "orientation_on_the_left":
-        "Whether an object is on the left or right side relative to another object or the viewer.",
-    "orientation_in_front_of":
-        "Whether object A is in front of or behind object B in 3D space.",
-    "orientation_viewpoint":
-        "Questions about the camera or viewer's own orientation and perspective.",
-    "multi_object_facing":
-        "The facing direction of one or more objects (which way they are oriented).",
-    "multi_object_same_direction":
-        "Whether multiple objects face or point in the same direction.",
-    "multi_object_viewpoint_towards_object":
-        "Viewpoint-dependent orientation — whether objects are oriented towards a specific target from the viewer's perspective.",
-    "multi_object_parallel":
-        "Whether multiple objects are arranged in parallel alignment.",
-    # Counting / relation / depth / distance
-    "count":
-        "Counting the number of objects or instances of a specific type in the scene.",
-    "relation":
-        "Spatial relationship between objects (left/right, above/below, inside/outside, etc.).",
-    "depth":
-        "Relative depth ordering — which object is closer to or farther from the camera.",
-    "distance":
-        "Estimating or comparing distances between objects in the scene.",
+    "spatial_relation":
+        "Positional relationship between objects: above/below, left/right, "
+        "in front of/behind, next to, between, inside/outside. "
+        "Asks WHERE one object is relative to another.",
+    "distance_depth":
+        "How far apart objects are (allocentric distance) or how far an object "
+        "is from the camera/viewer (egocentric depth). "
+        "Asks HOW FAR — includes both depth and distance questions.",
+    "size":
+        "Comparing the size, height, or scale of objects: taller/shorter, "
+        "bigger/smaller, wider/narrower. "
+        "Asks HOW BIG one object is compared to another.",
+    "orientation":
+        "Which direction objects face, viewpoint-dependent questions, rotation, "
+        "parallel/perpendicular arrangement, same/different facing direction. "
+        "Asks WHICH WAY objects are oriented.",
+    "counting":
+        "Counting how many objects or instances of a type exist in the scene. "
+        "Asks HOW MANY.",
 }
 
-# Legacy aliases (kept for backward compatibility if needed)
-CATEGORIES_3DSRBENCH = ALL_CATEGORIES[:12]
-CATEGORIES_CVBENCH = ALL_CATEGORIES[12:]
+# ---------------------------------------------------------------------------
+# Mapping: fine-grained benchmark categories → 5 unified categories
+# Used for GT evaluation (never passed to Head Agent)
+# ---------------------------------------------------------------------------
+FINE_TO_UNIFIED = {
+    # 3DSRBench (12 categories)
+    "location_above": "spatial_relation",
+    "height_higher": "size",
+    "location_closer_to_camera": "distance_depth",
+    "multi_object_closer_to": "distance_depth",
+    "location_next_to": "spatial_relation",
+    "orientation_on_the_left": "spatial_relation",
+    "orientation_in_front_of": "spatial_relation",
+    "orientation_viewpoint": "orientation",
+    "multi_object_facing": "orientation",
+    "multi_object_same_direction": "orientation",
+    "multi_object_viewpoint_towards_object": "orientation",
+    "multi_object_parallel": "orientation",
+    # CV-Bench (4 categories)
+    "Count": "counting",
+    "Relation": "spatial_relation",
+    "Depth": "distance_depth",
+    "Distance": "distance_depth",
+}
 
 # ---------------------------------------------------------------------------
 # Score map defaults

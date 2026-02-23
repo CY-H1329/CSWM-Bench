@@ -33,27 +33,30 @@ Your ONLY job is to classify the given question into exactly ONE spatial categor
 
 ## Classification Rules
 
-1. Read the question carefully. Focus on WHAT spatial property is being asked about, not the objects themselves.
-2. If the question asks about relative position (above/below), choose a location or orientation category.
-3. If the question asks "which is closer/farther", choose a distance or depth category.
-4. If the question asks about direction or facing, choose an orientation category.
-5. If the question asks "how many", choose a counting category.
-6. When two categories seem plausible, choose the one that matches the CORE spatial relationship being asked.
+1. Read the question carefully. Focus on WHAT spatial property is being asked about.
+2. "above/below", "left/right", "in front of/behind", "next to", "between" → spatial_relation
+3. "closer/farther", "how far", "depth", "distance", "nearer" → distance_depth
+4. "taller/shorter", "bigger/smaller", "higher", "size" → size
+5. "facing", "direction", "viewpoint", "parallel", "oriented" → orientation
+6. "how many", counting objects → counting
 
 ## Examples
 
-Question: "Is the chair above the table?" → location_above
-Question: "Which object is closer to the camera?" → location_closer_to_camera
-Question: "Is the dog to the left of the cat?" → orientation_on_the_left
-Question: "Are the two cars facing the same direction?" → multi_object_same_direction
-Question: "How many people are in the scene?" → Count
-Question: "Is the red box in front of the blue box?" → orientation_in_front_of
+Question: "Is the chair above the table?" → spatial_relation
+Question: "Is the dog to the left of the cat?" → spatial_relation
+Question: "Which object is closer to the camera?" → distance_depth
+Question: "How far apart are the two chairs?" → distance_depth
+Question: "Which building is taller?" → size
+Question: "Are the two cars facing the same direction?" → orientation
+Question: "Is the bottle parallel to the wall?" → orientation
+Question: "How many people are in the scene?" → counting
 
 ## DO NOT
 
 - Do NOT explain your reasoning.
 - Do NOT output anything other than the category name.
 - Do NOT make up a category that is not in the list.
+- Do NOT answer the question itself — only classify it.
 
 ## Question
 
