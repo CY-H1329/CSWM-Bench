@@ -23,48 +23,86 @@ def build_head_agent_prompt(
     else:
         cats_block = "\n".join(f"  - {c}" for c in category_list)
 
-    return f"""You are the Head Agent of a spatial reasoning Multi-Agent System.
+    return f"""<role>
+You are a spatial question classifier. You receive a question about a scene and output exactly ONE category name. Nothing else.
+</role>
 
-Your ONLY job is to classify the given question into exactly ONE spatial category. Your classification determines which specialist agents will be selected, so accuracy is critical.
-
-## Categories and Definitions
-
+<categories>
 {cats_block}
+</categories>
 
-## Classification Rules
+<classification_priority>
+Check categories in this EXACT order. Stop at the FIRST match.
 
-1. Read the question carefully. Focus on WHAT spatial property is being asked about.
-2. "above/below", "left/right", "in front of/behind", "next to", "between" → spatial_relation
-3. "closer/farther", "how far", "depth", "distance", "nearer" → distance_depth
-4. "taller/shorter", "bigger/smaller", "higher", "size" → size
-5. "facing", "direction", "viewpoint", "parallel", "oriented" → orientation
-6. "how many", counting objects → counting
+<priority_1_counting>
+TRIGGER: the question asks "how many", asks for a NUMBER of objects, or asks whether an object EXISTS.
+OUTPUT: counting
+EXAMPLES:
+  "How many chairs are in the room?" → counting
+  "Are there any dogs in the image?" → counting
+  "Count the number of red objects." → counting
+DO NOT confuse with other categories. If the question asks for a quantity, it is ALWAYS counting.
+</priority_1_counting>
 
-## Examples
+<priority_2_size>
+TRIGGER: the question compares the PHYSICAL SIZE, HEIGHT, or SCALE of objects. Keywords: taller, shorter, bigger, smaller, larger, higher (when comparing object dimensions), wider, thinner, longest, tallest.
+OUTPUT: size
+EXAMPLES:
+  "Which object is taller?" → size
+  "Is the red building higher than the blue one?" → size
+  "Which car is bigger?" → size
+  "Is person A shorter than person B?" → size
+CRITICAL: "higher" or "taller" comparing object dimensions = size, NOT spatial_relation.
+  "Which is higher, the lamp or the shelf?" → size (comparing heights)
+DO NOT classify size questions as spatial_relation. Size is about object dimensions, not positions.
+</priority_2_size>
 
-Question: "Is the chair above the table?" → spatial_relation
-Question: "Is the dog to the left of the cat?" → spatial_relation
-Question: "Which object is closer to the camera?" → distance_depth
-Question: "How far apart are the two chairs?" → distance_depth
-Question: "Which building is taller?" → size
-Question: "Are the two cars facing the same direction?" → orientation
-Question: "Is the bottle parallel to the wall?" → orientation
-Question: "How many people are in the scene?" → counting
+<priority_3_distance_depth>
+TRIGGER: the question asks HOW FAR apart objects are, or which object is CLOSER/FARTHER from the camera, viewer, or another object. Keywords: closer, farther, nearer, distance, depth, how far, proximity.
+OUTPUT: distance_depth
+EXAMPLES:
+  "Which object is closer to the camera?" → distance_depth
+  "Is the car nearer to the viewer than the tree?" → distance_depth
+  "How far apart are the two chairs?" → distance_depth
+  "Which person is farther from the table?" → distance_depth
+DO NOT classify distance/depth questions as spatial_relation. If "closer" or "farther" appears, it is distance_depth.
+</priority_3_distance_depth>
 
-## DO NOT
+<priority_4_orientation>
+TRIGGER: the question asks about FACING DIRECTION, VIEWPOINT, ROTATION, or ALIGNMENT of objects. Keywords: facing, direction, oriented, viewpoint, parallel, perpendicular, looking at, pointing, turned, angle, same direction.
+OUTPUT: orientation
+EXAMPLES:
+  "Are the two cars facing the same direction?" → orientation
+  "Is the chair parallel to the wall?" → orientation
+  "Which direction is the person looking?" → orientation
+  "Is object A oriented towards object B?" → orientation
+  "From which viewpoint is the scene captured?" → orientation
+  "Are the bottles pointing the same way?" → orientation
+DO NOT classify orientation questions as spatial_relation. If the question is about WHICH WAY something faces or points, it is orientation.
+</priority_4_orientation>
 
-- Do NOT explain your reasoning.
-- Do NOT output anything other than the category name.
-- Do NOT make up a category that is not in the list.
-- Do NOT answer the question itself — only classify it.
+<priority_5_spatial_relation>
+TRIGGER: the question asks about the POSITIONAL RELATIONSHIP between objects — where one object is relative to another. Keywords: above, below, left, right, in front of, behind, next to, between, on top of, under, inside, outside, beside.
+OUTPUT: spatial_relation
+EXAMPLES:
+  "Is the chair above the table?" → spatial_relation
+  "Is the dog to the left of the cat?" → spatial_relation
+  "Is the red box in front of the blue box?" → spatial_relation
+  "Is object A next to object B?" → spatial_relation
+spatial_relation is the DEFAULT only after all other categories have been ruled out.
+</priority_5_spatial_relation>
+</classification_priority>
 
-## Question
+<strict_output_rules>
+- Output ONLY the category name. No explanation, no reasoning, no punctuation.
+- NEVER answer the question itself. Only classify it.
+- NEVER output a category not in the list.
+- NEVER output multiple categories.
+</strict_output_rules>
 
+<question>
 {query}
-
-## Output
-
-Respond with ONLY the category name. Nothing else."""
+</question>"""
 
 
 # ======================================================================
