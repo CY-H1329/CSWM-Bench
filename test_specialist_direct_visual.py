@@ -50,6 +50,7 @@ def run_specialist_test(
     benchmark: str = "cvbench",
     max_samples: int = None,
     seed: int = 42,
+    show_failures: int = 0,
 ):
     """
     Run direct_visual_heuristic + Qwen3 on benchmark, report accuracy vs GT.
@@ -59,6 +60,7 @@ def run_specialist_test(
         benchmark: "cvbench" or "3dsrbench"
         max_samples: Limit samples (None = all)
         seed: Random seed
+        show_failures: Print first N wrong cases (query, GT, pred, reason)
     """
     dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
     role = "direct_visual_heuristic"
@@ -97,11 +99,14 @@ def run_specialist_test(
 
         details.append({
             "index": i,
+            "query": query,
             "gt": gt_letter,
             "pred": pred_letter,
             "correct": hit,
             "category": category,
             "raw_answer": answer,
+            "reason": reason,
+            "raw_output": raw[:3000] if raw else "",
         })
 
         if (i + 1) % 50 == 0:
@@ -127,6 +132,26 @@ def run_specialist_test(
             print(f"  {cat:30s}  {100*acc:5.1f}%  ({v['correct']}/{v['total']})")
     print("=" * 60)
 
+    failures = [d for d in details if not d["correct"]]
+
+    # --- Show first N failures ---
+    if show_failures > 0 and failures:
+        n = min(show_failures, len(failures))
+        print()
+        print("=" * 60)
+        print(f"FAILURE ANALYSIS (first {n} of {len(failures)} wrong)")
+        print("=" * 60)
+        for j, d in enumerate(failures[:n]):
+            print()
+            print(f"--- Failure #{j+1} (index={d['index']}, category={d['category']}) ---")
+            print(f"Query:\n{d['query'][:500]}{'...' if len(d['query']) > 500 else ''}")
+            print(f"GT: {d['gt']}  |  Pred: {d['pred']}")
+            reason_preview = (d.get("reason") or "")[:600]
+            if reason_preview:
+                print(f"Model's Reason (truncated):\n{reason_preview}...")
+            print("-" * 40)
+        print("=" * 60)
+
     return {
         "benchmark": benchmark,
         "role": role,
@@ -136,6 +161,7 @@ def run_specialist_test(
         "total": total,
         "per_category": dict(by_category),
         "details": details,
+        "failures": failures,
     }
 
 
@@ -144,8 +170,15 @@ if __name__ == "__main__":
     parser.add_argument("--benchmark", default="cvbench", choices=["cvbench", "3dsrbench"])
     parser.add_argument("--max_samples", type=int, default=100)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--show_failures", type=int, default=0, help="Print first N wrong cases")
     args = parser.parse_args()
 
     from src2.models.qwen3 import Qwen3Runner
     runner = Qwen3Runner(device="cuda" if __import__("torch").cuda.is_available() else "cpu")
-    run_specialist_test(runner, benchmark=args.benchmark, max_samples=args.max_samples, seed=args.seed)
+    run_specialist_test(
+        runner,
+        benchmark=args.benchmark,
+        max_samples=args.max_samples,
+        seed=args.seed,
+        show_failures=args.show_failures,
+    )
