@@ -45,6 +45,8 @@ CATEGORIES_3DSRBENCH = [
 
 CATEGORIES_CVBENCH = ["Count", "Relation", "Depth", "Distance"]
 
+ALL_FINE_CATEGORIES = CATEGORIES_3DSRBENCH + CATEGORIES_CVBENCH  # 16 total
+
 FINE_CATEGORY_DESCRIPTIONS = {
     "location_above":
         "Object A is above/below object B in 3D space (vertical positioning).",
