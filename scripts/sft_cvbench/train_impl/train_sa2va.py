@@ -141,7 +141,15 @@ def train_sa2va(
     step = 0
     for epoch in range(epochs):
         for batch in loader:
-            batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+            moved = {}
+            for k, v in batch.items():
+                if isinstance(v, torch.Tensor):
+                    moved[k] = v.to(device)
+                elif isinstance(v, list) and v and isinstance(v[0], torch.Tensor):
+                    moved[k] = [x.to(device) for x in v]
+                else:
+                    moved[k] = v
+            batch = moved
             # Sa2VAChatModel.forward expects data dict
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")

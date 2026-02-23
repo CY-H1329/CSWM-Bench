@@ -30,7 +30,7 @@ models:
     device: "cuda"
   llava:
     enabled: true
-    model_id: "llava-hf/llava-v1.6-mistral-7b-hf"
+    model_id: "llava-hf/llava-1.5-7b-hf"  # LLaVA-NeXT a un bug token/feature
     device: "cuda"
 
   # Step 1 Phase 1: Qwen-3.0 4B, Llava-4D, Sa2VA
@@ -40,9 +40,9 @@ models:
     device: "cuda"
   llava4d:
     enabled: true
-    # LLaVA-4D not yet released (ICLR 2026). Using LLaVA-NeXT 7B as fallback.
-    # Update model_id when LLaVA-4D is available.
-    model_id: "llava-hf/llava-v1.6-mistral-7b-hf"
+    # LLaVA-NeXT (v1.6) has token/feature mismatch bug. Use LLaVA-1.5 until fixed.
+    # LLaVA-4D not yet released (ICLR 2026).
+    model_id: "llava-hf/llava-1.5-7b-hf"
     device: "cuda"
   sa2va:
     enabled: true
@@ -53,7 +53,8 @@ models:
     enabled: true
     model_id: "a8cheng/SpatialRGPT-VILA1.5-8B"
     device: "cuda"
-    # Requires: export SPATIALRGPT_PATH=/path/to/SpatialRGPT
+    # Requis: export SPATIALRGPT_PATH=/chemin/vers/SpatialRGPT
+    # Ex: export SPATIALRGPT_PATH=$PWD/SpatialRGPT  (si SpatialRGPT est dans le projet)
   spatialreasoner:
     enabled: true
     model_id: "ccvl/SpatialReasoner"

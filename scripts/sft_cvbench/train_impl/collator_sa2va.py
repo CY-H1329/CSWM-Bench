@@ -98,9 +98,10 @@ class Sa2VASFTDataCollator:
         self.patch_token = int(
             (self.image_size // self.patch_size) ** 2 * (self.downsample_ratio ** 2)
         )
-        self.IMG_CONTEXT_TOKEN = "<IMG_CONTEXT>"
-        self.IMG_START_TOKEN = "<img>"
-        self.IMG_END_TOKEN = "</img>"
+        # Sa2VA uses space ' ' as image placeholder (from model.preparing_for_generation)
+        self.IMG_CONTEXT_TOKEN = getattr(self.model, "IMG_CONTEXT_TOKEN", " ")
+        self.IMG_START_TOKEN = getattr(self.model, "IMG_START_TOKEN", " ")
+        self.IMG_END_TOKEN = getattr(self.model, "IMG_END_TOKEN", " ")
         self.IMAGENET_MEAN = (0.485, 0.456, 0.406)
         self.IMAGENET_STD = (0.229, 0.224, 0.225)
         self.transformer = Compose(
@@ -125,9 +126,7 @@ class Sa2VASFTDataCollator:
 
     def _build_input_text(self, prompt: str, answer: str) -> str:
         num_image_tokens = self.patch_token * 1  # single image
-        image_token_str = (
-            f"{self.IMG_START_TOKEN}{self.IMG_CONTEXT_TOKEN * num_image_tokens}{self.IMG_END_TOKEN}"
-        )
+        image_token_str = self.IMG_CONTEXT_TOKEN * num_image_tokens
         text = f"{image_token_str}\n{prompt}"
         template = getattr(self.model, "template", {})
         if isinstance(template, dict) and "INSTRUCTION" in template:
@@ -211,6 +210,7 @@ class Sa2VASFTDataCollator:
             "position_ids": torch.nn.utils.rnn.pad_sequence(
                 all_position_ids, batch_first=True, padding_value=0
             ),
-            "pixel_values": torch.cat(all_pixel_values, dim=0),
+            # Sa2VAChatModel.forward expects list of (N_tiles, C, H, W) per sample
+            "pixel_values": all_pixel_values,
         }
         return result

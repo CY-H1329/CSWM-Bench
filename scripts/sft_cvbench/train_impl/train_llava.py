@@ -1,7 +1,7 @@
 """
-LLaVA-NeXT SFT training on CV-Bench.
-Uses LlavaNextForConditionalGeneration, LoRA, custom training loop.
-Model: llava-hf/llava-v1.6-mistral-7b-hf
+LLaVA SFT training on CV-Bench.
+Uses LlavaForConditionalGeneration (LLaVA-1.5) — LLaVA-NeXT has token/feature mismatch bug.
+Model: llava-hf/llava-1.5-7b-hf
 """
 import sys
 from pathlib import Path
@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 import torch
 from torch.utils.data import DataLoader
-from transformers import AutoProcessor, LlavaNextForConditionalGeneration
+from transformers import AutoProcessor, LlavaForConditionalGeneration
 from peft import LoraConfig, get_peft_model, TaskType
 
 from .dataset import CVBenchSFTDataset
@@ -21,33 +21,26 @@ from .collator import CVBenchSFTDataCollator
 def train_llava(
     train_indices: list,
     output_dir: str,
-    model_id: str = "llava-hf/llava-v1.6-mistral-7b-hf",
+    model_id: str = "llava-hf/llava-1.5-7b-hf",
     epochs: int = 3,
     batch_size: int = 4,
     learning_rate: float = 2e-5,
     max_length: int = 2048,
     use_spatial_prompt: bool = False,
 ):
-    """Run SFT training for LLaVA-NeXT on CV-Bench (custom loop, no Trainer)."""
+    """Run SFT training for LLaVA-1.5 on CV-Bench (custom loop, no Trainer)."""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
     processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = LlavaNextForConditionalGeneration.from_pretrained(
+    model = LlavaForConditionalGeneration.from_pretrained(
         model_id,
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
         low_cpu_mem_usage=False,
     )
     model = model.to(device)
-    # Required for LLaVA-NeXT: align image token count with vision features (avoids token/feature mismatch)
-    cfg = model.config
-    vc = getattr(cfg, "vision_config", None)
-    if vc is not None:
-        processor.patch_size = getattr(vc, "patch_size", 14)
-    processor.vision_feature_select_strategy = getattr(cfg, "vision_feature_select_strategy", "default")
-    processor.num_additional_image_tokens = getattr(cfg, "num_additional_image_tokens", 1)
 
     for p in model.parameters():
         p.requires_grad = False
@@ -76,8 +69,7 @@ def train_llava(
 
     dataset = CVBenchSFTDataset(train_indices, processor, use_spatial_prompt=use_spatial_prompt)
     collator = CVBenchSFTDataCollator(processor, max_length=max_length, model_type="llava")
-    # LLaVA-NeXT: batch_size=1 (dynamic resolution causes token/feature mismatch when batching)
-    loader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collator)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collator)
 
     optimizer = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad],

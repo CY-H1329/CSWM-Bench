@@ -28,8 +28,18 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 | Action | Command |
 |--------|---------|
-| **Pull** (get latest) | `cd Spatial_MAS && git pull origin main` |
-| **Push** (after edits) | `git add . && git commit -m "message" && git push origin main` |
+| **Pull** (최신 코드) | `cd Spatial_MAS && git pull origin main` |
+| **Push** (수정 후) | `git add . && git commit -m "message" && git push origin main` |
+
+```bash
+# Pull
+cd ~/CY/Spatial_MAS && git pull origin main
+
+# Push
+git add .
+git commit -m "SFT training results"
+git push origin main
+```
 
 **Paths:**
 - Local: `~/Desktop/Spatial_MAS`

@@ -98,20 +98,10 @@ def main():
         train_qwen3(model_id="Qwen/Qwen3-VL-4B-Instruct", **train_kw)
     elif args.model == "llava4d":
         from train_impl.train_llava import train_llava
-        train_llava(model_id="llava-hf/llava-v1.6-mistral-7b-hf", **train_kw)
+        train_llava(model_id="llava-hf/llava-1.5-7b-hf", **train_kw)
     elif args.model == "sa2va":
-        # Sa2VA uses predict_forward; standard SFT (input_ids/labels) not supported. Use official repo.
-        run_config = {
-            "model": args.model,
-            "model_id": "ByteDance/Sa2VA-4B",
-            "shots": args.shots,
-            "train_indices": train_indices[:10],
-            "training": train_cfg,
-        }
-        with open(out_dir / "run_config.json", "w") as f:
-            json.dump(run_config, f, indent=2)
-        print("Sa2VA: standard SFT not supported (model uses predict_forward). Use official bytedance/Sa2VA finetune.")
-        print(f"  Config saved to {out_dir / 'run_config.json'}")
+        from train_impl.train_sa2va import train_sa2va
+        train_sa2va(model_id="ByteDance/Sa2VA-4B", **train_kw)
     elif args.model == "spatialreasoner":
         from train_impl.train_spatialreasoner import train_spatialreasoner
         train_spatialreasoner(
