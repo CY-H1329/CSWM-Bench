@@ -54,6 +54,8 @@ class CVBenchSFTDataCollator:
             except Exception as e:
                 if self.model_type == "llava" and image is not None:
                     # LLaVA: processor(images, prompt) pattern
+                    # Resize to 336x336 to avoid dynamic-resolution token/feature mismatch (transformers bug)
+                    img = image.convert("RGB").resize((336, 336))
                     prompt = self.processor.apply_chat_template(
                         messages, tokenize=False, add_generation_prompt=False
                     )
@@ -62,14 +64,14 @@ class CVBenchSFTDataCollator:
                     )
                     try:
                         out = self.processor(
-                            images=[image], text=[prompt], padding=True, return_tensors="pt"
+                            images=[img], text=[prompt], padding=True, return_tensors="pt"
                         )
                         user_out = self.processor(
-                            images=[image], text=[user_prompt], padding=True, return_tensors="pt"
+                            images=[img], text=[user_prompt], padding=True, return_tensors="pt"
                         )
                     except TypeError:
-                        out = self.processor(image, prompt, return_tensors="pt")
-                        user_out = self.processor(image, user_prompt, return_tensors="pt")
+                        out = self.processor(img, prompt, return_tensors="pt")
+                        user_out = self.processor(img, user_prompt, return_tensors="pt")
                     user_len = user_out["input_ids"].shape[1]
                 else:
                     raise RuntimeError(
