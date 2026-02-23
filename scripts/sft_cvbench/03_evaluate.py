@@ -148,11 +148,10 @@ def _eval_llava(checkpoint: Path, indices: list, max_new_tokens: int = 256) -> t
 
 
 def _eval_sa2va(checkpoint: Path, indices: list, max_new_tokens: int = 256) -> tuple:
-    """Evaluate Sa2VA-4B SFT checkpoint (LoRA)."""
+    """Evaluate Sa2VA-4B SFT checkpoint (built-in LoRA)."""
     import warnings
     from transformers import AutoModel, AutoTokenizer
     from transformers.modeling_utils import PreTrainedModel
-    from peft import PeftModel
 
     def _patch_sa2va():
         if hasattr(PreTrainedModel, "mark_tied_weights_as_initialized"):
@@ -179,10 +178,9 @@ def _eval_sa2va(checkpoint: Path, indices: list, max_new_tokens: int = 256) -> t
         return _orig_linspace(*a, **kw)
     try:
         torch.linspace = _patched_linspace
-        base_id = "ByteDance/Sa2VA-4B"
         tokenizer = AutoTokenizer.from_pretrained(checkpoint, trust_remote_code=True, use_fast=False)
         model = AutoModel.from_pretrained(
-            base_id,
+            str(checkpoint),
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=False,
             trust_remote_code=True,
@@ -190,7 +188,6 @@ def _eval_sa2va(checkpoint: Path, indices: list, max_new_tokens: int = 256) -> t
         )
     finally:
         torch.linspace = _orig_linspace
-    model = PeftModel.from_pretrained(model, checkpoint)
     model = model.to("cuda" if torch.cuda.is_available() else "cpu")
     model.eval()
     if hasattr(model, "preparing_for_generation"):

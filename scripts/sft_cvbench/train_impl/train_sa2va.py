@@ -1,7 +1,7 @@
 """
 Sa2VA (ByteDance/Sa2VA-4B) SFT training on CV-Bench.
-Sa2VAChatModel has forward(data) returning loss - uses standard CausalLM-style training.
-Requires custom collator for model's data format (pixel_values, input_ids, position_ids, labels).
+Sa2VAChatModel has forward(data) returning loss. Uses model's built-in LoRA (use_llm_lora)
+because PeftModel unpacks the batch dict and breaks the custom forward signature.
 """
 import sys
 import warnings
@@ -12,9 +12,8 @@ sys.path.insert(0, str(ROOT))
 
 import torch
 from torch.utils.data import DataLoader
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, AutoConfig
 from transformers.modeling_utils import PreTrainedModel
-from peft import LoraConfig, get_peft_model, TaskType
 
 from .dataset import CVBenchSFTDataset
 from .collator_sa2va import Sa2VASFTDataCollator
@@ -73,8 +72,13 @@ def train_sa2va(
     _orig_linspace = _patch_torch_linspace_for_sa2va()
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True, use_fast=False)
+        # Use built-in LoRA (use_llm_lora) — PeftModel breaks forward(data, mode="loss")
+        config = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
+        config.use_llm_lora = 64
+        config.use_backbone_lora = 0
         model = AutoModel.from_pretrained(
             model_id,
+            config=config,
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=False,
             trust_remote_code=True,
@@ -87,36 +91,10 @@ def train_sa2va(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
-    # LoRA on language model
-    llm_arch = getattr(
-        model.config.llm_config, "architectures", ["Qwen2ForCausalLM"]
-    )[0]
-    if "Qwen2" in llm_arch or "Llama" in llm_arch:
-        target_modules = ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj"]
-    elif "InternLM2" in llm_arch:
-        target_modules = ["attention.wqkv", "attention.wo", "feed_forward.w1", "feed_forward.w2", "feed_forward.w3"]
-    else:
-        target_modules = ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj"]
-
-    for p in model.parameters():
-        p.requires_grad = False
-    lora_config = LoraConfig(
-        r=64,
-        lora_alpha=128,
-        lora_dropout=0.05,
-        target_modules=target_modules,
-        bias="none",
-        task_type=TaskType.CAUSAL_LM,
-    )
-    model = get_peft_model(model, lora_config)
-    model.print_trainable_parameters()
-
     if hasattr(model, "enable_input_require_grads"):
         model.enable_input_require_grads()
-    else:
-        def _make_inputs_require_grad(module, inp, out):
-            out.requires_grad_(True)
-        model.get_input_embeddings().register_forward_hook(_make_inputs_require_grad)
+    elif hasattr(model, "language_model"):
+        model.language_model.enable_input_require_grads()
 
     try:
         model.gradient_checkpointing_enable()
