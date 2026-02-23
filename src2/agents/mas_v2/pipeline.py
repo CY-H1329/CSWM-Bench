@@ -25,6 +25,9 @@ from .score_map import ScoreMap
 from .score_map_updater import ScoreMapUpdater
 from .shared_memory import SharedMemory
 
+# C (Hybrid): tools only for explicit_3d and scene_graph
+_ROLES_WITH_TOOLS = {"explicit_3d_representation", "scene_graph_construction"}
+
 logger = logging.getLogger(__name__)
 
 
@@ -114,11 +117,24 @@ def run_step(
     # 2. Agent selection from score map
     assignments = score_map.select_agents(category, step)
 
-    # 3. Run 3 specialist agents -> SharedMemory
+    # 3. Run 3 specialist agents -> SharedMemory (C: tools for explicit_3d, scene_graph)
     shared_memory = SharedMemory()
     agent_details = []
+    tool_output_cache = {}  # role -> tool output (computed once per role type)
     for role, llm_name in assignments:
-        role_prompt = build_role_prompt(role, query)
+        if role in _ROLES_WITH_TOOLS and role not in tool_output_cache:
+            try:
+                if role == "explicit_3d_representation":
+                    from src2.tools import get_depth_summary
+                    tool_output_cache[role] = get_depth_summary(image)
+                elif role == "scene_graph_construction":
+                    from src2.tools import get_scene_graph_summary
+                    tool_output_cache[role] = get_scene_graph_summary(image)
+            except Exception as e:
+                logger.warning("Tool for %s failed: %s", role, e)
+                tool_output_cache[role] = ""
+        tool_output = tool_output_cache.get(role, None)
+        role_prompt = build_role_prompt(role, query, tool_output=tool_output)
         raw_output = specialist_generate(llm_name, image, role_prompt)
         answer, reason = parse_specialist_output(raw_output)
         shared_memory.add(role, llm_name, answer, reason)

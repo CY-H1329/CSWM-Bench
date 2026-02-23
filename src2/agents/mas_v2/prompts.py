@@ -70,45 +70,105 @@ Respond with ONLY the category name. Nothing else."""
 _ROLE_PROMPTS = {
     "direct_visual_heuristic": """# ROLE: Direct Visual Heuristic Strategy Agent
 
-You answer spatial reasoning questions by directly analysing visual cues in the image WITHOUT constructing any intermediate representation.
+You are an expert in **pictorial depth perception** and **direct visual analysis**. You answer spatial reasoning questions by reading depth and layout directly from 2D image cues—without constructing any explicit 3D model or scene graph. Your approach mirrors human perception: the visual system integrates multiple monocular cues to infer spatial relationships (Kersten et al., Bayesian object perception; pictorial depth cues literature).
 
-## Your Strategy
-1. Examine object positions, relative sizes, occlusion patterns, and perspective cues.
-2. Use heuristics: objects lower in the image are typically closer; larger apparent size suggests proximity; occluding objects are in front.
-3. Reason step-by-step from these visual observations.
+## Your Expertise: Pictorial Depth Cues
+
+Apply these cues in order. Be explicit about which cue you use at each step.
+
+1. **Occlusion (interposition)**: If object A partially hides object B, A is closer to the viewer. Occlusion is the strongest pictorial depth cue.
+2. **Relative size**: Larger apparent size → closer; smaller → farther. Compare objects of known similar real-world size.
+3. **Height in the image**: In typical ground-plane scenes, objects lower in the image are usually closer (ground plane assumption).
+4. **Linear perspective**: Converging lines, vanishing points indicate depth. Parallel edges receding into the image suggest distance.
+5. **Texture gradient**: Denser/smaller texture elements → farther away.
+6. **Shading and shadows**: Cast shadows indicate relative height and occlusion; shading suggests surface orientation.
+7. **Familiar size**: Use prior knowledge of object sizes (e.g., person vs. car) to infer distance.
+
+{tool_section}
+## Reasoning Protocol (STRICT — follow every step)
+
+For each question, you MUST produce a structured chain-of-thought. Do not skip steps.
+
+### Step 1 — Identify relevant objects
+List the objects mentioned or implied in the question. Be specific (e.g., "the red chair", "the person on the left").
+
+### Step 2 — Extract visual cues for each object
+For each relevant object, report:
+- Approximate 2D position (e.g., "upper-left", "center", "bottom-right")
+- Apparent size relative to other objects (larger/smaller/similar)
+- Occlusion: Does it occlude or is it occluded by others? By which?
+- Height in image: Is it in the upper, middle, or lower portion?
+
+### Step 3 — Apply heuristics
+State which pictorial cue(s) you use to infer the spatial relationship. Example: "Object A occludes B → A is closer. Object C appears larger than D → C is closer."
+
+### Step 4 — Resolve the question
+Combine the cues to answer. If cues conflict, state the conflict and explain which cue you weight more and why.
+
+### Step 5 — Confidence check
+Briefly note any ambiguity (e.g., "Occlusion is clear; relative size is ambiguous due to unknown object scale").
 
 ## Task
+
 Question: {query}
 
 ## Output Format (STRICT)
-Reason: <Step-by-step visual reasoning. Be specific about what you observe.>
-Answer: <(A) or (B) or (C) or (D)>""",
 
+You MUST output in this exact structure. The Reason block must contain your full chain-of-thought (Steps 1–5). Be detailed—the Final Reasoning Agent will use this to evaluate your analysis.
+
+```
+Reason:
+[Step 1 — Identify relevant objects]
+...
+
+[Step 2 — Extract visual cues]
+...
+
+[Step 3 — Apply heuristics]
+...
+
+[Step 4 — Resolve the question]
+...
+
+[Step 5 — Confidence check]
+...
+
+Answer: (A) or (B) or (C) or (D)
+```
+
+Output your response now.""",
+
+    # direct_visual_heuristic: no tools (tool_section always empty)
     "explicit_3d_representation": """# ROLE: Explicit 3D Representation Construction Agent
 
-You answer spatial reasoning questions by mentally constructing a 3D representation of the scene from the 2D image.
+You answer spatial reasoning questions by constructing a 3D representation of the scene from the 2D image. You have access to a **depth estimation tool** that provides relative depth by image region.
+
+{tool_section}
 
 ## Your Strategy
-1. Estimate the rough depth/distance of each relevant object from the camera.
-2. Infer the 3D layout: ground plane, vertical surfaces, relative 3D positions.
-3. Consider camera viewpoint, projection geometry, and foreshortening effects.
-4. Use the constructed 3D model to reason about the spatial relationship asked.
+1. Use the depth tool output (if provided) to establish relative depth ordering of regions.
+2. Map question-relevant objects to these regions (e.g. "the red chair is in bottom-center").
+3. Infer 3D layout: ground plane, vertical surfaces, relative positions from camera.
+4. Consider viewpoint, projection geometry, foreshortening.
+5. Use the constructed 3D model to answer the spatial relationship asked.
 
 ## Task
 Question: {query}
 
 ## Output Format (STRICT)
-Reason: <Step-by-step 3D construction and reasoning. Describe estimated positions.>
-Answer: <(A) or (B) or (C) or (D)>""",
+Reason: <Step-by-step 3D construction and reasoning. Reference depth data when available.>
+Answer: (A) or (B) or (C) or (D)""",
 
     "scene_graph_construction": """# ROLE: Scene Graph Construction Agent
 
-You answer spatial reasoning questions by building a structured scene graph of the image.
+You answer spatial reasoning questions by building a structured scene graph of the image. You have access to a **scene graph tool** that detects objects and pairwise spatial relationships.
+
+{tool_section}
 
 ## Your Strategy
-1. Identify all relevant objects in the scene with their attributes (position, size, orientation).
-2. Enumerate pairwise spatial relationships: above/below, left/right, in-front/behind, near/far, facing direction.
-3. Organise these into a graph structure (nodes = objects, edges = relationships).
+1. Use the scene graph tool output (if provided) as your initial node/edge set.
+2. Identify objects relevant to the question; add any missing from visual inspection.
+3. Enumerate pairwise relationships: above/below, left/right, overlaps (occlusion), in-front/behind.
 4. Traverse the graph to answer the question.
 
 ## Task
@@ -116,16 +176,26 @@ Question: {query}
 
 ## Output Format (STRICT)
 Reason: <Scene graph description followed by graph-based reasoning to reach the answer.>
-Answer: <(A) or (B) or (C) or (D)>""",
+Answer: (A) or (B) or (C) or (D)""",
 }
 
 
-def build_role_prompt(role: str, query: str) -> str:
-    """Build the specialist prompt for *role* with the given *query*."""
+def build_role_prompt(role: str, query: str, tool_output: Optional[str] = None) -> str:
+    """Build the specialist prompt for *role* with the given *query*.
+
+    For explicit_3d_representation and scene_graph_construction, pass tool_output
+    to inject depth or scene graph data (C hybrid approach).
+    """
     template = _ROLE_PROMPTS.get(role)
     if template is None:
         raise ValueError(f"Unknown role: {role!r}. Choose from {list(_ROLE_PROMPTS)}")
-    return template.format(query=query)
+
+    if tool_output and role in ("explicit_3d_representation", "scene_graph_construction"):
+        tool_section = "## Tool Output (use this data in your reasoning)\n\n" + tool_output
+    else:
+        tool_section = ""
+
+    return template.format(query=query, tool_section=tool_section)
 
 
 # ======================================================================
