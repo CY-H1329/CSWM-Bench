@@ -33,19 +33,15 @@ class LLaVARunner:
         load_kwargs = dict(
             torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
             trust_remote_code=True,
+            low_cpu_mem_usage=False,
             **kwargs,
         )
-        try:
-            import accelerate
-            load_kwargs["device_map"] = "auto" if device == "cuda" and torch.cuda.is_available() else device
-        except ImportError:
-            pass
+        # No device_map — run without accelerate
         if self.is_next and LlavaNextForConditionalGeneration is not None:
             self.model = LlavaNextForConditionalGeneration.from_pretrained(model_id, **load_kwargs)
         else:
             self.model = LlavaForConditionalGeneration.from_pretrained(model_id, **load_kwargs)
-        if "device_map" not in load_kwargs:
-            self.model = self.model.to(device)
+        self.model = self.model.to(device)
         self.model.eval()
         self.device = device
 

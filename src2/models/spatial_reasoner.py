@@ -68,12 +68,13 @@ class SpatialReasonerRunner(BaseVLM):
                 model_id, trust_remote_code=True
             )
 
-        load_kwargs = dict(torch_dtype=dtype, trust_remote_code=True, **kwargs)
-        try:
-            import accelerate
-            load_kwargs["device_map"] = "auto" if device == "cuda" and torch.cuda.is_available() else None
-        except ImportError:
-            pass
+        load_kwargs = dict(
+            torch_dtype=dtype,
+            trust_remote_code=True,
+            low_cpu_mem_usage=False,
+            **kwargs,
+        )
+        # No device_map — run without accelerate
         if use_flash_attn and device == "cuda":
             try:
                 import flash_attn  # noqa: F401
@@ -82,8 +83,7 @@ class SpatialReasonerRunner(BaseVLM):
                 pass
 
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_id, **load_kwargs)
-        if "device_map" not in load_kwargs:
-            self.model = self.model.to(device)
+        self.model = self.model.to(device)
         self.model.eval()
 
     def generate(

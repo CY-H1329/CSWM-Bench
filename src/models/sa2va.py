@@ -13,6 +13,8 @@ from transformers.modeling_utils import PreTrainedModel
 
 def _patch_tied_weights_for_sa2va():
     """Sa2VA uses _tied_weights_keys; newer transformers expect all_tied_weights_keys."""
+    if not hasattr(PreTrainedModel, "mark_tied_weights_as_initialized"):
+        return  # Newer transformers: method removed, no patch needed
     _orig = PreTrainedModel.mark_tied_weights_as_initialized
 
     def _patched(self):
