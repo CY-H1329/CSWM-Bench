@@ -1,8 +1,8 @@
 # SFT CV-Bench pipeline — reproducibility config
 seed: 42
 
-# Shots per task for each training regime
-shots_per_task: [10, 30, 100]
+# Shots per task for each training regime (0 = baseline, no training)
+shots_per_task: [0, 10, 30, 100]
 
 # Models to train
 models: [qwen3_4b, llava4d, sa2va, spatialrgpt, spatialreasoner]
