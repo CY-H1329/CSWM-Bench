@@ -10,7 +10,23 @@ sys.path.insert(0, str(ROOT))
 
 import torch
 from torch.utils.data import DataLoader
-from transformers import Qwen3VLForConditionalGeneration, AutoProcessor
+from transformers import AutoProcessor
+
+try:
+    from transformers import Qwen3VLForConditionalGeneration
+    def _load_qwen3_model(model_id, **kwargs):
+        return Qwen3VLForConditionalGeneration.from_pretrained(model_id, **kwargs)
+except ImportError:
+    import warnings
+    from transformers import AutoModelForCausalLM
+    warnings.warn(
+        "Qwen3VLForConditionalGeneration not found (transformers>=4.57 required). "
+        "Using AutoModelForCausalLM with trust_remote_code."
+    )
+    def _load_qwen3_model(model_id, **kwargs):
+        kwargs.setdefault("trust_remote_code", True)
+        return AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
+
 from peft import LoraConfig, get_peft_model, TaskType
 
 from .dataset import CVBenchSFTDataset
@@ -32,7 +48,7 @@ def train_qwen3(
     output_path.mkdir(parents=True, exist_ok=True)
 
     processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-    model = Qwen3VLForConditionalGeneration.from_pretrained(
+    model = _load_qwen3_model(
         model_id,
         torch_dtype=torch.bfloat16,
         device_map="auto",

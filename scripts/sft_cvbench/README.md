@@ -18,7 +18,7 @@ pip install datasets pyyaml peft  # peft for LoRA
 python scripts/setup_datasets.py --benchmarks cvbench  # cache CV-Bench
 ```
 
-For qwen3_4b training: `transformers>=4.51` (Qwen3VLForConditionalGeneration)
+For qwen3_4b training: `transformers>=4.57` (Qwen3VLForConditionalGeneration). Older versions use AutoModelForCausalLM fallback.
 
 Uses custom training loop (no Trainer) to avoid sklearn/llava version conflicts.
 
