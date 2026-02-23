@@ -41,6 +41,13 @@ def train_llava(
         low_cpu_mem_usage=False,
     )
     model = model.to(device)
+    # Required for LLaVA-NeXT: align image token count with vision features (avoids token/feature mismatch)
+    cfg = model.config
+    vc = getattr(cfg, "vision_config", None)
+    if vc is not None:
+        processor.patch_size = getattr(vc, "patch_size", 14)
+    processor.vision_feature_select_strategy = getattr(cfg, "vision_feature_select_strategy", "default")
+    processor.num_additional_image_tokens = getattr(cfg, "num_additional_image_tokens", 1)
 
     for p in model.parameters():
         p.requires_grad = False
@@ -69,7 +76,8 @@ def train_llava(
 
     dataset = CVBenchSFTDataset(train_indices, processor, use_spatial_prompt=use_spatial_prompt)
     collator = CVBenchSFTDataCollator(processor, max_length=max_length, model_type="llava")
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collator)
+    # LLaVA-NeXT: batch_size=1 (dynamic resolution causes token/feature mismatch when batching)
+    loader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collator)
 
     optimizer = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad],
