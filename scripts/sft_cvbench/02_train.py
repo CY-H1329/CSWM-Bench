@@ -15,7 +15,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(SCRIPT_DIR))
 
 import yaml
 
@@ -40,6 +42,7 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--resume_from", type=str, default=None)
     parser.add_argument("--debug", action="store_true", help="Limit data for quick test")
+    parser.add_argument("--spatial_prompt", action="store_true", help="Use full spatial prompt (longer)")
     return parser.parse_args()
 
 
@@ -62,7 +65,10 @@ def main():
         print(f"[DEBUG] Using {len(train_indices)} samples")
 
     out_dir = args.output_dir or Path(config["paths"]["checkpoints_dir"]) / f"{args.model}_cvbench_{args.shots}shot"
+    out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    train_cfg = config["training"]
 
     print("=" * 70)
     print("SFT Training (CV-Bench)")
@@ -73,22 +79,29 @@ def main():
     print(f"Output: {out_dir}")
     print()
 
-    # Training implementation: use LLaMA-Factory or custom Trainer
-    # For H100: recommend LLaMA-Factory for multi-model support
-    # Placeholder: save config for reproducibility
-    run_config = {
-        "model": args.model,
-        "shots": args.shots,
-        "train_indices": train_indices[:5],  # sample for log
-        "training": config["training"],
-    }
-    with open(out_dir / "run_config.json", "w") as f:
-        json.dump(run_config, f, indent=2)
-
-    print("NOTE: Full training requires LLaMA-Factory or custom Trainer.")
-    print("  Install: pip install llmtuner  # or llamafactory")
-    print("  Or implement train loop in scripts/sft_cvbench/train_impl/")
-    print(f"  Config saved to {out_dir / 'run_config.json'}")
+    if args.model == "qwen3_4b":
+        from train_impl.train_qwen3 import train_qwen3
+        train_qwen3(
+            train_indices=train_indices,
+            output_dir=str(out_dir),
+            model_id="Qwen/Qwen3-VL-4B-Instruct",
+            epochs=train_cfg.get("epochs", 3),
+            batch_size=train_cfg.get("batch_size", 4),
+            learning_rate=train_cfg.get("learning_rate", 2e-5),
+            max_length=2048,
+            use_spatial_prompt=args.spatial_prompt,
+        )
+    else:
+        run_config = {
+            "model": args.model,
+            "shots": args.shots,
+            "train_indices": train_indices[:5],
+            "training": train_cfg,
+        }
+        with open(out_dir / "run_config.json", "w") as f:
+            json.dump(run_config, f, indent=2)
+        print(f"Model {args.model}: use LLaMA-Factory or add train_impl/train_{args.model}.py")
+        print(f"  Config saved to {out_dir / 'run_config.json'}")
 
 
 if __name__ == "__main__":

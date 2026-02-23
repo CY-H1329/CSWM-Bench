@@ -14,9 +14,11 @@ Analyzes how performance scales with training size (10/30/100 shots per task).
 ## Prerequisites
 
 ```bash
-pip install datasets pyyaml  # or: conda activate spatial_mas
+pip install datasets pyyaml peft  # peft for LoRA
 python scripts/setup_datasets.py --benchmarks cvbench  # cache CV-Bench
 ```
+
+For qwen3_4b training: `transformers>=4.51` (Qwen3VLForConditionalGeneration)
 
 ## Quick Start
 

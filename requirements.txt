@@ -5,6 +5,7 @@ transformers>=4.51.0
 datasets
 huggingface_hub
 accelerate
+peft
 qwen-vl-utils
 pillow
 openai>=1.0.0
