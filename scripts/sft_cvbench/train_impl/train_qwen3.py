@@ -49,18 +49,12 @@ def train_qwen3(
 
     processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    load_kwargs = dict(
+    model = _load_qwen3_model(
+        model_id,
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
     )
-    try:
-        import accelerate
-        load_kwargs["device_map"] = "auto"
-    except ImportError:
-        pass
-    model = _load_qwen3_model(model_id, **load_kwargs)
-    if "device_map" not in load_kwargs:
-        model = model.to(device)
+    model = model.to(device)
 
     for p in model.parameters():
         p.requires_grad = False
