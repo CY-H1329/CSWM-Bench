@@ -25,6 +25,10 @@ Uses custom training loop (no Trainer) to avoid sklearn/llava version conflicts.
 ## Quick Start
 
 ```bash
+# 0. Verify models load and run inference (no training)
+python scripts/sft_cvbench/00_verify_models.py
+# Or single model: python scripts/sft_cvbench/00_verify_models.py --model qwen3_4b
+
 # 1. Sample dataset (stratified, reproducible)
 python scripts/sft_cvbench/01_sample_dataset.py
 
