@@ -36,11 +36,11 @@ cd Spatial_MAS  # 또는 ~/CY/Spatial_MAS
 # 0. (선택) 모델 로드/추론 확인
 python scripts/sft_cvbench/00_verify_models.py
 
-# 1. 학습만 실행 (sample + train 4 models)
-bash scripts/sft_cvbench/run_train_all.sh 10
-
-# 2. 또는 전체 파이프라인 (train + eval + aggregate)
+# 1. 전체 파이프라인 (sample + train + eval + aggregate) — 권장
 bash scripts/sft_cvbench/run_full_pipeline.sh 10
+
+# 2. 학습만 실행 (eval 없이)
+bash scripts/sft_cvbench/run_train_all.sh 10
 
 # 개별 학습
 python scripts/sft_cvbench/01_sample_dataset.py

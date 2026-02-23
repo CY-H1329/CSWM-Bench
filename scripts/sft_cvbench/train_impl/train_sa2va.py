@@ -1,7 +1,7 @@
 """
 Sa2VA (ByteDance/Sa2VA-4B) SFT training on CV-Bench.
-Sa2VAChatModel has forward(data) returning loss. Uses model's built-in LoRA (use_llm_lora)
-because PeftModel unpacks the batch dict and breaks the custom forward signature.
+Sa2VAChatModel has forward(data) returning loss. Apply LoRA to language_model only
+(not full model) so forward(data, mode="loss") works.
 """
 import sys
 import warnings
@@ -12,8 +12,9 @@ sys.path.insert(0, str(ROOT))
 
 import torch
 from torch.utils.data import DataLoader
-from transformers import AutoModel, AutoTokenizer, AutoConfig
+from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
+from peft import LoraConfig, get_peft_model, TaskType
 
 from .dataset import CVBenchSFTDataset
 from .collator_sa2va import Sa2VASFTDataCollator
@@ -72,13 +73,8 @@ def train_sa2va(
     _orig_linspace = _patch_torch_linspace_for_sa2va()
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True, use_fast=False)
-        # Use built-in LoRA (use_llm_lora) — PeftModel breaks forward(data, mode="loss")
-        config = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
-        config.use_llm_lora = 64
-        config.use_backbone_lora = 0
         model = AutoModel.from_pretrained(
             model_id,
-            config=config,
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=False,
             trust_remote_code=True,
@@ -91,9 +87,29 @@ def train_sa2va(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
-    if hasattr(model, "enable_input_require_grads"):
-        model.enable_input_require_grads()
-    elif hasattr(model, "language_model"):
+    # LoRA on language_model only — full-model PeftModel breaks forward(data)
+    llm_arch = getattr(model.config.llm_config, "architectures", ["Qwen2ForCausalLM"])[0]
+    if "Qwen2" in llm_arch or "Llama" in llm_arch:
+        target_modules = ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj"]
+    elif "InternLM2" in llm_arch:
+        target_modules = ["attention.wqkv", "attention.wo", "feed_forward.w1", "feed_forward.w2", "feed_forward.w3"]
+    else:
+        target_modules = ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj"]
+
+    for p in model.parameters():
+        p.requires_grad = False
+    lora_config = LoraConfig(
+        r=64,
+        lora_alpha=128,
+        lora_dropout=0.05,
+        target_modules=target_modules,
+        bias="none",
+        task_type=TaskType.CAUSAL_LM,
+    )
+    model.language_model = get_peft_model(model.language_model, lora_config)
+    model.language_model.print_trainable_parameters()
+
+    if hasattr(model.language_model, "enable_input_require_grads"):
         model.language_model.enable_input_require_grads()
 
     try:
@@ -128,7 +144,9 @@ def train_sa2va(
                 else:
                     moved[k] = v
             batch = moved
-            # Sa2VAChatModel.forward expects data dict
+            # Sa2VAChatModel uses _count in _llm_forward; ensure it exists
+            if not hasattr(model, "_count"):
+                model._count = 0
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 outputs = model.forward(batch, mode="loss")
@@ -151,8 +169,11 @@ def train_sa2va(
                 ckpt_dir.mkdir(parents=True, exist_ok=True)
                 model.save_pretrained(ckpt_dir)
                 tokenizer.save_pretrained(ckpt_dir)
+                model.language_model.save_pretrained(ckpt_dir / "language_model")
                 print(f"  Saved {ckpt_dir}")
 
     model.save_pretrained(output_path)
     tokenizer.save_pretrained(output_path)
+    (output_path / "language_model").mkdir(exist_ok=True)
+    model.language_model.save_pretrained(output_path / "language_model")
     print(f"Done. Saved to {output_path}")

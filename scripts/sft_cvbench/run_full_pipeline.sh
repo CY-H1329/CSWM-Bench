@@ -36,5 +36,6 @@ python scripts/sft_cvbench/04_aggregate_results.py
 
 echo ""
 echo "=============================================="
-echo "Done. See results/sft_cvbench/results_cvbench_scaling.csv"
+echo "Done. Results: results/sft_cvbench/results_cvbench_scaling.csv"
+echo "Checkpoints: results/sft_cvbench/checkpoints/"
 echo "=============================================="
