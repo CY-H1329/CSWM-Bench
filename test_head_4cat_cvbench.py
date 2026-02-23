@@ -26,11 +26,49 @@ from src2.benchmarks.loaders import (
 CVBENCH_4 = ["count", "relation", "depth", "distance"]
 GT_MAP = {"Count": "count", "Relation": "relation", "Depth": "depth", "Distance": "distance"}
 
+# 16-category → 4-category fallback mapping.
+# When the model outputs a fine-grained category not in CVBENCH_4,
+# map it to the corresponding coarse category instead of defaulting to [0].
+FINE_TO_COARSE = {
+    "location_above": "relation",
+    "height_higher": "relation",
+    "location_closer_to_camera": "depth",
+    "multi_object_closer_to": "distance",
+    "location_next_to": "relation",
+    "orientation_on_the_left": "relation",
+    "orientation_in_front_of": "relation",
+    "orientation_viewpoint": "relation",
+    "multi_object_facing": "relation",
+    "multi_object_same_direction": "relation",
+    "multi_object_viewpoint_towards_object": "depth",
+    "multi_object_parallel": "relation",
+}
+
+
+def parse_category_4(raw: str) -> str:
+    """Parse model output into one of the 4 CV-Bench categories."""
+    raw_clean = (raw or "").strip().lower()
+    # 1. Exact match to 4 categories
+    for cat in CVBENCH_4:
+        if cat == raw_clean:
+            return cat
+    # 2. Substring match to 4 categories
+    for cat in CVBENCH_4:
+        if cat in raw_clean:
+            return cat
+    # 3. Fine-grained 16-category → coarse 4-category mapping
+    for fine, coarse in FINE_TO_COARSE.items():
+        if fine in raw_clean:
+            return coarse
+    # 4. Unknown output
+    return "UNKNOWN"
+
 
 def run_4cat_test(runner, max_samples=None, seed=42):
     dataset = load_benchmark("cvbench", max_samples=max_samples, seed=seed)
     correct = 0
     total = 0
+    unknown_count = 0
     by_gt = defaultdict(lambda: {"correct": 0, "total": 0})
     confusion = defaultdict(lambda: defaultdict(int))
     details = []
@@ -45,7 +83,9 @@ def run_4cat_test(runner, max_samples=None, seed=42):
 
         prompt = build_head_agent_prompt(query, CVBENCH_4, CATEGORY_DESCRIPTIONS)
         raw = runner.generate(image, prompt, temperature=0.0, max_new_tokens=64)
-        pred = parse_category(raw, CVBENCH_4)
+        pred = parse_category_4(raw)
+        if pred == "UNKNOWN":
+            unknown_count += 1
 
         total += 1
         hit = pred == gt
@@ -63,9 +103,11 @@ def run_4cat_test(runner, max_samples=None, seed=42):
     # --- Print report ---
     print()
     print("=" * 55)
-    print("HEAD AGENT — CV-Bench 4 categories only")
+    print("HEAD AGENT — CV-Bench 4 categories (with fine→coarse mapping)")
     print("=" * 55)
     print(f"Overall: {correct}/{total} = {100*correct/total:.1f}%")
+    if unknown_count:
+        print(f"UNKNOWN outputs (model answered instead of classifying): {unknown_count}")
     print()
     for cat in sorted(by_gt):
         v = by_gt[cat]
@@ -73,13 +115,14 @@ def run_4cat_test(runner, max_samples=None, seed=42):
         print(f"  {cat:15s}  {100*acc:.1f}%  ({v['correct']}/{v['total']})")
 
     print()
+    all_pred_cats = CVBENCH_4 + (["UNKNOWN"] if unknown_count else [])
     print("Confusion (row=GT, col=Pred):")
-    header = f"{'':15s}" + "".join(f"  {c:>10s}" for c in CVBENCH_4)
+    header = f"{'':15s}" + "".join(f"  {c:>10s}" for c in all_pred_cats)
     print(header)
     print("-" * len(header))
     for gt_cat in CVBENCH_4:
         row = f"{gt_cat:15s}"
-        for pred_cat in CVBENCH_4:
+        for pred_cat in all_pred_cats:
             row += f"  {confusion[gt_cat][pred_cat]:>10d}"
         print(row)
     print("=" * 55)
