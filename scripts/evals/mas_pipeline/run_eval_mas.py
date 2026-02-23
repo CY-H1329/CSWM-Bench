@@ -54,17 +54,12 @@ OpenRouterRunner = _runners.OpenRouterRunner
 try:
     from src.models.qwen3 import Qwen3Runner
     from src.models.sa2va import Sa2VARunner
-    from src.models.llava4d import LLaVA4DRunner
+    from src.models.llava import LLaVARunner
     from src.models.deepseek_vl import DeepSeekVLRunner as DeepSeekVLGPURunner
-    from src.models.spatialreasoner import SpatialReasonerRunner
     GPU_AVAILABLE = True
 except ImportError:
-    Qwen3Runner = Sa2VARunner = LLaVA4DRunner = DeepSeekVLGPURunner = SpatialReasonerRunner = None
+    Qwen3Runner = Sa2VARunner = LLaVARunner = DeepSeekVLGPURunner = None
     GPU_AVAILABLE = False
-try:
-    from src.models.spatialrgpt import SpatialRGPTRunner
-except ImportError:
-    SpatialRGPTRunner = None
 
 
 def _norm_answer(s: str) -> str:
@@ -120,11 +115,7 @@ def build_runners(config: dict):
                 elif name == "sa2va":
                     specialist_runners[name] = Sa2VARunner(model_id=model_id, device=device)
                 elif name == "llava4d":
-                    specialist_runners[name] = LLaVA4DRunner(model_id=model_id, device=device)
-                elif name == "spatialrgpt" and SpatialRGPTRunner:
-                    specialist_runners[name] = SpatialRGPTRunner(model_id=model_id, device=device)
-                elif name == "spatialreasoner" and SpatialReasonerRunner:
-                    specialist_runners[name] = SpatialReasonerRunner(model_id=model_id, device=device)
+                    specialist_runners[name] = LLaVARunner(model_id=model_id, device=device)
                 else:
                     specialist_runners[name] = None
             except Exception as e:
@@ -188,15 +179,11 @@ def main():
     def head_gen(img: Image.Image, prompt: str) -> str:
         return head_runner.generate(img, prompt, max_tokens=2048)
 
-    def spec_gen(agent_name: str, img: Image.Image, prompt: str, role: str = None) -> str:
+    def spec_gen(agent_name: str, img: Image.Image, prompt: str) -> str:
         r = specialist_runners.get(agent_name)
         if not r:
             return ""
-        # Role-based (generate_by_role): 3D→depth tool, SceneGraph→grounding, Direct→plain
-        if role and hasattr(r, "generate_by_role"):
-            out = r.generate_by_role(img, prompt, role, max_new_tokens=2048)
-            return out if isinstance(out, str) else out.get("answer", "")
-        # Fallback: plain generate
+        # GPU runners use max_new_tokens, API use max_tokens
         mod = type(r).__module__ or ""
         if "src.models" in mod:
             return r.generate(img, prompt, max_new_tokens=2048)
@@ -234,7 +221,6 @@ def main():
             reasoning_generate=reason_gen,
             score_manager=score_manager,
             category_seen=category_seen,
-            use_role_assignment=True,
         )
 
         if "error" in out:

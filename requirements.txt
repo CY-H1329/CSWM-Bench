@@ -2,9 +2,6 @@
 torch>=2.1.0
 torchvision
 transformers>=4.51.0
-# For role-specific tools (optional, for generate_as_3d, generate_as_scene_graph):
-# - Depth: depth-anything/Depth-Anything-V2-Small-hf (auto-downloaded)
-# - Scene graph: IDEA-Research/grounding-dino-tiny (auto-downloaded)
 datasets
 huggingface_hub
 accelerate
