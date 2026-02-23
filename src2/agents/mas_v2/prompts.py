@@ -114,9 +114,11 @@ Question: {query}
 
 ## Output Format (STRICT)
 
-You MUST output in this exact structure. The Reason block must contain your full chain-of-thought (Steps 1–5). Be detailed—the Final Reasoning Agent will use this to evaluate your analysis.
+You MUST output in this exact order. **Put Answer FIRST** so it is never cut off.
 
 ```
+Answer: (A) or (B) or (C) or (D)
+
 Reason:
 [Step 1 — Identify relevant objects]
 ...
@@ -132,9 +134,9 @@ Reason:
 
 [Step 5 — Confidence check]
 ...
-
-Answer: (A) or (B) or (C) or (D)
 ```
+
+CRITICAL: Your first line MUST be "Answer: (X)" where X is A, B, C, or D. Then provide your Reason.
 
 Output your response now.""",
 

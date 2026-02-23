@@ -67,9 +67,18 @@ def parse_specialist_output(raw: str) -> Tuple[str, str]:
         reason = reason_m.group(1).strip()[:2000]
 
     if not answer:
+        # Fallback: (A), "answer is A", "therefore (B)", "choose C", etc.
         fallback = re.search(r"\(([A-D])\)", raw)
         if fallback:
             answer = f"({fallback.group(1)})"
+        if not answer:
+            for pat in [r"answer\s+is\s+\(?([A-D])\)?", r"choose\s+\(?([A-D])\)?",
+                        r"therefore\s+\(?([A-D])\)?", r"conclude\s+\(?([A-D])\)?",
+                        r"option\s+\(?([A-D])\)?", r"correct\s+is\s+\(?([A-D])\)?"]:
+                m = re.search(pat, raw, re.IGNORECASE)
+                if m:
+                    answer = f"({m.group(1).upper()})"
+                    break
 
     return answer, reason
 
