@@ -1,11 +1,37 @@
 from .base import BaseVLM
-from .qwen import QwenRunner
-from .qwen3 import Qwen3Runner
-from .llava import LLaVARunner
-from .sa2va import Sa2VARunner
-from .deepseek_vl import DeepSeekVLRunner
-from .gpt import GPTRunner
-from .gemini import GeminiRunner
+
+# Optional runners — import may fail if deps missing (e.g. qwen, openai)
+QwenRunner = Qwen3Runner = LLaVARunner = Sa2VARunner = None
+DeepSeekVLRunner = GPTRunner = GeminiRunner = None
+
+try:
+    from .qwen import QwenRunner
+except Exception:
+    pass
+try:
+    from .qwen3 import Qwen3Runner
+except Exception:
+    pass
+try:
+    from .llava import LLaVARunner
+except Exception:
+    pass
+try:
+    from .sa2va import Sa2VARunner
+except Exception:
+    pass
+try:
+    from .deepseek_vl import DeepSeekVLRunner
+except Exception:
+    pass
+try:
+    from .gpt import GPTRunner
+except Exception:
+    pass
+try:
+    from .gemini import GeminiRunner
+except Exception:
+    pass
 
 __all__ = [
     "BaseVLM", "QwenRunner", "Qwen3Runner", "LLaVARunner", "Sa2VARunner",

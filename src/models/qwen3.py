@@ -29,14 +29,16 @@ class Qwen3Runner:
                 "Install: pip install transformers>=4.51"
             )
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        device_map = "auto" if device == "cuda" and torch.cuda.is_available() else device
-
         load_kwargs = dict(
             torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-            device_map=device_map,
             trust_remote_code=True,
             **kwargs,
         )
+        try:
+            import accelerate
+            load_kwargs["device_map"] = "auto" if device == "cuda" and torch.cuda.is_available() else device
+        except ImportError:
+            pass
         if use_flash_attn and device == "cuda":
             try:
                 import flash_attn  # noqa: F401
@@ -46,10 +48,9 @@ class Qwen3Runner:
 
         self.model_id = model_id
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-        self.model = Qwen3VLForConditionalGeneration.from_pretrained(
-            model_id,
-            **load_kwargs,
-        )
+        self.model = Qwen3VLForConditionalGeneration.from_pretrained(model_id, **load_kwargs)
+        if "device_map" not in load_kwargs:
+            self.model = self.model.to(device)
         self.model.eval()
         self.device = device
 
