@@ -51,6 +51,7 @@ def run_specialist_test(
     max_samples: int = None,
     seed: int = 42,
     show_failures: int = 0,
+    max_new_tokens: int = 512,
 ):
     """
     Run direct_visual_heuristic + Qwen3 on benchmark, report accuracy vs GT.
@@ -61,9 +62,11 @@ def run_specialist_test(
         max_samples: Limit samples (None = all)
         seed: Random seed
         show_failures: Print first N wrong cases (query, GT, pred, reason)
+        max_new_tokens: Reduce to 256 for faster runs (less COT detail)
     """
     dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
     role = "direct_visual_heuristic"
+    print(f"Starting: {len(dataset)} samples, {role} + Qwen3-VL-4B...")
 
     correct = 0
     total = 0
@@ -85,7 +88,7 @@ def run_specialist_test(
             continue
 
         prompt = build_role_prompt(role, query, tool_output=None)
-        raw = runner.generate(image, prompt, temperature=0.0, max_new_tokens=512)
+        raw = runner.generate(image, prompt, temperature=0.0, max_new_tokens=max_new_tokens)
         answer, reason = parse_specialist_output(raw)
         pred_letter = _normalize_answer(answer)
 
@@ -109,7 +112,9 @@ def run_specialist_test(
             "raw_output": raw[:3000] if raw else "",
         })
 
-        if (i + 1) % 50 == 0:
+        # Progress: every 10 samples, or every sample if <= 30
+        interval = 1 if len(dataset) <= 30 else 10
+        if (i + 1) % interval == 0 or (i + 1) == len(dataset):
             acc = correct / total if total > 0 else 0
             print(f"  Progress {i+1}/{len(dataset)} | acc: {100*acc:.1f}%")
 
@@ -171,6 +176,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_samples", type=int, default=100)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--show_failures", type=int, default=0, help="Print first N wrong cases")
+    parser.add_argument("--max_new_tokens", type=int, default=512, help="256 for faster runs")
     args = parser.parse_args()
 
     from src2.models.qwen3 import Qwen3Runner
@@ -181,4 +187,5 @@ if __name__ == "__main__":
         max_samples=args.max_samples,
         seed=args.seed,
         show_failures=args.show_failures,
+        max_new_tokens=args.max_new_tokens,
     )
