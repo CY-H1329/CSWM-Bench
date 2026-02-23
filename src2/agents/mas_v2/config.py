@@ -87,13 +87,13 @@ CATEGORY_DESCRIPTIONS = {
         "Whether multiple objects are arranged in parallel alignment.",
     # Counting / relation / depth / distance
     "count":
-        "Counting how many objects exist. The question explicitly asks 'how many' or a specific number.",
+        "Counting the number of objects or instances of a specific type in the scene.",
     "relation":
-        "Spatial relationship between objects: left/right, above/below, in front of/behind, inside/outside, etc.",
+        "Spatial relationship between objects (left/right, above/below, inside/outside, etc.).",
     "depth":
-        "Comparing which object is closer to or farther from the CAMERA or VIEWER. Keywords: 'closer to the camera', 'nearer', 'farther away', 'in front in the scene'. This is NOT about counting objects.",
+        "Relative depth ordering — which object is closer to or farther from the camera.",
     "distance":
-        "Comparing or estimating the distance BETWEEN two objects (not relative to the camera). Keywords: 'how far apart', 'closer to object X', 'distance between'.",
+        "Estimating or comparing distances between objects in the scene.",
 }
 
 # Legacy aliases (kept for backward compatibility if needed)
