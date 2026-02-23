@@ -50,7 +50,7 @@ def train_qwen3(
     processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
     model = _load_qwen3_model(
         model_id,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         device_map="auto",
         trust_remote_code=True,
     )
