@@ -35,6 +35,7 @@ class CVBenchSFTDataCollator:
         all_attention_mask = []
         all_pixel_values = []
         all_image_grid_thw = []
+        all_image_sizes = []
 
         pad_id = _get_pad_id(self.processor)
         for item in batch:
@@ -79,6 +80,7 @@ class CVBenchSFTDataCollator:
             input_ids = out["input_ids"].squeeze(0)
             pixel_values = out.get("pixel_values")
             image_grid_thw = out.get("image_grid_thw")
+            image_sizes = out.get("image_sizes")
 
             # User part only (to find assistant start)
             if user_len is None:
@@ -113,6 +115,13 @@ class CVBenchSFTDataCollator:
                 all_pixel_values.append(pixel_values)
             if image_grid_thw is not None:
                 all_image_grid_thw.append(image_grid_thw)
+            if image_sizes is not None:
+                sz = image_sizes
+                if not isinstance(sz, torch.Tensor):
+                    sz = torch.tensor(sz, dtype=torch.long)
+                if sz.dim() == 1:
+                    sz = sz.unsqueeze(0)
+                all_image_sizes.append(sz)
 
         result = {
             "input_ids": torch.nn.utils.rnn.pad_sequence(all_input_ids, batch_first=True, padding_value=pad_id),
@@ -123,4 +132,6 @@ class CVBenchSFTDataCollator:
             result["pixel_values"] = torch.cat(all_pixel_values, dim=0)
         if all_image_grid_thw:
             result["image_grid_thw"] = torch.cat(all_image_grid_thw, dim=0)
+        if all_image_sizes:
+            result["image_sizes"] = torch.cat(all_image_sizes, dim=0)
         return result
