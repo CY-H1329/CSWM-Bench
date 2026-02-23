@@ -23,27 +23,45 @@ def build_head_agent_prompt(
     else:
         cats_block = "\n".join(f"  - {c}" for c in category_list)
 
-    return f"""Classify this question into exactly ONE category. Output ONLY the category name.
+    return f"""You are the Head Agent of a spatial reasoning Multi-Agent System.
 
-Categories:
+Your ONLY job is to classify the given question into exactly ONE spatial category. Your classification determines which specialist agents will be selected, so accuracy is critical.
+
+## Categories and Definitions
+
 {cats_block}
 
-Rules (check in order, pick the FIRST match):
-1. "how many" or counting objects → counting
-2. comparing height, size, or scale (taller, shorter, bigger, smaller, higher, wider) → size
-3. closer, farther, nearer, distance, depth, how far → distance_depth
-4. facing, direction, viewpoint, parallel, oriented, same direction, looking at, pointing → orientation
-5. position of one object relative to another (above, below, left, right, in front, behind, next to) → spatial_relation
+## Classification Rules
 
-IMPORTANT:
-- "Which is higher/taller" comparing objects = size (NOT spatial_relation)
-- "facing" or "direction" or "parallel" = orientation (NOT spatial_relation)
-- "closer" or "farther" = distance_depth (NOT spatial_relation)
-- Do NOT answer the question. Only classify it.
+1. Read the question carefully. Focus on WHAT spatial property is being asked about, not the objects themselves.
+2. If the question asks about relative position (above/below), choose a location or orientation category.
+3. If the question asks "which is closer/farther", choose a distance or depth category.
+4. If the question asks about direction or facing, choose an orientation category.
+5. If the question asks "how many", choose a counting category.
+6. When two categories seem plausible, choose the one that matches the CORE spatial relationship being asked.
 
-Question: {query}
+## Examples
 
-Category:"""
+Question: "Is the chair above the table?" → location_above
+Question: "Which object is closer to the camera?" → location_closer_to_camera
+Question: "Is the dog to the left of the cat?" → orientation_on_the_left
+Question: "Are the two cars facing the same direction?" → multi_object_same_direction
+Question: "How many people are in the scene?" → Count
+Question: "Is the red box in front of the blue box?" → orientation_in_front_of
+
+## DO NOT
+
+- Do NOT explain your reasoning.
+- Do NOT output anything other than the category name.
+- Do NOT make up a category that is not in the list.
+
+## Question
+
+{query}
+
+## Output
+
+Respond with ONLY the category name. Nothing else."""
 
 
 # ======================================================================
