@@ -1,18 +1,33 @@
 """
-Data collator for Qwen3-VL SFT.
+Data collator for VLM SFT (Qwen3-VL, LLaVA-NeXT, Qwen2.5-VL/SpatialReasoner).
 Applies chat template with images, masks labels for user tokens.
+LLaVA and Qwen2.5-VL use apply_chat_template similarly to Qwen3.
+Sa2VA uses collator_sa2va.Sa2VASFTDataCollator.
 """
 from dataclasses import dataclass
 from typing import Any, Dict, List
 import torch
 
 
+def _get_pad_id(processor: Any) -> int:
+    pad_id = getattr(processor, "pad_token_id", None)
+    if pad_id is not None:
+        return pad_id
+    tok = getattr(processor, "tokenizer", None)
+    if tok is not None:
+        return getattr(tok, "pad_token_id", None) or getattr(tok, "eos_token_id", 0) or 0
+    return 0
+
+
 @dataclass
 class CVBenchSFTDataCollator:
-    """Collate batch: apply chat template (with images), tokenize, mask user tokens in labels."""
+    """Collate batch: apply chat template (with images), tokenize, mask user tokens in labels.
+    Works for Qwen3-VL, LLaVA-NeXT, Qwen2.5-VL/SpatialReasoner (apply_chat_template with images).
+    """
 
     processor: Any
     max_length: int = 2048
+    model_type: str = "auto"  # "auto" | "llava" for LLaVA processor(image, prompt) fallback
 
     def __call__(self, batch: List[Dict]) -> Dict[str, torch.Tensor]:
         all_input_ids = []
@@ -21,11 +36,12 @@ class CVBenchSFTDataCollator:
         all_pixel_values = []
         all_image_grid_thw = []
 
-        pad_id = getattr(self.processor, "pad_token_id", 0) or 0
+        pad_id = _get_pad_id(self.processor)
         for item in batch:
             messages = item["messages"]
+            image = item.get("image")
             # Full conversation (user + assistant)
-            # Qwen3 processor handles image in messages via apply_chat_template
+            user_len = None
             try:
                 out = self.processor.apply_chat_template(
                     messages,
@@ -35,23 +51,47 @@ class CVBenchSFTDataCollator:
                     return_tensors="pt",
                 )
             except Exception as e:
-                raise RuntimeError(f"Processor failed on messages. Ensure image in PIL format. {e}")
+                if self.model_type == "llava" and image is not None:
+                    # LLaVA: processor(images, prompt) pattern
+                    prompt = self.processor.apply_chat_template(
+                        messages, tokenize=False, add_generation_prompt=False
+                    )
+                    user_prompt = self.processor.apply_chat_template(
+                        [messages[0]], tokenize=False, add_generation_prompt=True
+                    )
+                    try:
+                        out = self.processor(
+                            images=[image], text=[prompt], padding=True, return_tensors="pt"
+                        )
+                        user_out = self.processor(
+                            images=[image], text=[user_prompt], padding=True, return_tensors="pt"
+                        )
+                    except TypeError:
+                        out = self.processor(image, prompt, return_tensors="pt")
+                        user_out = self.processor(image, user_prompt, return_tensors="pt")
+                    user_len = user_out["input_ids"].shape[1]
+                else:
+                    raise RuntimeError(
+                        f"Processor failed on messages. Ensure image in PIL format. {e}"
+                    )
+
             out.pop("token_type_ids", None)
             input_ids = out["input_ids"].squeeze(0)
             pixel_values = out.get("pixel_values")
             image_grid_thw = out.get("image_grid_thw")
 
             # User part only (to find assistant start)
-            user_messages = [messages[0]]
-            user_out = self.processor.apply_chat_template(
-                user_messages,
-                tokenize=True,
-                add_generation_prompt=True,
-                return_dict=True,
-                return_tensors="pt",
-            )
-            user_out.pop("token_type_ids", None)
-            user_len = user_out["input_ids"].shape[1]
+            if user_len is None:
+                user_messages = [messages[0]]
+                user_out = self.processor.apply_chat_template(
+                    user_messages,
+                    tokenize=True,
+                    add_generation_prompt=True,
+                    return_dict=True,
+                    return_tensors="pt",
+                )
+                user_out.pop("token_type_ids", None)
+                user_len = user_out["input_ids"].shape[1]
 
             # Labels: -100 for user + padding, keep assistant
             labels = input_ids.clone()

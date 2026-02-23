@@ -34,6 +34,9 @@ python scripts/sft_cvbench/01_sample_dataset.py
 
 # 2. Train (per model, per shots)
 python scripts/sft_cvbench/02_train.py --model qwen3_4b --shots 10
+python scripts/sft_cvbench/02_train.py --model llava4d --shots 10
+python scripts/sft_cvbench/02_train.py --model sa2va --shots 10
+python scripts/sft_cvbench/02_train.py --model spatialreasoner --shots 10
 
 # 3. Evaluate on human_selected_test_set
 python scripts/sft_cvbench/03_evaluate.py --model qwen3_4b --shots 10 --checkpoint results/sft_cvbench/checkpoints/qwen3_4b_cvbench_10shot
