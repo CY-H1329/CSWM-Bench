@@ -69,7 +69,9 @@ python scripts/evals/cvbench/run_all_models_full.py
 ```
 Spatial_MAS/
 ├── config.yaml
-├── results_summary/             # Aggregated results (tracked)
+├── spatial_aomas/              # Trust Score (Step 1~4, score-based agent selection)
+├── scripts/sft_cvbench/        # SFT pipeline (train + eval on CV-Bench, 10/30/100 shot)
+├── results_summary/            # Aggregated results (tracked)
 ├── scripts/
 │   ├── evals/3dsrbench/         # GPU (Qwen3, Sa2VA, LLaVA4D)
 │   ├── evals/3dsrbench_api/     # API (Claude, GPT-4o, Gemini)

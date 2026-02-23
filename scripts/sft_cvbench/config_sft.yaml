@@ -1,0 +1,31 @@
+# SFT CV-Bench pipeline — reproducibility config
+seed: 42
+
+# Shots per task for each training regime
+shots_per_task: [10, 30, 100]
+
+# Models to train
+models: [qwen3_4b, llava4d, sa2va, spatialrgpt, spatialreasoner]
+
+# Human-selected test set (stratified, no overlap with training)
+human_test_2d: 300  # Count + Relation
+human_test_3d: 300  # Depth + Distance
+
+# Training hyperparameters (identical across models for fairness)
+training:
+  epochs: 3
+  batch_size: 4
+  learning_rate: 2.0e-5
+  warmup_steps: 100
+  weight_decay: 0.01
+  gradient_accumulation_steps: 4
+  max_grad_norm: 1.0
+  save_steps: 500
+  eval_steps: 250
+  logging_steps: 50
+
+paths:
+  data_dir: "data/sft_cvbench"
+  splits_dir: "data/sft_cvbench/splits"
+  output_dir: "results/sft_cvbench"
+  checkpoints_dir: "results/sft_cvbench/checkpoints"
