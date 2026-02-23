@@ -222,7 +222,8 @@ def run_classification_test(
     all_pred_cats = sorted(set(
         pred for preds in confusion.values() for pred in preds
     ))
-    header = f"{'GT \\ Pred':<30s}" + "".join(f"{c[:12]:>13s}" for c in all_pred_cats)
+    gt_pred_label = "GT \\ Pred"
+    header = f"{gt_pred_label:<30s}" + "".join(f"{c[:12]:>13s}" for c in all_pred_cats)
     print(header)
     print("-" * len(header))
     for gt_cat in sorted(confusion.keys()):
