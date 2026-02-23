@@ -34,26 +34,30 @@ Your ONLY job is to classify the given question into exactly ONE spatial categor
 ## Classification Rules
 
 1. Read the question carefully. Focus on WHAT spatial property is being asked about, not the objects themselves.
-2. If the question asks about relative position (above/below), choose a location or orientation category.
-3. If the question asks "which is closer/farther", choose a distance or depth category.
-4. If the question asks about direction or facing, choose an orientation category.
-5. If the question asks "how many", choose a counting category.
-6. When two categories seem plausible, choose the one that matches the CORE spatial relationship being asked.
+2. "how many" or asking for a NUMBER of objects → count.
+3. "closer/nearer/farther from the camera or viewer" → depth. This is about camera-relative ordering.
+4. "distance between objects" or "closer to object X" (not camera) → distance.
+5. "left/right/above/below/in front of/behind" between objects → relation.
+6. CRITICAL: If the question compares positions relative to THE CAMERA, it is depth, NOT count and NOT distance.
+7. If the question asks about the spatial arrangement between two objects (not the camera), it is relation.
 
 ## Examples
 
-Question: "Is the chair above the table?" → location_above
-Question: "Which object is closer to the camera?" → location_closer_to_camera
-Question: "Is the dog to the left of the cat?" → orientation_on_the_left
-Question: "Are the two cars facing the same direction?" → multi_object_same_direction
-Question: "How many people are in the scene?" → Count
-Question: "Is the red box in front of the blue box?" → orientation_in_front_of
+Question: "How many cars are in the image?" → count
+Question: "How many chairs can you see?" → count
+Question: "Which object is closer to the camera, A or B?" → depth
+Question: "Is object A nearer to the viewer than object B?" → depth
+Question: "Is the red ball to the left of the blue box?" → relation
+Question: "Is object A above object B?" → relation
+Question: "Which object is closer to the table?" → distance
+Question: "How far apart are the two chairs?" → distance
 
 ## DO NOT
 
 - Do NOT explain your reasoning.
 - Do NOT output anything other than the category name.
 - Do NOT make up a category that is not in the list.
+- Do NOT classify camera/viewer proximity questions as count — those are depth.
 
 ## Question
 
