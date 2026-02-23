@@ -68,6 +68,6 @@ class CVBenchSFTDataset(Dataset):
 
         messages = [
             {"role": "user", "content": [{"type": "image", "image": img}, {"type": "text", "text": prompt}]},
-            {"role": "assistant", "content": assistant_text},
+            {"role": "assistant", "content": [{"type": "text", "text": assistant_text}]},
         ]
         return {"messages": messages, "image": img}
