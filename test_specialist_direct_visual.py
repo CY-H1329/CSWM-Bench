@@ -51,7 +51,7 @@ def run_specialist_test(
     max_samples: int = None,
     seed: int = 42,
     show_failures: int = 0,
-    max_new_tokens: int = 512,
+    max_new_tokens: int = 1024,
 ):
     """
     Run direct_visual_heuristic + Qwen3 on benchmark, report accuracy vs GT.
@@ -62,7 +62,7 @@ def run_specialist_test(
         max_samples: Limit samples (None = all)
         seed: Random seed
         show_failures: Print first N wrong cases (query, GT, pred, reason)
-        max_new_tokens: Reduce to 256 for faster runs (less COT detail)
+        max_new_tokens: 512 often cuts off before Answer; use 1024+ for full COT
     """
     dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
     role = "direct_visual_heuristic"
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_samples", type=int, default=100)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--show_failures", type=int, default=0, help="Print first N wrong cases")
-    parser.add_argument("--max_new_tokens", type=int, default=512, help="256 for faster runs")
+    parser.add_argument("--max_new_tokens", type=int, default=1024, help="512 cuts off; 1024+ for full COT+Answer")
     args = parser.parse_args()
 
     from src2.models.qwen3 import Qwen3Runner
