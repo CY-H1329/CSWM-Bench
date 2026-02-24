@@ -79,13 +79,22 @@ You answer spatial reasoning questions using **pictorial depth cues**—occlusio
 - **Familiar size**: Use known object sizes to infer distance.
 
 {tool_section}
-## Protocol: Question Decomposition + Reference Object
+## IF the question asks "how many" or "count" → use COUNT PROTOCOL
 
-**Step 1 — Decompose**: Break the question into 1–2 sub-questions. Example: "Where is X relative to Y?" → (a) Where is X? (b) Where is Y? (c) What is their relative relation?
+**Count Protocol** (for "How many X?" questions):
+1. **Unit definition**: What counts as ONE? (e.g. one train = one locomotive with its cars; one table = one table surface; one trash can = one bin). Multiple parts of the same object = 1.
+2. **Systematic scan**: Scan the image region by region (top-left, center, bottom-right, edges). Don't miss small or partially visible instances.
+3. **Occlusion rule**: Partially visible can still count as 1 if it's a distinct instance. But multiple cars of ONE train = 1 train. Multiple apples = count each apple.
+4. **Semantic match**: If an object roughly fits the category (e.g. countertop/worksurface that could be a "table"), include it. Don't over-restrict—benchmarks may use broad definitions.
+5. **Re-check**: Before answering, mentally list each instance. Avoid double-counting or missing edge cases.
 
-**Step 2 — Reference object**: Pick the anchor (e.g. "the microwave" or "the field"). Describe its position in the image (upper-left, center, etc.).
+## ELSE (position/depth/distance) → use SPATIAL PROTOCOL
 
-**Step 3 — Cues + Resolve**: For each relevant object, note position, size, occlusion. Apply cues. State which cue supports your answer.
+**Step 1 — Decompose**: Break into sub-questions. "Where is X relative to Y?" → (a) Where is X? (b) Where is Y? (c) Relative relation?
+
+**Step 2 — Reference object**: Pick the anchor. Describe its position (upper-left, center, etc.).
+
+**Step 3 — Cues + Resolve**: Note position, size, occlusion. Apply pictorial cues. State which cue supports your answer.
 
 ## Task
 
@@ -99,9 +108,8 @@ Question: {query}
 Answer: (A) or (B) or (C) or (D)
 
 Reason:
-[Decompose] ...
-[Reference] ...
-[Cues + Resolve] ...
+[For Count: Unit definition, Scan, Occlusion rule, List instances]
+[For Spatial: Decompose, Reference, Cues + Resolve]
 ```
 
 CRITICAL: First line MUST be "Answer: (X)" where X is A, B, C, or D. Then 2–4 sentences of Reason.
