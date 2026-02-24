@@ -90,16 +90,16 @@ def _get_spatial_relation(box_a: Tuple[float, float, float, float],
     return rels if rels else ["adjacent"]
 
 
-def get_scene_graph_summary(image: Image.Image) -> str:
+def get_detected_objects(image: Image.Image, n_keep: int = 15) -> List[dict]:
     """
-    Detect objects and compute spatial relationships.
+    Detect objects in image and return list of {id, label, box, score}.
 
-    Returns a textual summary: objects with positions and pairwise
-    relationships (above/below, left/right, overlaps).
+    box is (x1, y1, x2, y2) in image coordinates.
+    Returns empty list on failure.
     """
     detector = _get_detector()
     if detector == "unavailable":
-        return "[Scene graph tool unavailable. Proceed with visual analysis only.]"
+        return []
 
     processor, model = detector
     global _COCO_LABELS
@@ -111,23 +111,21 @@ def get_scene_graph_summary(image: Image.Image) -> str:
         with torch.no_grad():
             outputs = model(**inputs)
 
-        # Post-process: get boxes, scores, labels (one result per image)
         target_sizes = torch.tensor([[image.height, image.width]])
         results = processor.post_process_object_detection(
             outputs, target_sizes=target_sizes, threshold=0.5,
         )
         if not results:
-            return "[No objects detected. Proceed with visual analysis.]"
+            return []
         result = results[0]
 
         boxes = result["boxes"].cpu().numpy()
         scores = result["scores"].cpu().numpy()
         pred_labels = result["labels"].cpu().numpy()
 
-        # Keep top 15 detections
-        n_keep = min(15, len(boxes))
+        n_keep = min(n_keep, len(boxes))
         if n_keep == 0:
-            return "[No objects detected above threshold. Proceed with visual analysis.]"
+            return []
 
         objects = []
         id2label = getattr(model.config, "id2label", None) or {}
@@ -143,7 +141,25 @@ def get_scene_graph_summary(image: Image.Image) -> str:
                 "box": (x1, y1, x2, y2),
                 "score": float(scores[i]),
             })
+        return objects
 
+    except Exception as e:
+        logger.warning("Scene graph detection failed: %s", e)
+        return []
+
+
+def get_scene_graph_summary(image: Image.Image) -> str:
+    """
+    Detect objects and compute spatial relationships.
+
+    Returns a textual summary: objects with positions and pairwise
+    relationships (above/below, left/right, overlaps).
+    """
+    objects = get_detected_objects(image)
+    if not objects:
+        return "[Scene graph tool unavailable or no objects detected. Proceed with visual analysis only.]"
+
+    try:
         # Build relationship summary
         lines = [
             "## Scene Graph Tool Output",

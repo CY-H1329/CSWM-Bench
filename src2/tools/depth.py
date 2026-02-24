@@ -36,6 +36,39 @@ def _get_depth_pipeline():
     return _depth_pipeline
 
 
+def get_depth_map(image: Image.Image) -> Optional[np.ndarray]:
+    """
+    Estimate depth and return the raw depth map (H×W array).
+
+    Lower values = closer to viewer (typical for DepthAnything).
+    Returns None on failure.
+    """
+    pipeline = _get_depth_pipeline()
+    if pipeline == "unavailable":
+        return None
+
+    try:
+        result = pipeline(image)
+        depth_map = result.get("depth") or result.get("predicted_depth")
+        if depth_map is None and isinstance(result, (np.ndarray, list)):
+            depth_map = result
+        if depth_map is None:
+            return None
+
+        if hasattr(depth_map, "numpy"):
+            depth_arr = depth_map.numpy().squeeze()
+        elif hasattr(depth_map, "cpu"):
+            depth_arr = depth_map.cpu().numpy().squeeze()
+        else:
+            depth_arr = np.array(depth_map).squeeze()
+        if depth_arr.ndim != 2:
+            return None
+        return depth_arr
+    except Exception as e:
+        logger.warning("Depth map extraction failed: %s", e)
+        return None
+
+
 def get_depth_summary(image: Image.Image) -> str:
     """
     Estimate depth from image and return a textual summary.
@@ -47,28 +80,11 @@ def get_depth_summary(image: Image.Image) -> str:
         Text block to inject into the agent prompt. On failure, returns
         a placeholder message.
     """
-    pipeline = _get_depth_pipeline()
-    if pipeline == "unavailable":
+    depth_arr = get_depth_map(image)
+    if depth_arr is None:
         return "[Depth tool unavailable. Proceed with visual analysis only.]"
 
     try:
-        result = pipeline(image)
-        depth_map = result.get("depth") or result.get("predicted_depth")
-        if depth_map is None and isinstance(result, (np.ndarray, list)):
-            depth_map = result
-        if depth_map is None:
-            return "[Depth estimation returned no map. Proceed with visual analysis.]"
-
-        # Handle tensor, PIL, or ndarray
-        if hasattr(depth_map, "numpy"):
-            depth_arr = depth_map.numpy().squeeze()
-        elif hasattr(depth_map, "cpu"):
-            depth_arr = depth_map.cpu().numpy().squeeze()
-        else:
-            depth_arr = np.array(depth_map).squeeze()
-        if depth_arr.ndim != 2:
-            return "[Invalid depth map shape. Proceed with visual analysis.]"
-
         # Divide into 3x3 grid, compute mean depth per region
         h, w = depth_arr.shape
         region_h, region_w = h // 3, w // 3

@@ -119,23 +119,57 @@ Output your response now.""",
     # direct_visual_heuristic: no tools (tool_section always empty)
     "explicit_3d_representation": """# ROLE: Explicit 3D Representation Construction Agent
 
-You answer spatial reasoning questions by constructing a 3D representation of the scene from the 2D image. You have access to a **depth estimation tool** that provides relative depth by image region.
+You are a **3D depth reasoning specialist**. You answer spatial questions (closer/farther, in front/behind, depth order) using the **object-level 3D representation** when available. When the tool fails or returns no data, use pictorial cues from the image.
 
 {tool_section}
 
-## Your Strategy
-1. Use the depth tool output (if provided) to establish relative depth ordering of regions.
-2. Map question-relevant objects to these regions (e.g. "the red chair is in bottom-center").
-3. Infer 3D layout: ground plane, vertical surfaces, relative positions from camera.
-4. Consider viewpoint, projection geometry, foreshortening.
-5. Use the constructed 3D model to answer the spatial relationship asked.
+## When Tool Output is Missing or Failed — Use Pictorial Cues
+
+Apply these cues from the image directly:
+- **Occlusion**: A hides B → A is closer.
+- **Relative size**: Larger apparent size → closer.
+- **Height in image**: Lower in frame → usually closer (ground plane).
+- **For Count**: Systematic scan (top-left → center → bottom-right). Unit definition (train cars = 1 train). Semantic match.
+
+Always answer. Never refuse. If no tool data, say "Tool unavailable; reasoning from image" and use cues above.
+
+## When Tool Output is Available — Use 3D Representation
+
+The tool provides (mathematical 3D representation):
+1. **Depth Map Grid (3×3)** — Normalized depth per image region [0,1]. Lower = closer.
+2. **Object Depth Values (z)** — Each object has z ∈ [0,1]. z=0 = closest, z=1 = farthest.
+3. **Depth Ordering** — Adjacent pairs "A (z=0.2) → B (z=0.6)" with Δz. Chain to infer any A vs B.
+4. **Instance Count** — For "how many X?": match X to the label.
+5. **Trust z values** — They are derived from monocular depth estimation. Override pictorial cues.
+
+**Protocol:**
+1. **Identify question objects** — What does the question ask about?
+2. **Match to tool output** — Find objects in Object Depth Values or Instance Count. Semantic match (dining table ≈ table).
+3. **For depth/distance** — Compare z values: lower z = closer. Pairwise gives z_A, z_B, Δz.
+4. **For "how many X?"** — Use Instance Count.
+5. **For "which is closer/farther?"** — Pick object with smallest/largest z among options.
+6. **Depth Map Grid** — Use for spatial layout; map object position to grid region depth.
 
 ## Task
 Question: {query}
 
 ## Output Format (STRICT)
-Reason: <Step-by-step 3D construction and reasoning. Reference depth data when available.>
-Answer: (A) or (B) or (C) or (D)""",
+
+**Answer FIRST**, then brief justification. Reference the 3D tool data explicitly.
+
+```
+Answer: (A) or (B) or (C) or (D)
+
+Reason:
+[1] Question objects: X, Y
+[2] From tool: X rank N, Y rank M (or Pairwise: X in front of Y)
+[3] Depth inference: X closer than Y (or vice versa)
+[4] Conclusion → option (X)
+```
+
+CRITICAL: First line MUST be "Answer: (X)". If the tool failed, say so and reason from the image only.
+
+Output your response now.""",
 
     "scene_graph_construction": """# ROLE: Scene Graph Construction Agent
 

@@ -134,8 +134,12 @@ def run_step(
         if role in _ROLES_WITH_TOOLS and role not in tool_output_cache:
             try:
                 if role == "explicit_3d_representation":
-                    from src2.tools import get_depth_summary
-                    tool_output_cache[role] = get_depth_summary(image)
+                    from src2.tools import get_3d_representation
+                    from src2.tools.object_extraction import extract_objects_from_image
+                    object_names = extract_objects_from_image(image, specialist_generate, llm_name)
+                    tool_output_cache[role] = get_3d_representation(
+                        image, object_names=object_names if object_names else None
+                    )
                 elif role == "scene_graph_construction":
                     from src2.tools import get_scene_graph_summary
                     tool_output_cache[role] = get_scene_graph_summary(image)
