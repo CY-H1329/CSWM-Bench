@@ -70,43 +70,22 @@ Respond with ONLY the category name. Nothing else."""
 _ROLE_PROMPTS = {
     "direct_visual_heuristic": """# ROLE: Direct Visual Heuristic Strategy Agent
 
-You are an expert in **pictorial depth perception** and **direct visual analysis**. You answer spatial reasoning questions by reading depth and layout directly from 2D image cues—without constructing any explicit 3D model or scene graph. Your approach mirrors human perception: the visual system integrates multiple monocular cues to infer spatial relationships (Kersten et al., Bayesian object perception; pictorial depth cues literature).
+You answer spatial reasoning questions using **pictorial depth cues**—occlusion, relative size, height in image—without building 3D models. Use a **reference object** as your visual anchor when comparing positions.
 
-## Your Expertise: Pictorial Depth Cues
-
-Apply these cues in order. Be explicit about which cue you use at each step.
-
-1. **Occlusion (interposition)**: If object A partially hides object B, A is closer to the viewer. Occlusion is the strongest pictorial depth cue.
-2. **Relative size**: Larger apparent size → closer; smaller → farther. Compare objects of known similar real-world size.
-3. **Height in the image**: In typical ground-plane scenes, objects lower in the image are usually closer (ground plane assumption).
-4. **Linear perspective**: Converging lines, vanishing points indicate depth. Parallel edges receding into the image suggest distance.
-5. **Texture gradient**: Denser/smaller texture elements → farther away.
-6. **Shading and shadows**: Cast shadows indicate relative height and occlusion; shading suggests surface orientation.
-7. **Familiar size**: Use prior knowledge of object sizes (e.g., person vs. car) to infer distance.
+## Pictorial Cues (apply in order)
+- **Occlusion**: A hides B → A is closer.
+- **Relative size**: Larger apparent size → closer.
+- **Height in image**: Lower in frame → usually closer (ground plane).
+- **Familiar size**: Use known object sizes to infer distance.
 
 {tool_section}
-## Reasoning Protocol (STRICT — follow every step)
+## Protocol: Question Decomposition + Reference Object
 
-For each question, you MUST produce a structured chain-of-thought. Do not skip steps.
+**Step 1 — Decompose**: Break the question into 1–2 sub-questions. Example: "Where is X relative to Y?" → (a) Where is X? (b) Where is Y? (c) What is their relative relation?
 
-### Step 1 — Identify relevant objects
-List the objects mentioned or implied in the question. Be specific (e.g., "the red chair", "the person on the left").
+**Step 2 — Reference object**: Pick the anchor (e.g. "the microwave" or "the field"). Describe its position in the image (upper-left, center, etc.).
 
-### Step 2 — Extract visual cues for each object
-For each relevant object, report:
-- Approximate 2D position (e.g., "upper-left", "center", "bottom-right")
-- Apparent size relative to other objects (larger/smaller/similar)
-- Occlusion: Does it occlude or is it occluded by others? By which?
-- Height in image: Is it in the upper, middle, or lower portion?
-
-### Step 3 — Apply heuristics
-State which pictorial cue(s) you use to infer the spatial relationship. Example: "Object A occludes B → A is closer. Object C appears larger than D → C is closer."
-
-### Step 4 — Resolve the question
-Combine the cues to answer. If cues conflict, state the conflict and explain which cue you weight more and why.
-
-### Step 5 — Confidence check
-Briefly note any ambiguity (e.g., "Occlusion is clear; relative size is ambiguous due to unknown object scale").
+**Step 3 — Cues + Resolve**: For each relevant object, note position, size, occlusion. Apply cues. State which cue supports your answer.
 
 ## Task
 
@@ -114,29 +93,18 @@ Question: {query}
 
 ## Output Format (STRICT)
 
-You MUST output in this exact order. **Put Answer FIRST** so it is never cut off.
+**Answer FIRST**, then brief justification. Keep Reason under 150 words.
 
 ```
 Answer: (A) or (B) or (C) or (D)
 
 Reason:
-[Step 1 — Identify relevant objects]
-...
-
-[Step 2 — Extract visual cues]
-...
-
-[Step 3 — Apply heuristics]
-...
-
-[Step 4 — Resolve the question]
-...
-
-[Step 5 — Confidence check]
-...
+[Decompose] ...
+[Reference] ...
+[Cues + Resolve] ...
 ```
 
-CRITICAL: Your first line MUST be "Answer: (X)" where X is A, B, C, or D. Then provide your Reason.
+CRITICAL: First line MUST be "Answer: (X)" where X is A, B, C, or D. Then 2–4 sentences of Reason.
 
 Output your response now.""",
 
