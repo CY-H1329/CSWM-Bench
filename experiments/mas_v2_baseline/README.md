@@ -9,10 +9,12 @@ Sample sizes: 10, 50, 100.
 ```
 experiments/mas_v2_baseline/
 ├── README.md
-├── cvbench_experiments.ipynb      # CV-Bench: 10, 50, 100 samples
-├── 3dsrbench_experiments.ipynb    # 3DSRBench: 10, 50, 100 samples
-├── run_all.py                     # Python script (all experiments)
-└── run_h100.sh                    # H100 batch script
+├── mas_v2_baseline.ipynb          # Full experiments (Untitled style, 10/50/100 × 2 benchmarks)
+├── mas_v2_quick_test.ipynb       # Quick test (run_mas_test, no train)
+├── cvbench_experiments.ipynb     # CV-Bench only
+├── 3dsrbench_experiments.ipynb   # 3DSRBench only
+├── run_all.py                    # Command: python run_all.py
+└── run_h100.sh                   # Command: bash run_h100.sh
 ```
 
 ## Results
@@ -25,18 +27,21 @@ Saved to `results/mas_v2_baseline/{benchmark}/{n}samples/{timestamp}/`:
 ## H100 실행
 
 ```bash
-cd ~/CY/Spatial_MAS   # 또는 프로젝트 경로
+cd ~/CY/Spatial_MAS
 git pull origin main
 
-# 방법 1: Shell script (6개 실험 순차 실행)
+# Command 1: Full experiments (train+test, 10/50/100 × 2 benchmarks)
 bash experiments/mas_v2_baseline/run_h100.sh
-
-# 방법 2: Python script
+# 또는
 python experiments/mas_v2_baseline/run_all.py
 
-# 방법 3: Jupyter notebook
+# Command 2: Quick test (no train, random agents)
+python test_final_reasoning_mas_v2.py --benchmark cvbench --max_samples 100 --use_local_reasoning
+
+# Notebook (Untitled.ipynb 스타일)
 jupyter notebook experiments/mas_v2_baseline/
-# cvbench_experiments.ipynb, 3dsrbench_experiments.ipynb 실행
+# mas_v2_baseline.ipynb — full experiments
+# mas_v2_quick_test.ipynb — quick test
 ```
 
 ## Requirements

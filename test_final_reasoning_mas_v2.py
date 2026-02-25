@@ -196,6 +196,8 @@ if __name__ == "__main__":
     parser.add_argument("--reasoning_api_base", type=str, default="http://localhost:8000/v1")
     parser.add_argument("--reasoning_api_key", type=str, default="EMPTY")
     parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--use_local_reasoning", action="store_true", help="H100: DeepSeek-R1-Distill locally")
+    parser.add_argument("--reasoning_local_model", type=str, default="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B")
     args = parser.parse_args()
 
     from run_eval_mas_v2 import build_runners
@@ -204,6 +206,8 @@ if __name__ == "__main__":
         reasoning_api_base=args.reasoning_api_base,
         reasoning_api_key=args.reasoning_api_key,
         specialist_device=args.device,
+        use_local_reasoning=args.use_local_reasoning,
+        reasoning_local_model_id=args.reasoning_local_model,
     )
 
     results = run_mas_test(
