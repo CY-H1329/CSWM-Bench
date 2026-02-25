@@ -226,12 +226,14 @@ def build_role_prompt(role: str, query: str, tool_output: Optional[str] = None) 
 
 
 # ======================================================================
-# Final Reasoning Agent -- synthesis
+# Final Reasoning Agent -- synthesis from SharedMemory
 # ======================================================================
 def build_final_reasoning_prompt(query: str, shared_memory_text: str) -> str:
     return f"""# ROLE: Final Reasoning Agent
 
-You are the final decision-maker. Three specialist agents have independently analysed the same image and question using different strategies. Their outputs are below.
+You are the final decision-maker. Three specialist agents have independently analysed the same image and question. Each used a different strategy and produced their own reasoning and answer. Your job is to **read all of them carefully**, **think through the question and their analyses together**, and **synthesize a final conclusion**.
+
+The questions can be diverse: spatial relations (above/below, left/right), depth (closer/farther, in front/behind), counting, orientation, mental rotation, viewpoint, multi-object relations, and more. Do not apply fixed rules. Engage with the content.
 
 ## Question
 {query}
@@ -239,12 +241,36 @@ You are the final decision-maker. Three specialist agents have independently ana
 ## Specialist Agent Outputs
 {shared_memory_text}
 
-## Instructions
-1. Compare all three agents' reasoning and answers carefully.
-2. When 2 or more agents agree, strongly prefer that answer -- consensus is a reliable signal.
-3. When agents disagree, evaluate the quality and specificity of each agent's reasoning.
-4. Provide your final answer with a brief justification.
+## Reasoning Protocol (think through each step)
+
+### Step 1: Understand the question
+- What exactly is the question asking? What spatial property, relation, or quantity?
+- What objects or entities are involved?
+- What would a correct answer require—2D layout, 3D depth, counting, orientation, viewpoint, or something else?
+
+### Step 2: Read each agent's reasoning in full
+- For each agent: What did they conclude? What evidence or reasoning did they cite?
+- Note each agent's **Strategy**—what kind of information they had (pictorial cues, 3D depth, 2D graph).
+- Ask: Is this agent's reasoning **relevant** to what the question asks? Does their strategy match the question's demands?
+- Ask: Is their reasoning **internally consistent**? Did they use their data correctly?
+
+### Step 3: Compare and synthesize
+- Where do the agents agree? Where do they disagree?
+- For each disagreement: Which reasoning is more **grounded** in the question? Which cites more **concrete** data (z values, graph edges, specific cues)?
+- Consider: Does the question require information that only one agent had? (e.g. depth → explicit_3d; 2D relations → scene_graph)
+- Do **not** blindly follow majority vote. If one agent's reasoning is more relevant and correct for this specific question, choose that answer even if the others disagree.
+- If multiple agents' reasoning supports the same conclusion from different angles, that strengthens the case—but only if each reasoning is sound.
+
+### Step 4: Draw your conclusion
+- Based on your synthesis: What is the most justified answer?
+- Your conclusion must be grounded in the specialists' reasoning. Reference which agent(s) you found most convincing and why.
+- If the question is ambiguous or the reasoning is inconclusive, choose the best-supported answer and state the uncertainty.
+
+### Step 5: Output
+- First line MUST be: **Answer: (A)** or **(B)** or **(C)** or **(D)**.
+- Then: **Reason:** Write 2–5 sentences. Explain: (a) what the question asks, (b) which specialist(s) you found most relevant and why, (c) how you synthesized their reasoning, (d) why you chose this answer.
 
 ## Output Format (STRICT)
-Reason: <Brief justification for your choice, referencing the agents' analyses.>
-Answer: <(A) or (B) or (C) or (D)>"""
+Answer: (A) or (B) or (C) or (D)
+
+Reason: <Your synthesis and justification.>"""

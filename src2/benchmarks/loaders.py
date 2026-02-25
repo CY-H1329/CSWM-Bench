@@ -1,14 +1,22 @@
 """
 Unified loaders for all 4 benchmarks.
 Returns normalized format: image, question, options (list or None), answer, category (optional).
+
+3DSRBench: images are fetched from URL. Use image_cache_dir to cache locally for faster reruns.
 """
+import hashlib
+import io
+import os
 import random
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from datasets import load_dataset
 from PIL import Image
-import io
 import requests
+
+# Local cache for 3DSRBench URL images (set to enable)
+IMAGE_CACHE_DIR = os.environ.get("SPATIAL_MAS_IMAGE_CACHE")
 
 # Task categories for Head-Agent classification (do NOT give to Head - it must infer)
 SPATIAL_TASK_CATEGORIES = [
@@ -46,12 +54,31 @@ BENCHMARK_CONFIGS = {
 }
 
 
+def _url_to_cache_path(url: str) -> Optional[Path]:
+    """Return cache path for URL if IMAGE_CACHE_DIR is set."""
+    if not IMAGE_CACHE_DIR:
+        return None
+    key = hashlib.sha256(url.encode()).hexdigest()[:16]
+    ext = ".jpg" if ".jpg" in url.lower() or ".jpeg" in url.lower() else ".png"
+    return Path(IMAGE_CACHE_DIR) / f"{key}{ext}"
+
+
 def _fetch_image_from_url(url: str) -> Optional[Image.Image]:
-    """Fetch image from URL. Returns PIL Image or None."""
+    """Fetch image from URL. Uses local cache if IMAGE_CACHE_DIR is set."""
+    cache_path = _url_to_cache_path(url)
+    if cache_path and cache_path.exists():
+        try:
+            return Image.open(cache_path).convert("RGB")
+        except Exception:
+            pass
     try:
         r = requests.get(url, timeout=30)
         r.raise_for_status()
-        return Image.open(io.BytesIO(r.content)).convert("RGB")
+        img = Image.open(io.BytesIO(r.content)).convert("RGB")
+        if cache_path:
+            Path(IMAGE_CACHE_DIR).mkdir(parents=True, exist_ok=True)
+            img.save(cache_path, quality=95)
+        return img
     except Exception:
         return None
 

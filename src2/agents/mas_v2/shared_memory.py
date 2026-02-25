@@ -10,6 +10,12 @@ from typing import Dict, List
 class SharedMemory:
     """Per-step shared memory between specialist agents and the reasoning agent."""
 
+    ROLE_STRATEGIES = {
+        "direct_visual_heuristic": "Pictorial cues (occlusion, size, height in image). No tools. Strong for: count, general layout.",
+        "explicit_3d_representation": "3D depth (z values, in front/behind, Instance Count). Strong for: closer/farther, depth order.",
+        "scene_graph_construction": "2D spatial relations (above/below, left/right). Strong for: above/below, left/right, next to.",
+    }
+
     def __init__(self):
         self._entries: List[Dict] = []
 
@@ -31,9 +37,11 @@ class SharedMemory:
         """Format all entries as text for the Final Reasoning Agent prompt."""
         lines = []
         for i, e in enumerate(self._entries, 1):
+            strategy = self.ROLE_STRATEGIES.get(e["role"], "")
             lines.append(f"### Agent {i}: {e['role']} (Model: {e['llm_name']})")
-            lines.append(f"- Answer: {e['answer']}")
-            lines.append(f"- Reasoning: {e['reason']}")
+            lines.append(f"Strategy: {strategy}")
+            lines.append(f"Answer: {e['answer']}")
+            lines.append(f"Reasoning: {e['reason']}")
             lines.append("")
         return "\n".join(lines)
 
