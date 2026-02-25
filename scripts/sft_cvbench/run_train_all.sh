@@ -4,7 +4,7 @@
 #   shots: 10 (default), 30, 100
 set -e
 cd "$(dirname "$0")/../.."
-SHOTS=${1:-10}
+SHOTS=${1:-30}
 
 echo "=============================================="
 echo "SFT Training (CV-Bench) — shots=$SHOTS"

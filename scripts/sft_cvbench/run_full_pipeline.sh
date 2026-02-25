@@ -3,7 +3,7 @@
 # Usage: bash scripts/sft_cvbench/run_full_pipeline.sh [shots]
 set -e
 cd "$(dirname "$0")/../.."
-SHOTS=${1:-10}
+SHOTS=${1:-30}
 
 echo "=============================================="
 echo "SFT CV-Bench Pipeline (shots=$SHOTS)"
