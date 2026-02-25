@@ -14,7 +14,11 @@ Jupyter에서 실행 (서버 경로에 맞게 PROJECT_ROOT 수정):
 """
 import sys
 import subprocess
+import warnings
 from pathlib import Path
+
+# Suppress "sequential on GPU" pipeline warning (we call per-sample due to different labels)
+warnings.filterwarnings("ignore", message=".*sequentially on GPU.*")
 
 # 서버: "/home/jovyan/CY/Spatial_MAS" 로 변경 가능
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

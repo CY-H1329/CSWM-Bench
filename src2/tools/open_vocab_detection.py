@@ -53,11 +53,14 @@ def get_detections_with_labels(
         return []
 
     try:
-        predictions = pipeline(
-            image,
-            candidate_labels=candidate_labels,
-            threshold=threshold,
-        )
+        # Pass as list to avoid "sequential on GPU" warning
+        out = pipeline([image], candidate_labels=candidate_labels, threshold=threshold)
+        if not out:
+            predictions = []
+        elif isinstance(out[0], list):
+            predictions = out[0]  # list of images -> list of result lists
+        else:
+            predictions = out  # single image result as list of dicts
 
         objects = []
         for i, pred in enumerate(predictions or []):

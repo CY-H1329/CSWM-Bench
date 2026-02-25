@@ -26,7 +26,11 @@ Usage (CLI):
 import argparse
 import re
 import sys
+import warnings
 from collections import defaultdict
+
+# Suppress "sequential on GPU" pipeline warning (OWL-ViT called per-sample)
+warnings.filterwarnings("ignore", message=".*sequentially on GPU.*")
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
