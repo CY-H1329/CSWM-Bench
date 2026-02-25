@@ -35,6 +35,22 @@ CVBENCH_2D = {"Count", "Relation"}
 CVBENCH_3D = {"Depth", "Distance"}
 
 
+def _build_spatial_prompt(question: str) -> str:
+    """Spatial reasoning prompt (cf. cvbench with_prompt). LLaVA Depth 71% vs 5% without."""
+    return f"""# ROLE
+You are an expert in visual and spatial reasoning (2D: spatial relationships, counting; 3D: depth order, relative distance).
+
+# TASK
+Analyze the image carefully. Apply step-by-step reasoning. Reply with **Final Answer: (X)** where X is A, B, C, or D.
+
+---
+
+# QUESTION
+
+{question}
+"""
+
+
 def load_config(config_path: Path = None) -> dict:
     if config_path is None:
         config_path = Path(__file__).parent / "config_sft.yaml"
@@ -405,8 +421,12 @@ def _eval_sa2va(checkpoint: Path, indices: list, max_new_tokens: int = 256) -> t
     return preds, gt_list, categories
 
 
-def _eval_spatialreasoner_baseline(indices: list, max_new_tokens: int = 256) -> tuple:
-    """Evaluate SpatialReasoner base model (zero-shot)."""
+def _eval_spatialreasoner_baseline(
+    indices: list, max_new_tokens: int = 512, use_spatial_prompt: bool = True
+) -> tuple:
+    """Evaluate SpatialReasoner base model (zero-shot).
+    use_spatial_prompt: wrap with spatial reasoning prompt (paper-like; without it 3D acc drops ~70%).
+    """
     from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 
     base_id = "ccvl/SpatialReasoner"
@@ -427,6 +447,8 @@ def _eval_spatialreasoner_baseline(indices: list, max_new_tokens: int = 256) -> 
         ex = ds[idx]
         img = get_benchmark_image(ex, "cvbench")
         query = get_benchmark_prompt(ex, "cvbench")
+        if use_spatial_prompt:
+            query = _build_spatial_prompt(query)
         gt = get_benchmark_answer(ex, "cvbench")
         cat = get_benchmark_category(ex, "cvbench") or "unknown"
         if img is None:
@@ -578,6 +600,11 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--max_samples", type=int, default=None, help="Limit for debug")
     parser.add_argument("--max_new_tokens", type=int, default=256)
+    parser.add_argument(
+        "--no_spatial_prompt",
+        action="store_true",
+        help="SpatialReasoner: use raw Q+options only (no spatial prompt; 3D acc drops ~70%%)",
+    )
     return parser.parse_args()
 
 
@@ -609,6 +636,8 @@ def main():
     print(f"Shots: {args.shots}" + (" (baseline, no training)" if args.shots == 0 else ""))
     print(f"Checkpoint: {args.checkpoint or 'base'}")
     print(f"Split: {args.split} ({len(indices)} samples)")
+    if args.model == "spatialreasoner" and (args.shots == 0 or args.checkpoint == "base"):
+        print(f"Spatial prompt: {'yes (paper-like)' if not args.no_spatial_prompt else 'no (raw Q+options)'}")
     print(f"Output: {out_dir}")
     print()
 
@@ -635,7 +664,10 @@ def main():
         elif args.model == "spatialrgpt":
             preds, gt_list, categories = _eval_spatialrgpt_baseline(indices, max_new_tokens=args.max_new_tokens)
         elif args.model == "spatialreasoner":
-            preds, gt_list, categories = _eval_spatialreasoner_baseline(indices, args.max_new_tokens)
+            mtok = max(args.max_new_tokens, 512)  # CoT needs more tokens
+            preds, gt_list, categories = _eval_spatialreasoner_baseline(
+                indices, max_new_tokens=mtok, use_spatial_prompt=not args.no_spatial_prompt
+            )
         else:
             print(f"Model {args.model}: no baseline eval.")
             sys.exit(1)
@@ -665,11 +697,15 @@ def main():
         return
 
     acc_overall, acc_2d, acc_3d, task_acc = _compute_results(preds, gt_list, categories)
+    n_2d = sum(1 for c in categories if str(c).strip() in CVBENCH_2D)
+    n_3d = sum(1 for c in categories if str(c).strip() in CVBENCH_3D)
     results = {
         "model": args.model,
         "shots": args.shots,
         "split": args.split,
         "n_samples": len(indices),
+        "n_2d": n_2d,
+        "n_3d": n_3d,
         "overall_accuracy": acc_overall,
         "accuracy_2d": acc_2d,
         "accuracy_3d": acc_3d,
@@ -679,6 +715,7 @@ def main():
         json.dump(results, f, indent=2)
 
     print("=" * 70)
+    print(f"Samples: 2D={n_2d}, 3D={n_3d} (human_test: 300+300 expected)")
     print(f"Overall: {acc_overall:.4f} | 2D: {acc_2d:.4f} | 3D: {acc_3d:.4f}")
     print(f"Task: {task_acc}")
     print("=" * 70)

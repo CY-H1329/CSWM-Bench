@@ -271,6 +271,17 @@ def main():
     parser.add_argument("--reasoning_api_key", type=str, default="EMPTY")
     parser.add_argument("--reasoning_model_name", type=str, default="deepseek-r1")
     parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument(
+        "--use_local_reasoning",
+        action="store_true",
+        help="Use DeepSeek-R1-Distill locally (H100, no API server)",
+    )
+    parser.add_argument(
+        "--reasoning_local_model",
+        type=str,
+        default="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+        help="Local reasoning model when --use_local_reasoning",
+    )
     args = parser.parse_args()
 
     head_gen, spec_gen, reason_gen = build_runners(
@@ -278,9 +289,14 @@ def main():
         reasoning_api_key=args.reasoning_api_key,
         reasoning_model_name=args.reasoning_model_name,
         specialist_device=args.device,
+        use_local_reasoning=args.use_local_reasoning,
+        reasoning_local_model_id=args.reasoning_local_model,
     )
 
-    out_dir = f"{args.output_dir}/{args.benchmark}"
+    if args.max_samples:
+        out_dir = f"{args.output_dir}/{args.benchmark}/{args.max_samples}samples"
+    else:
+        out_dir = f"{args.output_dir}/{args.benchmark}"
     run_experiment(
         benchmark=args.benchmark,
         head_generate=head_gen,
