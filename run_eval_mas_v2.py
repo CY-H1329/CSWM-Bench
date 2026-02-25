@@ -49,6 +49,8 @@ def build_runners(
     reasoning_api_key: str = "EMPTY",
     reasoning_model_name: str = "deepseek-r1",
     specialist_device: str = "cuda",
+    use_local_reasoning: bool = False,
+    reasoning_local_model_id: str = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
 ):
     """Instantiate all model runners.
 
@@ -58,11 +60,14 @@ def build_runners(
       head_generate(image, prompt) -> str          Qwen3-VL-4B
       specialist_generate(llm_name, image, prompt) -> str
       reasoning_generate(prompt) -> str             DeepSeek-R1 (text-only)
+
+    use_local_reasoning: If True, load DeepSeek-R1-Distill locally (no API).
+        Good for H100/single-GPU Jupyter. Uses reasoning_local_model_id.
     """
     from src2.models.qwen3 import Qwen3Runner
     from src2.models.llava import LLaVARunner
     from src2.models.sa2va import Sa2VARunner
-    from src2.models.deepseek_r1 import DeepSeekR1Runner
+    from src2.models.deepseek_r1 import DeepSeekR1Runner, DeepSeekR1LocalRunner
 
     # --- Head Agent (Qwen3-VL-4B, VLM) ---
     # Reused from specialist cache; loaded once, shared.
@@ -109,11 +114,17 @@ def build_runners(
         return runner.generate(image, prompt, temperature=0.0, max_new_tokens=1024)
 
     # --- Final Reasoning Agent (DeepSeek-R1, text-only) ---
-    reasoning = DeepSeekR1Runner(
-        api_base=reasoning_api_base,
-        api_key=reasoning_api_key,
-        model_name=reasoning_model_name,
-    )
+    if use_local_reasoning:
+        reasoning = DeepSeekR1LocalRunner(
+            model_id=reasoning_local_model_id,
+            device=specialist_device,
+        )
+    else:
+        reasoning = DeepSeekR1Runner(
+            api_base=reasoning_api_base,
+            api_key=reasoning_api_key,
+            model_name=reasoning_model_name,
+        )
 
     def reasoning_generate(prompt: str) -> str:
         return reasoning.generate(prompt, temperature=0.0, max_tokens=1024)
