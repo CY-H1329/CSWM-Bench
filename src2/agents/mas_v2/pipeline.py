@@ -272,10 +272,12 @@ def run_test(
     get_image_fn: Callable = None,
     get_prompt_fn: Callable = None,
     get_answer_fn: Callable = None,
+    random_agents: bool = False,
 ) -> List[Dict]:
     """Test phase: iterate over dataset, score map is frozen (no updates).
 
     Categories are always the fixed ALL_CATEGORIES (16 types).
+    random_agents: If True, use step=0 for each sample (random agent selection).
     """
     from src2.benchmarks.loaders import (
         get_benchmark_image, get_benchmark_prompt, get_benchmark_answer,
@@ -301,7 +303,7 @@ def run_test(
             image=image,
             query=query,
             gt=gt,
-            step=step + 999999,
+            step=step_val if random_agents else step + 999999,
             total_steps=total,
             score_map=score_map,
             head_generate=head_generate,

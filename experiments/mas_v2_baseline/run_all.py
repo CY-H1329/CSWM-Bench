@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-MAS v2 Baseline — Run all experiments (10, 50, 100 samples × 2 benchmarks).
+MAS v2 Baseline — Testing only (no train/test split).
+
+Pipeline: Head → ScoreMap (random) → 3 Specialists → SharedMemory → Final Reasoning
+Benchmarks: CV-Bench, 3DSRBench
+Sample sizes: 10, 50, 100
 
 Usage:
   cd Spatial_MAS
-  python experiments/mas_v2_baseline/run_all.py
-
-Or on H100:
   python experiments/mas_v2_baseline/run_all.py
 """
 import sys
@@ -15,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from run_eval_mas_v2 import build_runners, run_experiment
+from run_eval_mas_v2 import build_runners, run_test_only
 
 BENCHMARKS = ["cvbench", "3dsrbench"]
 SAMPLE_SIZES = [10, 50, 100]
@@ -35,34 +36,33 @@ def main():
     for benchmark in BENCHMARKS:
         for n in SAMPLE_SIZES:
             print(f"\n{'='*60}")
-            print(f"{benchmark} | {n} samples")
+            print(f"{benchmark} | {n} samples (testing only)")
             print("="*60)
             out_dir = str(OUTPUT_BASE / benchmark / f"{n}samples")
-            out = run_experiment(
+            out = run_test_only(
                 benchmark=benchmark,
                 head_generate=head_gen,
                 specialist_generate=spec_gen,
                 reasoning_generate=reason_gen,
-                train_ratio=0.5,
+                max_samples=n,
                 seed=SEED,
                 output_dir=out_dir,
-                max_samples=n,
             )
+            m = out["metrics"]
             all_results.append({
                 "benchmark": benchmark,
                 "samples": n,
-                "train_acc": out["train_metrics"]["accuracy"],
-                "test_acc": out["test_metrics"]["accuracy"],
-                "train_n": out["train_metrics"]["total"],
-                "test_n": out["test_metrics"]["total"],
+                "accuracy": m["accuracy"],
+                "correct": m["correct"],
+                "total": m["total"],
             })
 
     print("\n" + "="*60)
-    print("SUMMARY")
+    print("SUMMARY (testing only, random agents)")
     print("="*60)
     for r in all_results:
         print(f"  {r['benchmark']:12} | {r['samples']:3} samples | "
-              f"train {r['train_acc']*100:.1f}% | test {r['test_acc']*100:.1f}%")
+              f"accuracy {r['accuracy']*100:.1f}% ({r['correct']}/{r['total']})")
     print(f"\nResults saved to {OUTPUT_BASE}/")
 
 

@@ -14,7 +14,10 @@ Usage:
         --seed 42
 
 Or import from Jupyter:
-    from run_eval_mas_v2 import build_runners, run_experiment
+    from run_eval_mas_v2 import build_runners, run_experiment, run_test_only
+
+Test-only (no train split):
+    python run_eval_mas_v2.py --benchmark cvbench --max_samples 10 --test_only --use_local_reasoning
 """
 import argparse
 import json
@@ -147,7 +150,76 @@ def split_dataset(dataset, train_ratio: float = 0.5, seed: int = 42):
 
 
 # ======================================================================
-# Main experiment runner
+# Test-only runner (no train/test split, no ScoreMap update)
+# ======================================================================
+def run_test_only(
+    benchmark: str,
+    head_generate,
+    specialist_generate,
+    reasoning_generate,
+    max_samples: int,
+    seed: int = 42,
+    output_dir: str = None,
+    random_agents: bool = True,
+):
+    """Run MAS v2 pipeline on N samples — testing only, no ScoreMap training.
+
+    Pipeline: Head → ScoreMap (random) → 3 Specialists → SharedMemory → Final Reasoning.
+    """
+    dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
+    logger.info("Loaded %d samples (test only, no train)", len(dataset))
+
+    score_map = ScoreMap(categories=ALL_CATEGORIES, seed=seed)
+
+    logger.info("=" * 60)
+    logger.info("TESTING (%d samples, random_agents=%s)", len(dataset), random_agents)
+    logger.info("=" * 60)
+    results = run_test(
+        dataset=dataset,
+        benchmark=benchmark,
+        score_map=score_map,
+        head_generate=head_generate,
+        specialist_generate=specialist_generate,
+        reasoning_generate=reasoning_generate,
+        random_agents=random_agents,
+    )
+    metrics = compute_accuracy(results)
+    logger.info(
+        "Accuracy: %.2f%% (%d/%d)",
+        100 * metrics["accuracy"],
+        metrics["correct"], metrics["total"],
+    )
+
+    if output_dir:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = Path(output_dir) / ts
+        out_path.mkdir(parents=True, exist_ok=True)
+        summary = {
+            "benchmark": benchmark,
+            "samples": len(dataset),
+            "seed": seed,
+            "random_agents": random_agents,
+            "accuracy": metrics["accuracy"],
+            "correct": metrics["correct"],
+            "total": metrics["total"],
+            "per_category": metrics["per_category"],
+            "specialist_llms": SPECIALIST_LLMS,
+            "roles": ROLES,
+            "timestamp": ts,
+        }
+        (out_path / "summary.json").write_text(
+            json.dumps(summary, indent=2, ensure_ascii=False)
+        )
+        with open(out_path / "details.jsonl", "w") as f:
+            for r in results:
+                f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
+        logger.info("Results saved to %s", out_path)
+
+    return {"results": results, "metrics": metrics}
+
+
+# ======================================================================
+# Main experiment runner (train + test split)
 # ======================================================================
 def run_experiment(
     benchmark: str,
@@ -265,6 +337,11 @@ def main():
     parser.add_argument("--benchmark", choices=["3dsrbench", "cvbench"], required=True)
     parser.add_argument("--train_ratio", type=float, default=0.5)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--test_only",
+        action="store_true",
+        help="Testing only: run pipeline on N samples, no train/test split, no ScoreMap update",
+    )
     parser.add_argument("--output_dir", type=str, default="results/mas_v2")
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--reasoning_api_base", type=str, default="http://localhost:8000/v1")
@@ -284,6 +361,9 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.test_only and not args.max_samples:
+        parser.error("--max_samples required when --test_only")
+
     head_gen, spec_gen, reason_gen = build_runners(
         reasoning_api_base=args.reasoning_api_base,
         reasoning_api_key=args.reasoning_api_key,
@@ -293,20 +373,32 @@ def main():
         reasoning_local_model_id=args.reasoning_local_model,
     )
 
-    if args.max_samples:
+    if args.test_only:
         out_dir = f"{args.output_dir}/{args.benchmark}/{args.max_samples}samples"
+        run_test_only(
+            benchmark=args.benchmark,
+            head_generate=head_gen,
+            specialist_generate=spec_gen,
+            reasoning_generate=reason_gen,
+            max_samples=args.max_samples,
+            seed=args.seed,
+            output_dir=out_dir,
+        )
     else:
-        out_dir = f"{args.output_dir}/{args.benchmark}"
-    run_experiment(
-        benchmark=args.benchmark,
-        head_generate=head_gen,
-        specialist_generate=spec_gen,
-        reasoning_generate=reason_gen,
-        train_ratio=args.train_ratio,
-        seed=args.seed,
-        output_dir=out_dir,
-        max_samples=args.max_samples,
-    )
+        if args.max_samples:
+            out_dir = f"{args.output_dir}/{args.benchmark}/{args.max_samples}samples"
+        else:
+            out_dir = f"{args.output_dir}/{args.benchmark}"
+        run_experiment(
+            benchmark=args.benchmark,
+            head_generate=head_gen,
+            specialist_generate=spec_gen,
+            reasoning_generate=reason_gen,
+            train_ratio=args.train_ratio,
+            seed=args.seed,
+            output_dir=out_dir,
+            max_samples=args.max_samples,
+        )
 
 
 if __name__ == "__main__":
