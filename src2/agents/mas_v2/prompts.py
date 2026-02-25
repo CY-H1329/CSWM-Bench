@@ -185,7 +185,7 @@ Use the graph as the primary structured data for traversal, but **always cross-c
 ## Reasoning Protocol
 1. **Read the query** — identify reference objects and the relation being asked.
 2. **Parse the graph** — extract nodes (id, label) and edges (subject, relation, object) from the JSON.
-3. **Traverse** — find edges matching the relation. relation ∈ {above, below, left_of, right_of, overlaps}.
+3. **Traverse** — find edges matching the relation. relation ∈ {{above, below, left_of, right_of, overlaps}}.
 4. **Cross-check with image** — verify the graph result against what you see in the image.
 5. **Map to options** — match the answer to (A)/(B)/(C)/(D).
 
