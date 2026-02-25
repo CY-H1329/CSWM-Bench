@@ -27,6 +27,7 @@ import argparse
 import re
 import sys
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -53,6 +54,20 @@ def _normalize_answer(s: str) -> str:
     return ""
 
 
+def _prefetch_sample(ex, benchmark, i):
+    """Prefetch image + metadata for one sample (runs in thread)."""
+    image = get_benchmark_image(ex, benchmark)
+    if image is None:
+        return None
+    query = get_benchmark_prompt(ex, benchmark)
+    gt_raw = get_benchmark_answer(ex, benchmark)
+    category = get_benchmark_category(ex, benchmark) or "unknown"
+    gt_letter = _normalize_answer(gt_raw)
+    if not gt_letter:
+        return None
+    return {"index": i, "ex": ex, "image": image, "query": query, "gt_letter": gt_letter, "category": category}
+
+
 def run_specialist_test(
     runner,
     benchmark: str = "cvbench",
@@ -60,11 +75,14 @@ def run_specialist_test(
     seed: int = 42,
     show_failures: int = 0,
     max_new_tokens: int = 1024,
+    prefetch_workers: int = 4,
 ):
     """
     Run scene_graph_construction + Qwen3 on benchmark.
 
     Uses: extract_objects_from_image → get_scene_graph → build_role_prompt
+
+    prefetch_workers: number of threads to prefetch images in parallel (0 = no prefetch).
     """
     dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
     role = "scene_graph_construction"
@@ -73,7 +91,7 @@ def run_specialist_test(
     def _specialist_generate(llm_name, image, prompt):
         return runner.generate(image, prompt, temperature=0.0, max_new_tokens=max_new_tokens)
 
-    print(f"Starting: {len(dataset)} samples, {role} + Qwen3-VL-4B...")
+    print(f"Starting: {len(dataset)} samples, {role} + Qwen3-VL-4B... (prefetch_workers={prefetch_workers})")
 
     correct = 0
     total = 0
@@ -83,19 +101,27 @@ def run_specialist_test(
     from src2.tools import get_scene_graph
     from src2.tools.object_extraction import extract_objects_from_image
 
-    for i in range(len(dataset)):
-        ex = dataset[i]
-        image = get_benchmark_image(ex, benchmark)
-        query = get_benchmark_prompt(ex, benchmark)
-        gt_raw = get_benchmark_answer(ex, benchmark)
-        category = get_benchmark_category(ex, benchmark) or "unknown"
+    # Build list of samples to process (with optional prefetch)
+    if prefetch_workers > 0:
+        # Prefetch images in parallel; yield ready samples in order
+        with ThreadPoolExecutor(max_workers=prefetch_workers) as exe:
+            futures = {exe.submit(_prefetch_sample, dataset[i], benchmark, i): i for i in range(len(dataset))}
+            prefetched = {}
+            for fut in as_completed(futures):
+                result = fut.result()
+                if result is not None:
+                    prefetched[result["index"]] = result
+        # Process in index order
+        samples = [prefetched[i] for i in sorted(prefetched.keys())]
+    else:
+        samples = []
+        for i in range(len(dataset)):
+            r = _prefetch_sample(dataset[i], benchmark, i)
+            if r is not None:
+                samples.append(r)
 
-        if image is None:
-            continue
-
-        gt_letter = _normalize_answer(gt_raw)
-        if not gt_letter:
-            continue
+    for s in samples:
+        i, image, query, gt_letter, category = s["index"], s["image"], s["query"], s["gt_letter"], s["category"]
 
         # Tool: object extraction + scene graph
         try:
@@ -129,10 +155,10 @@ def run_specialist_test(
             "raw_output": raw[:3000] if raw else "",
         })
 
-        interval = 1 if len(dataset) <= 30 else 10
-        if (i + 1) % interval == 0 or (i + 1) == len(dataset):
+        interval = 1 if len(samples) <= 30 else 10
+        if total % interval == 0:
             acc = correct / total if total > 0 else 0
-            print(f"  Progress {i+1}/{len(dataset)} | acc: {100*acc:.1f}%")
+            print(f"  Progress {total}/{len(samples)} | acc: {100*acc:.1f}%")
 
     if total == 0:
         print("No samples evaluated!")
@@ -192,6 +218,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--show_failures", type=int, default=10, help="Print first N wrong cases")
     parser.add_argument("--max_new_tokens", type=int, default=1024)
+    parser.add_argument("--prefetch_workers", type=int, default=4, help="Threads to prefetch images (0=off)")
     args = parser.parse_args()
 
     from src2.models.qwen3 import Qwen3Runner
@@ -203,4 +230,5 @@ if __name__ == "__main__":
         seed=args.seed,
         show_failures=args.show_failures,
         max_new_tokens=args.max_new_tokens,
+        prefetch_workers=args.prefetch_workers,
     )
