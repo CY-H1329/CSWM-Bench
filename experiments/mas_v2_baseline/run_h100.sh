@@ -11,6 +11,10 @@
 # Uses --test_only (no ScoreMap training) + --use_local_reasoning
 set -e
 
+# Suppress noisy warnings (torch_dtype, generation flags, offload buffer)
+export TRANSFORMERS_VERBOSITY=error
+export PYTHONWARNINGS="ignore::UserWarning"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"

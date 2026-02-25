@@ -24,8 +24,14 @@ import json
 import logging
 import random
 import sys
+import warnings
 from datetime import datetime
 from pathlib import Path
+
+# Suppress noisy deprecation/generation warnings
+warnings.filterwarnings("ignore", message=".*torch_dtype.*")
+warnings.filterwarnings("ignore", message=".*generation flags.*")
+warnings.filterwarnings("ignore", message=".*offload.*buffer.*")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
