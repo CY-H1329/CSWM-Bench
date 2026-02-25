@@ -1,15 +1,15 @@
 """
 Scene graph tool for scene_graph_construction agent.
 
-Uses object detection (DETR or similar) to extract objects and bounding boxes,
-then computes pairwise spatial relationships (above/below, left/right, overlap).
-Returns a textual summary suitable for injection into the scene graph agent's prompt.
+Extracts objects (VLM + OWL-ViT open-vocab, or DETR fallback) and computes
+pairwise spatial relationships (above/below, left/right, overlaps).
+Returns a structured nodes + edges representation for graph-based reasoning.
 """
+import json
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from PIL import Image
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -148,48 +148,99 @@ def get_detected_objects(image: Image.Image, n_keep: int = 15) -> List[dict]:
         return []
 
 
-def get_scene_graph_summary(image: Image.Image) -> str:
-    """
-    Detect objects and compute spatial relationships.
+def _objects_to_edges(objects: List[dict], img_h: int, img_w: int) -> List[dict]:
+    """Compute pairwise spatial relations and return edge list."""
+    edges = []
+    for i, oa in enumerate(objects):
+        for j, ob in enumerate(objects):
+            if i >= j:
+                continue
+            iou = _compute_iou(oa["box"], ob["box"])
+            rels = _get_spatial_relation(oa["box"], ob["box"], iou)
+            for rel in rels:
+                if rel == "overlaps (possible occlusion)":
+                    rel = "overlaps"
+                # Direction: oa -> ob means "oa is [rel] ob"
+                edges.append({
+                    "subject": str(oa["id"]),
+                    "relation": rel,
+                    "object": str(ob["id"]),
+                })
+    return edges
 
-    Returns a textual summary: objects with positions and pairwise
-    relationships (above/below, left/right, overlaps).
+
+def get_scene_graph(
+    image: Image.Image,
+    object_names: Optional[List[str]] = None,
+) -> str:
     """
-    objects = get_detected_objects(image)
+    Build structured scene graph: nodes (objects) + edges (pairwise relations).
+
+    Args:
+        image: PIL Image
+        object_names: If provided, use OWL-ViT (open-vocab). If None, use DETR (COCO 80).
+
+    Returns formatted string with nodes + edges for graph-based reasoning.
+    """
+    if object_names:
+        try:
+            from .open_vocab_detection import get_detections_with_labels
+            objects = get_detections_with_labels(image, candidate_labels=object_names)
+        except Exception as e:
+            logger.warning("OWL-ViT for scene graph failed: %s. Falling back to DETR.", e)
+            objects = get_detected_objects(image)
+    else:
+        objects = get_detected_objects(image)
+
     if not objects:
-        return "[Scene graph tool unavailable or no objects detected. Proceed with visual analysis only.]"
+        return "[Scene graph tool: No objects detected. Proceed with visual analysis only.]"
 
     try:
-        # Build relationship summary
-        lines = [
-            "## Scene Graph Tool Output",
-            "",
-            "### Detected Objects (id, label, position in image)",
-        ]
+        img_w, img_h = image.size
+        nodes = []
         for obj in objects:
             x1, y1, x2, y2 = obj["box"]
             cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
-            pos = "upper" if cy < image.height / 3 else ("lower" if cy > 2 * image.height / 3 else "middle")
-            pos += "-left" if cx < image.width / 3 else ("-right" if cx > 2 * image.width / 3 else "-center")
-            lines.append(f"  {obj['id']}. {obj['label']} ({pos}, score={obj['score']:.2f})")
+            nodes.append({
+                "id": str(obj["id"]),
+                "label": obj["label"],
+                "bbox": [round(x1, 1), round(y1, 1), round(x2, 1), round(y2, 1)],
+                "center": [round(cx, 1), round(cy, 1)],
+                "score": round(obj["score"], 2),
+            })
+        edges = _objects_to_edges(objects, img_h, img_w)
 
-        lines.append("")
-        lines.append("### Pairwise Spatial Relationships")
+        graph = {
+            "nodes": nodes,
+            "edges": edges,
+        }
+        json_str = json.dumps(graph, indent=2, ensure_ascii=False)
 
-        for i, oa in enumerate(objects):
-            for j, ob in enumerate(objects):
-                if i >= j:
-                    continue
-                iou = _compute_iou(oa["box"], ob["box"])
-                rels = _get_spatial_relation(oa["box"], ob["box"], iou)
-                if rels:
-                    rel_str = ", ".join(rels)
-                    lines.append(f"  {oa['label']}({oa['id']}) — {rel_str} — {ob['label']}({ob['id']})")
-
-        lines.append("")
-        lines.append("Use this graph to reason about the question.")
+        lines = [
+            "## Scene Graph Tool Output (JSON)",
+            "",
+            "```json",
+            json_str,
+            "```",
+            "",
+            "### Traversal Protocol",
+            "- \"A is above B\" → find edge subject=A, relation=above, object=B",
+            "- \"What is left of X?\" → find edge where relation=left_of, object=X → subject is answer",
+            "- \"What is above X?\" → find edge where relation=above, object=X → subject is answer",
+            "- \"What is below X?\" → find edge where relation=below, object=X → subject is answer",
+            "- \"What is right of X?\" → find edge where relation=right_of, object=X → subject is answer",
+            "- Map the answer node id to its label, then to the correct option (A/B/C/D).",
+        ]
         return "\n".join(lines)
 
     except Exception as e:
         logger.warning("Scene graph tool error: %s", e)
         return f"[Scene graph tool error: {e}. Proceed with visual analysis only.]"
+
+
+def get_scene_graph_summary(image) -> str:
+    """
+    Legacy: Detect objects (DETR only) and return scene graph.
+    Use get_scene_graph(image, object_names) for open-vocab + structured output.
+    """
+    return get_scene_graph(image, object_names=None)

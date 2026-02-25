@@ -12,7 +12,7 @@ Usage:
   text = get_3d_representation(image, object_names=objects)
 """
 from .depth import get_depth_map, get_depth_summary
-from .scene_graph import get_detected_objects, get_scene_graph_summary
+from .scene_graph import get_detected_objects, get_scene_graph, get_scene_graph_summary
 from .representation_3d import get_3d_representation
 from .object_extraction import extract_objects_from_image
 
@@ -20,6 +20,7 @@ __all__ = [
     "get_depth_map",
     "get_depth_summary",
     "get_detected_objects",
+    "get_scene_graph",
     "get_scene_graph_summary",
     "get_3d_representation",
     "extract_objects_from_image",
