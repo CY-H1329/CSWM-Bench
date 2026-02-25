@@ -303,7 +303,7 @@ def run_test(
             image=image,
             query=query,
             gt=gt,
-            step=step_val if random_agents else step + 999999,
+            step=0 if random_agents else step + 999999,
             total_steps=total,
             score_map=score_map,
             head_generate=head_generate,
