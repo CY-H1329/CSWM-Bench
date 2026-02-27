@@ -228,10 +228,29 @@ def build_role_prompt(role: str, query: str, tool_output: Optional[str] = None) 
 # ======================================================================
 # Final Reasoning Agent -- synthesis from SharedMemory
 # ======================================================================
-def build_final_reasoning_prompt(query: str, shared_memory_text: str) -> str:
+def build_final_reasoning_prompt(
+    query: str,
+    shared_memory_text: str,
+    with_image: bool = False,
+) -> str:
+    image_note = (
+        "\n\n**You also see the image** that the specialists analysed. "
+        "Cross-check their reasoning against what you observe. "
+        "If a specialist's claim contradicts the image, trust the image."
+    ) if with_image else ""
+
+    image_step2 = (
+        "\n- **Verify against the image**: For each specialist's claim (positions, depth order, count, relations), "
+        "check if it matches what you see. If the image clearly shows otherwise, discount that specialist's answer."
+    ) if with_image else ""
+
+    image_step3 = (
+        "\n- **Use the image to resolve disagreements**: When specialists disagree, look at the image to see which answer is correct."
+    ) if with_image else ""
+
     return f"""# ROLE: Final Reasoning Agent
 
-You are the final decision-maker. Three specialist agents have independently analysed the same image and question. Each used a different strategy and produced their own reasoning and answer. Your job is to **read all of them carefully**, **think through the question and their analyses together**, and **synthesize a final conclusion**.
+You are the final decision-maker. Three specialist agents have independently analysed the same image and question. Each used a different strategy and produced their own reasoning and answer. Your job is to **read all of them carefully**, **think through the question and their analyses together**, and **synthesize a final conclusion**.{image_note}
 
 The questions can be diverse: spatial relations (above/below, left/right), depth (closer/farther, in front/behind), counting, orientation, mental rotation, viewpoint, multi-object relations, and more. Do not apply fixed rules. Engage with the content.
 
@@ -252,11 +271,11 @@ The questions can be diverse: spatial relations (above/below, left/right), depth
 - For each agent: What did they conclude? What evidence or reasoning did they cite?
 - Note each agent's **Strategy**—what kind of information they had (pictorial cues, 3D depth, 2D graph).
 - Ask: Is this agent's reasoning **relevant** to what the question asks? Does their strategy match the question's demands?
-- Ask: Is their reasoning **internally consistent**? Did they use their data correctly?
+- Ask: Is their reasoning **internally consistent**? Did they use their data correctly?{image_step2}
 
 ### Step 3: Compare and synthesize
 - Where do the agents agree? Where do they disagree?
-- For each disagreement: Which reasoning is more **grounded** in the question? Which cites more **concrete** data (z values, graph edges, specific cues)?
+- For each disagreement: Which reasoning is more **grounded** in the question? Which cites more **concrete** data (z values, graph edges, specific cues)?{image_step3}
 - Consider: Does the question require information that only one agent had? (e.g. depth → explicit_3d; 2D relations → scene_graph)
 - Do **not** blindly follow majority vote. If one agent's reasoning is more relevant and correct for this specific question, choose that answer even if the others disagree.
 - If multiple agents' reasoning supports the same conclusion from different angles, that strengthens the case—but only if each reasoning is sound.

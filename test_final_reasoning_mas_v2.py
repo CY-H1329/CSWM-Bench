@@ -27,6 +27,7 @@ Usage (CLI):
     python test_final_reasoning_mas_v2.py --benchmark cvbench --max_samples 100
 """
 import argparse
+import random
 import re
 import sys
 import warnings
@@ -75,6 +76,7 @@ def run_mas_test(
     seed: int = 42,
     prefetch_workers: int = 4,
     show_failures: int = 0,
+    use_vlm_reasoning: bool = False,
 ):
     """
     Run full MAS v2 pipeline on benchmark.
@@ -104,7 +106,12 @@ def run_mas_test(
             if r is not None:
                 samples.append(r)
 
-    print(f"Starting: {len(samples)} samples, MAS v2 (Head + 3 Specialists + Final Reasoning)...")
+    # Shuffle to avoid dataset-ordering bias (e.g. easier samples clustered at end)
+    rng = random.Random(seed)
+    rng.shuffle(samples)
+
+    reason_mode = "Qwen3-VL-8B (image+text)" if use_vlm_reasoning else "DeepSeek-R1 (text-only)"
+    print(f"Starting: {len(samples)} samples, MAS v2 (Head + 3 Specialists + Final Reasoning [{reason_mode}])...")
     print(f"  prefetch_workers={prefetch_workers}")
 
     correct = 0
@@ -125,6 +132,7 @@ def run_mas_test(
             reasoning_generate=reasoning_generate,
             updater=None,
             update_scores=False,
+            use_vlm_reasoning=use_vlm_reasoning,
         )
         hit = result.get("correct", False)
         total += 1
