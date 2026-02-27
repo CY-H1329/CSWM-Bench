@@ -107,10 +107,11 @@ def run_step(
     score_map: ScoreMap,
     head_generate: Callable[[Image.Image, str], str],
     specialist_generate: Callable[[str, Image.Image, str], str],
-    reasoning_generate: Callable[[str], str],
+    reasoning_generate: Callable,
     updater: Optional[ScoreMapUpdater] = None,
     update_scores: bool = True,
     shared_object_extraction: bool = True,
+    use_vlm_reasoning: bool = False,
 ) -> Dict:
     """Execute one step of the MAS v2 pipeline.
 
@@ -174,9 +175,11 @@ def run_step(
             "raw_output": raw_output[:3000],
         })
 
-    # 4. Final Reasoning Agent (DeepSeek-R1, text-only: query + SharedMemory)
-    reasoning_prompt = build_final_reasoning_prompt(query, shared_memory.to_prompt_text())
-    reasoning_raw = reasoning_generate(reasoning_prompt)
+    # 4. Final Reasoning Agent (DeepSeek-R1 text-only, or Qwen3-VL-8B image+text)
+    reasoning_prompt = build_final_reasoning_prompt(
+        query, shared_memory.to_prompt_text(), with_image=use_vlm_reasoning
+    )
+    reasoning_raw = reasoning_generate(reasoning_prompt, image=image)
     final_answer = parse_final_answer(reasoning_raw)
 
     # 5. Score map update (train phase only)
@@ -221,6 +224,7 @@ def run_train(
     get_prompt_fn: Callable = None,
     get_answer_fn: Callable = None,
     seed: int = 42,
+    use_vlm_reasoning: bool = False,
 ) -> List[Dict]:
     """Train phase: iterate over dataset, update score map with GT.
 
@@ -259,6 +263,7 @@ def run_train(
             reasoning_generate=reasoning_generate,
             updater=updater,
             update_scores=True,
+            use_vlm_reasoning=use_vlm_reasoning,
         )
         results.append(result)
 
@@ -284,6 +289,7 @@ def run_test(
     get_prompt_fn: Callable = None,
     get_answer_fn: Callable = None,
     random_agents: bool = False,
+    use_vlm_reasoning: bool = False,
 ) -> List[Dict]:
     """Test phase: iterate over dataset, score map is frozen (no updates).
 
@@ -322,6 +328,7 @@ def run_test(
             reasoning_generate=reasoning_generate,
             updater=None,
             update_scores=False,
+            use_vlm_reasoning=use_vlm_reasoning,
         )
         results.append(result)
 

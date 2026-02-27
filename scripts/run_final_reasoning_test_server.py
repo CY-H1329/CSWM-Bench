@@ -32,8 +32,8 @@ from test_final_reasoning_mas_v2 import run_mas_test
 
 head_gen, spec_gen, reason_gen = build_runners(
     specialist_device="cuda",
-    use_local_reasoning=True,  # H100: API 없이 로컬 추론 (Jupyter 한 세션에서 전부 실행)
-    reasoning_local_model_id="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    use_vlm_reasoning=True,  # Qwen3-VL-8B: 이미지 + SharedMemory로 Final Reasoning
+    reasoning_vlm_model_id="Qwen/Qwen3-VL-8B-Instruct",
 )
 
 
@@ -49,6 +49,7 @@ results_cv = run_mas_test(
     max_samples=100,
     prefetch_workers=4,
     show_failures=20,
+    use_vlm_reasoning=True,
 )
 
 

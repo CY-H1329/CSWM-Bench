@@ -60,6 +60,8 @@ def build_runners(
     specialist_device: str = "cuda",
     use_local_reasoning: bool = False,
     reasoning_local_model_id: str = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    use_vlm_reasoning: bool = False,
+    reasoning_vlm_model_id: str = "Qwen/Qwen3-VL-8B-Instruct",
 ):
     """Instantiate all model runners.
 
@@ -68,10 +70,10 @@ def build_runners(
     Signatures:
       head_generate(image, prompt) -> str          Qwen3-VL-4B
       specialist_generate(llm_name, image, prompt) -> str
-      reasoning_generate(prompt) -> str             DeepSeek-R1 (text-only)
+      reasoning_generate(prompt, image=None) -> str  DeepSeek-R1 (text) or Qwen3-VL-8B (image+text)
 
     use_local_reasoning: If True, load DeepSeek-R1-Distill locally (no API).
-        Good for H100/single-GPU Jupyter. Uses reasoning_local_model_id.
+    use_vlm_reasoning: If True, use Qwen3-VL-8B for Final Reasoning (image+SharedMemory). Overrides use_local_reasoning for reasoning.
     """
     from src2.models.qwen3 import Qwen3Runner
     from src2.models.llava import LLaVARunner
@@ -122,12 +124,28 @@ def build_runners(
         runner = _get_specialist(llm_name)
         return runner.generate(image, prompt, temperature=0.0, max_new_tokens=1024)
 
-    # --- Final Reasoning Agent (DeepSeek-R1, text-only) ---
-    if use_local_reasoning:
+    # --- Final Reasoning Agent ---
+    if use_vlm_reasoning:
+        # Qwen3-VL-8B: image + SharedMemory + query (can verify specialist claims)
+        _reasoning_vlm = Qwen3Runner(
+            model_id=reasoning_vlm_model_id,
+            device=specialist_device,
+        )
+
+        def reasoning_generate(prompt: str, image=None):
+            if image is None:
+                raise ValueError("use_vlm_reasoning=True requires image for Final Reasoning")
+            return _reasoning_vlm.generate(
+                image, prompt, temperature=0.0, max_new_tokens=1024
+            )
+    elif use_local_reasoning:
         reasoning = DeepSeekR1LocalRunner(
             model_id=reasoning_local_model_id,
             device=specialist_device,
         )
+
+        def reasoning_generate(prompt: str, image=None):
+            return reasoning.generate(prompt, temperature=0.0, max_tokens=1024)
     else:
         reasoning = DeepSeekR1Runner(
             api_base=reasoning_api_base,
@@ -135,8 +153,8 @@ def build_runners(
             model_name=reasoning_model_name,
         )
 
-    def reasoning_generate(prompt: str) -> str:
-        return reasoning.generate(prompt, temperature=0.0, max_tokens=1024)
+        def reasoning_generate(prompt: str, image=None):
+            return reasoning.generate(prompt, temperature=0.0, max_tokens=1024)
 
     return head_generate, specialist_generate, reasoning_generate
 
@@ -167,6 +185,7 @@ def run_test_only(
     seed: int = 42,
     output_dir: str = None,
     random_agents: bool = True,
+    use_vlm_reasoning: bool = False,
 ):
     """Run MAS v2 pipeline on N samples — testing only, no ScoreMap training.
 
@@ -188,6 +207,7 @@ def run_test_only(
         specialist_generate=specialist_generate,
         reasoning_generate=reasoning_generate,
         random_agents=random_agents,
+        use_vlm_reasoning=use_vlm_reasoning,
     )
     metrics = compute_accuracy(results)
     logger.info(
@@ -237,6 +257,7 @@ def run_experiment(
     output_dir: str = None,
     updater: ScoreMapUpdater = None,
     max_samples: int = None,
+    use_vlm_reasoning: bool = False,
 ):
     """Run full MAS v2 experiment: load data -> split -> train -> test -> report."""
 
@@ -264,6 +285,7 @@ def run_experiment(
         reasoning_generate=reasoning_generate,
         updater=updater,
         seed=seed,
+        use_vlm_reasoning=use_vlm_reasoning,
     )
     train_metrics = compute_accuracy(train_results)
     logger.info(
@@ -283,6 +305,7 @@ def run_experiment(
         head_generate=head_generate,
         specialist_generate=specialist_generate,
         reasoning_generate=reasoning_generate,
+        use_vlm_reasoning=use_vlm_reasoning,
     )
     test_metrics = compute_accuracy(test_results)
     logger.info(

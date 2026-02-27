@@ -76,6 +76,7 @@ def run_mas_test(
     seed: int = 42,
     prefetch_workers: int = 4,
     show_failures: int = 0,
+    use_vlm_reasoning: bool = False,
 ):
     """
     Run full MAS v2 pipeline on benchmark.
@@ -109,7 +110,8 @@ def run_mas_test(
     rng = random.Random(seed)
     rng.shuffle(samples)
 
-    print(f"Starting: {len(samples)} samples, MAS v2 (Head + 3 Specialists + Final Reasoning)...")
+    reason_mode = "Qwen3-VL-8B (image+text)" if use_vlm_reasoning else "DeepSeek-R1 (text-only)"
+    print(f"Starting: {len(samples)} samples, MAS v2 (Head + 3 Specialists + Final Reasoning [{reason_mode}])...")
     print(f"  prefetch_workers={prefetch_workers}")
 
     correct = 0
@@ -130,6 +132,7 @@ def run_mas_test(
             reasoning_generate=reasoning_generate,
             updater=None,
             update_scores=False,
+            use_vlm_reasoning=use_vlm_reasoning,
         )
         hit = result.get("correct", False)
         total += 1
