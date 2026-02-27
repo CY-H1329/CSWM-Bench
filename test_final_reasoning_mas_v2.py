@@ -27,6 +27,7 @@ Usage (CLI):
     python test_final_reasoning_mas_v2.py --benchmark cvbench --max_samples 100
 """
 import argparse
+import random
 import re
 import sys
 import warnings
@@ -103,6 +104,10 @@ def run_mas_test(
             r = _prefetch_sample(dataset[i], benchmark, i)
             if r is not None:
                 samples.append(r)
+
+    # Shuffle to avoid dataset-ordering bias (e.g. easier samples clustered at end)
+    rng = random.Random(seed)
+    rng.shuffle(samples)
 
     print(f"Starting: {len(samples)} samples, MAS v2 (Head + 3 Specialists + Final Reasoning)...")
     print(f"  prefetch_workers={prefetch_workers}")

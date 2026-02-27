@@ -110,6 +110,7 @@ def run_step(
     reasoning_generate: Callable[[str], str],
     updater: Optional[ScoreMapUpdater] = None,
     update_scores: bool = True,
+    shared_object_extraction: bool = True,
 ) -> Dict:
     """Execute one step of the MAS v2 pipeline.
 
@@ -126,6 +127,15 @@ def run_step(
     # 2. Agent selection from score map
     assignments = score_map.select_agents(category, step)
 
+    # 2.5 Precompute object_names once when shared (saves ~1 VLM call)
+    object_names_cache = None
+    if shared_object_extraction:
+        for role, llm_name in assignments:
+            if role in _ROLES_WITH_TOOLS:
+                from src2.tools.object_extraction import extract_objects_from_image
+                object_names_cache = extract_objects_from_image(image, specialist_generate, llm_name)
+                break
+
     # 3. Run 3 specialist agents -> SharedMemory (C: tools for explicit_3d, scene_graph)
     shared_memory = SharedMemory()
     agent_details = []
@@ -133,19 +143,20 @@ def run_step(
     for role, llm_name in assignments:
         if role in _ROLES_WITH_TOOLS and role not in tool_output_cache:
             try:
-                if role == "explicit_3d_representation":
-                    from src2.tools import get_3d_representation
+                if shared_object_extraction:
+                    object_names = object_names_cache if object_names_cache else None
+                else:
                     from src2.tools.object_extraction import extract_objects_from_image
                     object_names = extract_objects_from_image(image, specialist_generate, llm_name)
+                if role == "explicit_3d_representation":
+                    from src2.tools import get_3d_representation
                     tool_output_cache[role] = get_3d_representation(
-                        image, object_names=object_names if object_names else None
+                        image, object_names=object_names
                     )
                 elif role == "scene_graph_construction":
                     from src2.tools import get_scene_graph
-                    from src2.tools.object_extraction import extract_objects_from_image
-                    object_names = extract_objects_from_image(image, specialist_generate, llm_name)
                     tool_output_cache[role] = get_scene_graph(
-                        image, object_names=object_names if object_names else None
+                        image, object_names=object_names
                     )
             except Exception as e:
                 logger.warning("Tool for %s failed: %s", role, e)
