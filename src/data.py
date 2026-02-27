@@ -1,6 +1,6 @@
 """
 STVQA-7K dataset loader for evaluation.
-Dataset: https://huggingface.co/datasets/OX-PIXL/STVQA-7K
+Datasets: hunarbatra/STVQA-7K (default), OX-PIXL/STVQA-7K
 Paper: SpatialThinker (arXiv:2511.07403)
 """
 import random
@@ -11,7 +11,7 @@ from datasets import load_dataset
 
 
 def load_stvqa(
-    dataset_name: str = "OX-PIXL/STVQA-7K",
+    dataset_name: str = "hunarbatra/STVQA-7K",
     split: str = "val",
     max_samples: Optional[int] = None,
     max_per_category: Optional[int] = None,
