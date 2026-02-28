@@ -272,10 +272,15 @@ def _eval_spatialreasoner(dataset, indices, max_new_tokens=512):
 def _eval_spatialrgpt(dataset, indices, max_new_tokens=256):
     """SpatialRGPT (a8cheng/SpatialRGPT-VILA1.5-8B). Requires SPATIALRGPT_PATH."""
     import os
+    import subprocess
     if not os.environ.get("SPATIALRGPT_PATH") or not Path(os.environ["SPATIALRGPT_PATH"]).is_dir():
         raise RuntimeError(
             "SPATIALRGPT_PATH not set. Clone SpatialRGPT and set: export SPATIALRGPT_PATH=/path/to/SpatialRGPT"
         )
+    # Patch vision_encoder.py for Python 3.9 (match requires 3.10+) before import
+    patch_script = ROOT / "scripts" / "stvqa7k" / "patch_spatialrgpt_py39.py"
+    if patch_script.exists():
+        subprocess.run([sys.executable, str(patch_script)], check=False, capture_output=True)
     from src2.models.spatial_rgpt import SpatialRGPTRunner
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
