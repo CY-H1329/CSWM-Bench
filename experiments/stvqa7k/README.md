@@ -22,7 +22,7 @@ git push
 cd ~/Spatial_MAS   # ou votre chemin
 git pull
 
-# SpatialRGPT (optionnel, si vous évaluez spatialrgpt)
+# SpatialRGPT (requis pour spatialrgpt). Si Python < 3.10, le script applique un patch automatique.
 export SPATIALRGPT_PATH=/path/to/SpatialRGPT
 
 # Test rapide (10 samples)

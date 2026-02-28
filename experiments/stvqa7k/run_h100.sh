@@ -20,13 +20,16 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 OUTPUT_DIR="${OUTPUT_DIR:-results/stvqa7k}"
-MAX_SAMPLES="${MAX_SAMPLES:-}"
+MAX_SAMPLES="${MAX_SAMPLES:-692}"
 
 echo "=============================================="
 echo "STVQA-7K Evaluation — H100"
 echo "Project: $PROJECT_ROOT"
 echo "Output: $OUTPUT_DIR"
 echo "=============================================="
+
+# Patch SpatialRGPT for Python 3.9 (match statement requires 3.10+)
+python scripts/stvqa7k/patch_spatialrgpt_py39.py || true
 
 for MODEL in qwen3_4b llava4d sa2va spatialreasoner spatialrgpt; do
   echo ""
