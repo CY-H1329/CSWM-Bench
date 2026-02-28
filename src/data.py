@@ -23,7 +23,14 @@ def load_stvqa(
     - max_samples: 전체 상한 (앞에서부터)
     - max_per_category: 카테고리별 최대 개수 (균등 샘플링). 모든 task를 골고루 실험할 때 사용.
     """
-    dataset = load_dataset(dataset_name, split=split)
+    try:
+        dataset = load_dataset(dataset_name, split=split)
+    except TypeError as e:
+        if "dataclass" in str(e).lower() or "fields" in str(e).lower():
+            # Cache incompatible with current datasets version; force re-download
+            dataset = load_dataset(dataset_name, split=split, download_mode="force_redownload")
+        else:
+            raise
     if max_per_category is not None and "category" in dataset.features:
         rng = random.Random(seed)
         by_cat = {}
