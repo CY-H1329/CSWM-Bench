@@ -279,8 +279,9 @@ def _eval_spatialrgpt(dataset, indices, max_new_tokens=256):
         )
     # Patch vision_encoder.py for Python 3.9 (match requires 3.10+) before import
     patch_script = ROOT / "scripts" / "stvqa7k" / "patch_spatialrgpt_py39.py"
+    rgpt_path = os.environ["SPATIALRGPT_PATH"]
     if patch_script.exists():
-        subprocess.run([sys.executable, str(patch_script)], check=False, capture_output=True)
+        subprocess.run([sys.executable, str(patch_script), rgpt_path], check=False, capture_output=True)
     from src2.models.spatial_rgpt import SpatialRGPTRunner
 
     device = "cuda" if torch.cuda.is_available() else "cpu"

@@ -8,89 +8,72 @@ it with if/elif for Python 3.9.
 Usage on H100:
   export SPATIALRGPT_PATH=/path/to/SpatialRGPT
   python scripts/stvqa7k/patch_spatialrgpt_py39.py
-
-  # Or with explicit path:
-  python scripts/stvqa7k/patch_spatialrgpt_py39.py /path/to/SpatialRGPT
 """
 import os
-import re
 import sys
 
 
 def patch_file(fp: str) -> int:
     if not os.path.isfile(fp):
-        print(f"File not found: {fp}")
+        print(f"File not found: {fp}", file=sys.stderr)
         return 1
 
     with open(fp, "r") as f:
-        content = f.read()
+        lines = f.readlines()
 
-    if "match interpolate_mode:" not in content:
-        print("Patch already applied or file structure changed. Skipping.")
-        return 0
+    if not any("match interpolate_mode:" in line for line in lines):
+        return 0  # Already patched
 
-    # Flexible pattern: match any indentation (4 or 8 spaces typical)
-    pattern = re.compile(
-        r'^(\s*)match interpolate_mode:\s*\n'
-        r'\1    case "linear":\s*\n'
-        r'((?:\1        .*\n)+)'
-        r'\1    case _:\s*\n'
-        r'\1        raise NotImplementedError',
-        re.MULTILINE,
-    )
-
-    def replacer(m):
-        base_indent = m.group(1)
-        linear_block = m.group(2).rstrip("\n")
-        # Reduce indentation by 4 spaces for each line
-        new_lines = []
-        for line in linear_block.split("\n"):
-            if len(line) >= 4 and line.startswith("    "):
-                new_lines.append(line[4:])
-            else:
-                new_lines.append(line)
-        new_block = "\n".join(new_lines)
-        return (
-            f'{base_indent}if interpolate_mode == "linear":\n'
-            f'{new_block}\n'
-            f'{base_indent}else:\n'
-            f'{base_indent}    raise NotImplementedError'
-        )
-
-    content_new, n = pattern.subn(replacer, content, count=1)
-    if n == 0:
-        # Fallback: try 8-space base indent (method body)
-        pattern2 = re.compile(
-            r'^(        )match interpolate_mode:\n'
-            r'\1    case "linear":\n'
-            r'((?:\1        .*\n)+)'
-            r'\1    case _:\n'
-            r'\1        raise NotImplementedError',
-            re.MULTILINE,
-        )
-        content_new, n = pattern2.subn(replacer, content, count=1)
-
-    if n == 0:
-        print("Could not find match block. File structure may have changed.")
-        return 1
+    new_lines = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Look for: "        match interpolate_mode:" (8 spaces) or similar
+        stripped = line.lstrip()
+        if stripped.startswith("match interpolate_mode:"):
+            base_indent = line[: len(line) - len(stripped)]
+            # Replace match with if
+            new_lines.append(f'{base_indent}if interpolate_mode == "linear":\n')
+            i += 1
+            # Skip "case "linear":" line
+            if i < len(lines) and 'case "linear"' in lines[i]:
+                i += 1
+            # Process content until "case _:"
+            while i < len(lines):
+                cl = lines[i]
+                if "case _:" in cl:
+                    new_lines.append(f"{base_indent}else:\n")
+                    i += 1
+                    if i < len(lines) and "raise NotImplementedError" in lines[i]:
+                        err_line = lines[i]
+                        err_indent = err_line[: len(err_line) - len(err_line.lstrip())]
+                        # Reduce indent by 4 spaces
+                        if len(err_indent) >= 4:
+                            new_lines.append(" " * (len(err_indent) - 4) + err_line.lstrip())
+                        else:
+                            new_lines.append(err_line)
+                        i += 1
+                    break
+                # Unindent content by 4 spaces
+                if cl.startswith("    "):
+                    new_lines.append(cl[4:])
+                else:
+                    new_lines.append(cl)
+                i += 1
+            continue
+        new_lines.append(line)
+        i += 1
 
     with open(fp, "w") as f:
-        f.write(content_new)
+        f.writelines(new_lines)
 
-    print(f"Patched {fp} for Python 3.9 compatibility.")
     return 0
 
 
 def main():
-    if len(sys.argv) >= 2:
-        path = sys.argv[1]
-    else:
-        path = os.environ.get("SPATIALRGPT_PATH")
-
+    path = os.environ.get("SPATIALRGPT_PATH") or (sys.argv[1] if len(sys.argv) >= 2 else None)
     if not path or not os.path.isdir(path):
-        print("SPATIALRGPT_PATH not set or invalid. Usage: python patch_spatialrgpt_py39.py /path/to/SpatialRGPT")
         return 1
-
     fp = os.path.join(path, "llava", "model", "multimodal_encoder", "vision_encoder.py")
     return patch_file(fp)
 
