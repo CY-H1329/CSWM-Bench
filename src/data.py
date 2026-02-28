@@ -3,11 +3,22 @@ STVQA-7K dataset loader for evaluation.
 Datasets: hunarbatra/STVQA-7K (default), OX-PIXL/STVQA-7K
 Paper: SpatialThinker (arXiv:2511.07403)
 """
+import os
 import random
 import re
+import shutil
 from typing import Optional
 
 from datasets import load_dataset
+
+
+def _clear_dataset_cache(dataset_name: str) -> None:
+    """Remove incompatible cache for dataset (e.g. hunarbatra/STVQA-7K)."""
+    cache_root = os.environ.get("HF_DATASETS_CACHE", os.path.expanduser("~/.cache/huggingface/datasets"))
+    cache_dir = os.path.join(cache_root, dataset_name.replace("/", "___"))
+    if os.path.isdir(cache_dir):
+        shutil.rmtree(cache_dir)
+        print(f"  [data] Cleared cache: {cache_dir}")
 
 
 def load_stvqa(
@@ -27,7 +38,7 @@ def load_stvqa(
         dataset = load_dataset(dataset_name, split=split)
     except TypeError as e:
         if "dataclass" in str(e).lower() or "fields" in str(e).lower():
-            # Cache incompatible with current datasets version; force re-download
+            _clear_dataset_cache(dataset_name)
             dataset = load_dataset(dataset_name, split=split, download_mode="force_redownload")
         else:
             raise
