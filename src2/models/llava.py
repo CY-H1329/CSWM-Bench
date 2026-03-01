@@ -19,14 +19,6 @@ def _is_llava_next(model_id: str) -> bool:
     return "1.6" in model_id or "v1.6" in model_id or "mistral" in model_id.lower() or "next" in model_id.lower()
 
 
-def _has_accelerate() -> bool:
-    try:
-        import accelerate  # noqa: F401
-        return True
-    except ImportError:
-        return False
-
-
 class LLaVARunner:
     def __init__(
         self,
@@ -35,30 +27,21 @@ class LLaVARunner:
         **kwargs,
     ):
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        # device_map="auto" requires accelerate; fallback to .to(device) when absent
-        use_device_map = (
-            device == "cuda" and torch.cuda.is_available() and _has_accelerate()
-        )
-        device_map = "auto" if use_device_map else None
         self.model_id = model_id
         self.is_next = _is_llava_next(model_id)
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-        load_kw = dict(
+        load_kwargs = dict(
             torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-            device_map=device_map,
             trust_remote_code=True,
+            low_cpu_mem_usage=False,
             **kwargs,
         )
+        # No device_map — run without accelerate
         if self.is_next and LlavaNextForConditionalGeneration is not None:
-            self.model = LlavaNextForConditionalGeneration.from_pretrained(
-                model_id, **load_kw
-            )
+            self.model = LlavaNextForConditionalGeneration.from_pretrained(model_id, **load_kwargs)
         else:
-            self.model = LlavaForConditionalGeneration.from_pretrained(
-                model_id, **load_kw
-            )
-        if not use_device_map and device == "cuda":
-            self.model = self.model.cuda()
+            self.model = LlavaForConditionalGeneration.from_pretrained(model_id, **load_kwargs)
+        self.model = self.model.to(device)
         self.model.eval()
         self.device = device
 
