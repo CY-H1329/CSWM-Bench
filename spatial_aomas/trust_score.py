@@ -1,14 +1,13 @@
 """
 Spatial_AOMAS Trust Score — 메인 아키텍처용 단일 파일.
 
-역할 4가지:
+역할 3가지:
   - Direct: Direct Visual Heuristic Strategy
   - 3D: Explicit 3D Representation Construction
   - SceneGraph: Scene Graph Construction
-  - MentalTransform: Mental Transformation
 
 핵심 함수:
-  - select_agents_by_score(): score 기반으로 4 roles에 4 agents 배정
+  - select_agents_by_score(): score 기반으로 3 roles에 agents 배정
   - step1_compute_rewards(): 각 agent가 맞췄는지 보상 계산
   - step2_scale_rewards(): 샘플 수에 따라 보상 스케일 조절
   - step3_update_scores_simple(): 단순 점수 누적 업데이트
@@ -22,14 +21,13 @@ from typing import Callable, Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------
-# 역할 정의 (4가지)
+# 역할 정의 (3가지)
 # ---------------------------------------------------------------------------
 
 ROLES = [
     "Direct",        # Direct Visual Heuristic Strategy
     "3D",            # Explicit 3D Representation Construction
     "SceneGraph",    # Scene Graph Construction
-    "MentalTransform",  # Mental Transformation
 ]
 
 
@@ -44,7 +42,7 @@ def select_agents_by_score(
 ) -> Dict[str, str]:
     """
     각 역할(role)마다 가장 점수가 높은 agent를 1명씩 배정한다.
-    결과: 4 roles → 4 agents (역할당 1:1)
+    결과: 3 roles → 3 agents (역할당 1:1)
 
     scores[agent][category][role] = 점수
     반환: {role: agent} — 예) {"Direct": "qwen3", "3D": "sa2va", ...}
@@ -344,6 +342,7 @@ def run_step3(
 
 def run_step4(
     state: Dict[str, Dict[str, Dict[str, TrustState]]],
+    scores: Dict[str, Dict[str, Dict[str, float]]],
     agent_answers: Dict[str, str],
     final_answer: str,
     gt_answer: str,
@@ -357,10 +356,24 @@ def run_step4(
     lambda_g: float = 0.1,
     mu: float = 0.5,
 ) -> Dict[str, Dict[str, Dict[str, TrustState]]]:
-    """Step1+2+3+4: 보상 → 스케일 → Beta+EMA 신뢰도 업데이트."""
+    """
+    Step1+2+3+4: 보상 → 스케일 → Beta+EMA 신뢰도 업데이트.
+    마지막에 scores 테이블을 갱신한다 (in-place).
+    Returns: updated_state
+    """
     rewards = step1_compute_rewards(agent_answers, final_answer, gt_answer, kappa=kappa)
     scaled = step2_scale_rewards(rewards, N_c, T=T)
-    return step4_update_credibility_full(
+    updated_state = step4_update_credibility_full(
         state, scaled, category, agent_roles,
         lambda_f=lambda_f, lambda_g=lambda_g, mu=mu, gamma=gamma,
     )
+    # scores 테이블 갱신 (in-place)
+    for agent, cats in updated_state.items():
+        if agent not in scores:
+            scores[agent] = {}
+        for cat, roles in cats.items():
+            if cat not in scores[agent]:
+                scores[agent][cat] = {}
+            for role, t in roles.items():
+                scores[agent][cat][role] = t.s
+    return updated_state

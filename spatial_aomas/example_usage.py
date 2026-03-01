@@ -26,7 +26,7 @@ from spatial_aomas.trust_score import (
     TrustState,
 )
 
-AGENTS = ["qwen3_4b", "sa2va", "spatialreasoner", "llava4d"]
+AGENTS = ["qwen3_4b", "sa2va", "spatialreasoner"]
 CATEGORIES = ["depth", "relation", "count"]
 
 
@@ -35,7 +35,6 @@ def main():
         "qwen3_4b": "Final Answer: (A)",
         "sa2va": "The answer is (B)",
         "spatialreasoner": "Answer: (A)",
-        "llava4d": "Answer: (A)",
     }
     final_answer = "Final Answer: (A)"
     gt_answer = "(A)"
@@ -44,7 +43,6 @@ def main():
         "qwen3_4b": "Direct",
         "sa2va": "3D",
         "spatialreasoner": "SceneGraph",
-        "llava4d": "MentalTransform",
     }
 
     # 초기 점수 (예시)
@@ -53,7 +51,7 @@ def main():
         for a in AGENTS
     }
 
-    # 4 roles에 4 agents 배정
+    # 3 roles에 3 agents 배정
     role_to_agent = select_agents_by_score(scores, category, AGENTS)
     print("select_agents_by_score:", role_to_agent)
 
@@ -69,10 +67,10 @@ def main():
     scores = run_step3(scores, agent_answers, final_answer, gt_answer, category, agent_roles, N_c=1)
     print("run_step3 scores:", scores)
 
-    # Step4
+    # Step4 — scores 테이블을 마지막에 in-place 갱신
     state = {a: {c: {r: TrustState() for r in ROLES} for c in CATEGORIES} for a in AGENTS}
-    state = run_step4(state, agent_answers, final_answer, gt_answer, category, agent_roles, N_c=1)
-    scores = get_scores_from_state(state)
+    scores = {a: {c: {r: 0.5 for r in ROLES} for c in CATEGORIES} for a in AGENTS}
+    state = run_step4(state, scores, agent_answers, final_answer, gt_answer, category, agent_roles, N_c=1)
     print("run_step4 scores:", scores)
 
 
