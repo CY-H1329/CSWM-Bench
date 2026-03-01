@@ -29,7 +29,21 @@ conda activate spatial_mas
 python scripts/setup_datasets.py
 ```
 
-### 2. Run evaluation
+### 2. Frozen Benchmarks (논문 실험용)
+
+논문 실험을 위해 **고정된 샘플**로 평가하려면 frozen benchmarks를 사용합니다:
+
+```bash
+python scripts/prepare_frozen_benchmarks.py
+```
+
+- **CV-Bench 400**: 카테고리당 100개 (Count, Relation, Depth, Distance)
+- **3DSRBench 500**: 12개 카테고리 균등 샘플링
+- **STVQA full**: val split 전체 (692개)
+
+→ `data/frozen_benchmarks/` 참고
+
+### 3. Run evaluation
 
 **3DSRBench (GPU)**:
 ```bash

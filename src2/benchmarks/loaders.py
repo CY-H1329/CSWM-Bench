@@ -3,6 +3,9 @@ Unified loaders for all 4 benchmarks.
 Returns normalized format: image, question, options (list or None), answer, category (optional).
 
 3DSRBench: images are fetched from URL. Use image_cache_dir to cache locally for faster reruns.
+
+Supports frozen benchmarks: when use_frozen=True (default), loads from data/frozen_benchmarks/
+for reproducible paper experiments.
 """
 import hashlib
 import io
@@ -14,6 +17,13 @@ from typing import Any, Dict, List, Optional
 from datasets import load_dataset
 from PIL import Image
 import requests
+
+# Frozen benchmark paths (DO NOT MODIFY - used for all paper experiments)
+FROZEN_BENCHMARK_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "frozen_benchmarks"
+FROZEN_PATHS = {
+    "cvbench": "cvbench_400",
+    "3dsrbench": "3dsrbench_500",
+}
 
 # Local cache for 3DSRBench URL images (set to enable)
 IMAGE_CACHE_DIR = os.environ.get("SPATIAL_MAS_IMAGE_CACHE")
@@ -89,17 +99,34 @@ def load_benchmark(
     max_per_category: Optional[int] = None,
     category_filter: Optional[List[str]] = None,
     seed: int = 42,
+    use_frozen: bool = True,
 ):
     """
-    Load a benchmark dataset. Uses HuggingFace cache (from setup_datasets.py).
+    Load a benchmark dataset.
+
+    When use_frozen=True (default): loads from data/frozen_benchmarks/ for reproducible
+    paper experiments. Ignores max_samples/max_per_category - returns exact frozen set.
+
+    When use_frozen=False: loads from HuggingFace cache and applies sampling.
+
     Returns dataset with normalized access via get_benchmark_* helpers.
 
     Args:
-        category_filter: If set, keep only samples whose category is in this list.
+        category_filter: If set (and use_frozen=False), keep only samples whose category is in this list.
     """
     if benchmark not in BENCHMARK_CONFIGS:
         raise ValueError(f"Unknown benchmark: {benchmark}. Choose from {list(BENCHMARK_CONFIGS.keys())}")
 
+    # Try frozen benchmark first
+    if use_frozen and benchmark in FROZEN_PATHS:
+        frozen_name = FROZEN_PATHS[benchmark]
+        frozen_path = FROZEN_BENCHMARK_DIR / frozen_name
+        if frozen_path.exists() and (frozen_path / "dataset_info.json").exists():
+            from datasets import load_from_disk
+            ds = load_from_disk(str(frozen_path))
+            return ds
+
+    # Fallback: load from HuggingFace
     cfg = BENCHMARK_CONFIGS[benchmark]
     name = cfg["name"]
     split = cfg["split"]

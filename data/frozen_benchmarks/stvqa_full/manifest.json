@@ -1,0 +1,7 @@
+{
+  "benchmark": "stvqa",
+  "n_samples": 692,
+  "source": "hunarbatra/STVQA-7K",
+  "split": "val",
+  "sampling": "none (full eval)"
+}

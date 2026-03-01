@@ -1,0 +1,22 @@
+{
+  "benchmark": "3dsrbench",
+  "n_samples": 500,
+  "categories": [
+    "height_higher",
+    "location_above",
+    "location_closer_to_camera",
+    "location_next_to",
+    "orientation_in_front_of",
+    "orientation_on_the_left",
+    "orientation_viewpoint",
+    "multi_object_closer_to",
+    "multi_object_facing",
+    "multi_object_parallel",
+    "multi_object_same_direction",
+    "multi_object_viewpoint_towards_object"
+  ],
+  "seed": 42,
+  "source": "ccvl/3DSRBench",
+  "subset": "benchmark",
+  "split": "test"
+}
