@@ -7,11 +7,12 @@ Note: Sa2VA model loading triggers PEFT -> bitsandbytes. On servers with
 CUDA 12.4 (or when libbitsandbytes_cuda124.so is missing), we mock
 bitsandbytes so PEFT can load. Sa2VA inference does NOT use bitsandbytes.
 """
+import importlib.util
 import os
 import sys
+import types
 import warnings
 from typing import Optional
-from unittest.mock import MagicMock
 
 from PIL import Image
 import torch
@@ -21,20 +22,13 @@ from transformers.modeling_utils import PreTrainedModel
 
 def _mock_bitsandbytes_for_peft():
     """Mock bitsandbytes so PEFT can load when bitsandbytes CUDA is broken (e.g. CUDA 12.4).
-    Sa2VA inference does not use bitsandbytes; it's only a transitive dep from PEFT."""
+    Sa2VA inference does not use bitsandbytes; it's only a transitive dep from PEFT.
+    Uses types.ModuleType with __spec__ so importlib.util.find_spec() succeeds."""
     if "bitsandbytes" in sys.modules:
         return  # Already loaded (or mocked)
-    mock = MagicMock()
-    sys.modules["bitsandbytes"] = mock
-    sys.modules["bitsandbytes.cuda_setup"] = MagicMock()
-    sys.modules["bitsandbytes.cextension"] = MagicMock()
-    sys.modules["bitsandbytes.utils"] = MagicMock()
-    sys.modules["bitsandbytes.optim"] = MagicMock()
-    sys.modules["bitsandbytes.research"] = MagicMock()
-    sys.modules["bitsandbytes.research.nn"] = MagicMock()
-    sys.modules["bitsandbytes.research.nn.modules"] = MagicMock()
-    sys.modules["bitsandbytes.autograd"] = MagicMock()
-    sys.modules["bitsandbytes.autograd._functions"] = MagicMock()
+    fake = types.ModuleType("bitsandbytes")
+    fake.__spec__ = importlib.util.spec_from_loader("bitsandbytes", loader=None, origin="mock")
+    sys.modules["bitsandbytes"] = fake
 
 
 def _setup_cuda_library_path():
