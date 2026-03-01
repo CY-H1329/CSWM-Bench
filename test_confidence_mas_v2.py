@@ -47,8 +47,9 @@ from src2.agents.mas_v2.confidence_score_map import (
     ConfidenceScoreMapUpdater,
 )
 
-# Sa2VA 제외 (bitsandbytes/peft metaclass 충돌 시)
-SPECIALIST_LLMS_NO_SA2VA = [m for m in SPECIALIST_LLMS if m != "sa2va"]
+# Sa2VA 제외 (bitsandbytes/peft metaclass 충돌)
+# SpatialRGPT 제외 (SPATIALRGPT_PATH 별도 설정 필요)
+SPECIALIST_LLMS_MINIMAL = ["qwen3_4b", "llava4d", "spatial_reasoner"]
 from src2.benchmarks.loaders import (
     load_benchmark,
     get_benchmark_image,
@@ -93,7 +94,7 @@ def run_confidence_mas_test(
     rng = random.Random(seed)
     rng.shuffle(samples)
 
-    llms = specialist_llms if specialist_llms is not None else SPECIALIST_LLMS_NO_SA2VA
+    llms = specialist_llms if specialist_llms is not None else SPECIALIST_LLMS_MINIMAL
     score_map = ConfidenceScoreMap(categories=ALL_CATEGORIES, llms=llms, seed=seed)
     updater = ConfidenceScoreMapUpdater()
 
