@@ -54,6 +54,7 @@ def run_sa2va_all_roles_test(
             seed=seed,
             show_failures=show_failures,
             max_new_tokens=max_new_tokens,
+            model_name="sa2va",
         )
         if r:
             results[("direct_visual_heuristic", bench)] = r
@@ -70,6 +71,7 @@ def run_sa2va_all_roles_test(
             seed=seed,
             show_failures=show_failures,
             max_new_tokens=max_new_tokens,
+            model_name="sa2va",
         )
         if r:
             results[("explicit_3d_representation", bench)] = r
@@ -87,6 +89,7 @@ def run_sa2va_all_roles_test(
             show_failures=show_failures,
             max_new_tokens=max_new_tokens,
             prefetch_workers=prefetch_workers,
+            model_name="sa2va",
         )
         if r:
             results[("scene_graph_construction", bench)] = r
