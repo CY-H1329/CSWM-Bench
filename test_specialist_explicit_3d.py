@@ -41,6 +41,9 @@ from src2.benchmarks.loaders import (
 )
 
 
+_MODEL_DISPLAY = {"qwen3_4b": "Qwen3-VL-4B", "sa2va": "Sa2VA", "llava4d": "LLaVA4D", "spatial_rgpt": "SpatialRGPT", "spatial_reasoner": "SpatialReasoner"}
+
+
 def _normalize_answer(s: str) -> str:
     """Extract answer letter A/B/C/D for comparison."""
     s = (s or "").strip().upper()
@@ -59,20 +62,22 @@ def run_specialist_test(
     seed: int = 42,
     show_failures: int = 0,
     max_new_tokens: int = 1024,
+    model_name: str = "qwen3_4b",
 ):
     """
-    Run explicit_3d_representation + Qwen3 on benchmark.
+    Run explicit_3d_representation on benchmark.
 
     Uses: extract_objects_from_image → get_3d_representation → build_role_prompt
     """
     dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
     role = "explicit_3d_representation"
-    llm_name = "qwen3_4b"
+    llm_name = model_name
+    disp = _MODEL_DISPLAY.get(model_name, model_name)
 
     def _specialist_generate(llm_name, image, prompt):
         return runner.generate(image, prompt, temperature=0.0, max_new_tokens=max_new_tokens)
 
-    print(f"Starting: {len(dataset)} samples, {role} + Qwen3-VL-4B...")
+    print(f"Starting: {len(dataset)} samples, {role} + {disp}...")
 
     correct = 0
     total = 0
@@ -140,7 +145,7 @@ def run_specialist_test(
     # --- Report ---
     print()
     print("=" * 60)
-    print(f"SPECIALIST TEST — {role} + Qwen3-VL-4B — {benchmark.upper()}")
+    print(f"SPECIALIST TEST — {role} + {disp} — {benchmark.upper()}")
     print("=" * 60)
     print(f"Overall: {correct}/{total} = {100*correct/total:.1f}%")
     print()
@@ -174,7 +179,7 @@ def run_specialist_test(
     return {
         "benchmark": benchmark,
         "role": role,
-        "model": "qwen3_4b",
+        "model": model_name,
         "accuracy": correct / total,
         "correct": correct,
         "total": total,

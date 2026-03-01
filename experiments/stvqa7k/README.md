@@ -2,7 +2,7 @@
 
 Évaluation des 5 modèles VLM sur **STVQA-7K** (split `val`, 692 exemples).
 
-- **Dataset** : [hunarbatra/STVQA-7K](https://huggingface.co/datasets/hunarbatra/STVQA-7K)
+- **Dataset**: [hunarbatra/STVQA-7K](https://huggingface.co/datasets/hunarbatra/STVQA-7K/viewer/default/val)
 - **Modèles** : Qwen-3.0-VL 4B, LLaVA-4D, SpatialReasoner, SpatialRGPT, Sa2VA
 
 ## Workflow H100 (Git push → pull → run)
@@ -16,23 +16,26 @@ git commit -m "STVQA-7K eval: 5 models on val"
 git push
 ```
 
-### 2. H100 — Pull et exécution
+### 2. H100 — One-time setup
 
 ```bash
-cd ~/Spatial_MAS   # ou votre chemin
-git pull
-
-# SpatialRGPT (requis pour spatialrgpt). Si Python < 3.10, le script applique un patch automatique.
+git clone https://github.com/AnjieCheng/SpatialRGPT.git
 export SPATIALRGPT_PATH=/path/to/SpatialRGPT
-
-# Test rapide (10 samples)
-MAX_SAMPLES=10 bash experiments/stvqa7k/run_h100.sh
-
-# Évaluation complète (692 samples)
-bash experiments/stvqa7k/run_h100.sh
+conda activate srgpt   # has s2wrapper; or: pip install git+https://github.com/bfshi/scaling_on_scales
 ```
 
-### 3. Résultats
+### 3. H100 — Pull and run
+
+```bash
+cd ~/Spatial_MAS
+git pull
+export SPATIALRGPT_PATH=/path/to/SpatialRGPT
+
+bash experiments/stvqa7k/run_h100.sh
+# Quick test: MAX_SAMPLES=10 bash experiments/stvqa7k/run_h100.sh
+```
+
+### 4. Results
 
 - `results/stvqa7k/all_results.json` — résumé global
 - `results/stvqa7k/<model>/results.json` — par modèle

@@ -27,26 +27,21 @@ class LLaVARunner:
         **kwargs,
     ):
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        device_map = "auto" if device == "cuda" and torch.cuda.is_available() else device
         self.model_id = model_id
         self.is_next = _is_llava_next(model_id)
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+        load_kwargs = dict(
+            torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
+            trust_remote_code=True,
+            low_cpu_mem_usage=False,
+            **kwargs,
+        )
+        # No device_map — run without accelerate
         if self.is_next and LlavaNextForConditionalGeneration is not None:
-            self.model = LlavaNextForConditionalGeneration.from_pretrained(
-                model_id,
-                torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-                device_map=device_map,
-                trust_remote_code=True,
-                **kwargs,
-            )
+            self.model = LlavaNextForConditionalGeneration.from_pretrained(model_id, **load_kwargs)
         else:
-            self.model = LlavaForConditionalGeneration.from_pretrained(
-                model_id,
-                torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-                device_map=device_map,
-                trust_remote_code=True,
-                **kwargs,
-            )
+            self.model = LlavaForConditionalGeneration.from_pretrained(model_id, **load_kwargs)
+        self.model = self.model.to(device)
         self.model.eval()
         self.device = device
 

@@ -45,6 +45,9 @@ def _normalize_answer(s: str) -> str:
     return ""
 
 
+_MODEL_DISPLAY = {"qwen3_4b": "Qwen3-VL-4B", "sa2va": "Sa2VA", "llava4d": "LLaVA4D", "spatial_rgpt": "SpatialRGPT", "spatial_reasoner": "SpatialReasoner"}
+
+
 def run_specialist_test(
     runner,
     benchmark: str = "cvbench",
@@ -52,9 +55,10 @@ def run_specialist_test(
     seed: int = 42,
     show_failures: int = 0,
     max_new_tokens: int = 1024,
+    model_name: str = "qwen3_4b",
 ):
     """
-    Run direct_visual_heuristic + Qwen3 on benchmark, report accuracy vs GT.
+    Run direct_visual_heuristic on benchmark, report accuracy vs GT.
 
     Args:
         runner: Must have .generate(image, prompt, temperature=0, max_new_tokens=N)
@@ -63,10 +67,12 @@ def run_specialist_test(
         seed: Random seed
         show_failures: Print first N wrong cases (query, GT, pred, reason)
         max_new_tokens: 512 often cuts off before Answer; use 1024+ for full COT
+        model_name: Model key for display (qwen3_4b, sa2va, llava4d, etc.)
     """
     dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
     role = "direct_visual_heuristic"
-    print(f"Starting: {len(dataset)} samples, {role} + Qwen3-VL-4B...")
+    disp = _MODEL_DISPLAY.get(model_name, model_name)
+    print(f"Starting: {len(dataset)} samples, {role} + {disp}...")
 
     correct = 0
     total = 0
@@ -125,7 +131,7 @@ def run_specialist_test(
     # --- Report ---
     print()
     print("=" * 60)
-    print(f"SPECIALIST TEST — {role} + Qwen3-VL-4B — {benchmark.upper()}")
+    print(f"SPECIALIST TEST — {role} + {disp} — {benchmark.upper()}")
     print("=" * 60)
     print(f"Overall: {correct}/{total} = {100*correct/total:.1f}%")
     print()
@@ -160,7 +166,7 @@ def run_specialist_test(
     return {
         "benchmark": benchmark,
         "role": role,
-        "model": "qwen3_4b",
+        "model": model_name,
         "accuracy": correct / total,
         "correct": correct,
         "total": total,

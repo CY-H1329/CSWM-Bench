@@ -2,17 +2,49 @@
 Sa2VA inference (ByteDance/Sa2VA-4B).
 Uses model.predict_forward() for image chat.
 Requires: transformers, trust_remote_code=True
+
+Note: Sa2VA loading triggers PEFT -> bitsandbytes. When bitsandbytes CUDA
+fails (e.g. CUDA 12.4), we mock it so PEFT can load. Sa2VA inference does
+not use bitsandbytes.
 """
+import importlib.util
+import sys
+import types
 import warnings
 from typing import Optional
+from unittest.mock import MagicMock
+
 from PIL import Image
 import torch
 from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
 
 
+def _mock_bitsandbytes_for_peft():
+    """Use real bitsandbytes when available (e.g. conda spatial_reasoning).
+    Mock only when CUDA lib fails (e.g. CUDA 12.4, libbitsandbytes_cuda124.so missing)."""
+    if "bitsandbytes" in sys.modules:
+        return
+    try:
+        import bitsandbytes  # noqa: F401
+        return  # Real one works (e.g. conda activate spatial_reasoning)
+    except (RuntimeError, ImportError, OSError):
+        sys.modules.pop("bitsandbytes", None)  # Remove partial/failed load
+    fake = types.ModuleType("bitsandbytes")
+    fake.__spec__ = importlib.util.spec_from_loader("bitsandbytes", loader=None, origin="mock")
+    fake.nn = MagicMock()
+    fake.optim = MagicMock()
+    fake.cuda_setup = MagicMock()
+    fake.cextension = MagicMock()
+    fake.utils = MagicMock()
+    fake.research = MagicMock()
+    sys.modules["bitsandbytes"] = fake
+
+
 def _patch_tied_weights_for_sa2va():
     """Sa2VA uses _tied_weights_keys; newer transformers expect all_tied_weights_keys."""
+    if not hasattr(PreTrainedModel, "mark_tied_weights_as_initialized"):
+        return  # Newer transformers: method removed, no patch needed
     _orig = PreTrainedModel.mark_tied_weights_as_initialized
 
     def _patched(self):
@@ -55,6 +87,8 @@ class Sa2VARunner:
     ):
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model_id = model_id
+
+        _mock_bitsandbytes_for_peft()
 
         load_kwargs = dict(
             **kwargs,

@@ -3,11 +3,30 @@ STVQA-7K dataset loader for evaluation.
 Datasets: hunarbatra/STVQA-7K (default), OX-PIXL/STVQA-7K
 Paper: SpatialThinker (arXiv:2511.07403)
 """
+import os
 import random
 import re
+import shutil
+import tempfile
 from typing import Optional
 
 from datasets import load_dataset
+
+
+def _clear_dataset_cache(dataset_name: str) -> None:
+    """Remove incompatible cache for dataset (e.g. hunarbatra/STVQA-7K)."""
+    # Datasets cache: ~/.cache/huggingface/datasets/hunarbatra___stvqa-7k
+    ds_cache = os.environ.get("HF_DATASETS_CACHE", os.path.expanduser("~/.cache/huggingface/datasets"))
+    ds_dir = os.path.join(ds_cache, dataset_name.replace("/", "___"))
+    if os.path.isdir(ds_dir):
+        shutil.rmtree(ds_dir)
+        print(f"  [data] Cleared datasets cache: {ds_dir}")
+    # Hub cache: ~/.cache/huggingface/hub/datasets--hunarbatra--stvqa-7k (lowercase)
+    hub_cache = os.environ.get("HF_HUB_CACHE", os.path.expanduser("~/.cache/huggingface/hub"))
+    hub_dir = os.path.join(hub_cache, "datasets--" + dataset_name.lower().replace("/", "--"))
+    if os.path.isdir(hub_dir):
+        shutil.rmtree(hub_dir)
+        print(f"  [data] Cleared hub cache: {hub_dir}")
 
 
 def load_stvqa(
@@ -35,8 +54,29 @@ def load_stvqa(
         dataset = load_dataset(dataset_name, split=split)
     except TypeError as e:
         if "dataclass" in str(e).lower() or "fields" in str(e).lower():
-            # Cache incompatible with current datasets version; force re-download
-            dataset = load_dataset(dataset_name, split=split, download_mode="force_redownload")
+            _clear_dataset_cache(dataset_name)
+            # Retry with fresh cache dir (bypasses corrupted metadata)
+            tmp = tempfile.mkdtemp(prefix="stvqa_cache_")
+            ds_cache = os.path.join(tmp, "datasets")
+            hub_cache = os.path.join(tmp, "hub")
+            os.makedirs(ds_cache, exist_ok=True)
+            os.makedirs(hub_cache, exist_ok=True)
+            prev_ds = os.environ.get("HF_DATASETS_CACHE")
+            prev_hub = os.environ.get("HF_HUB_CACHE")
+            os.environ["HF_DATASETS_CACHE"] = ds_cache
+            os.environ["HF_HUB_CACHE"] = hub_cache
+            try:
+                dataset = load_dataset(dataset_name, split=split, download_mode="force_redownload")
+            finally:
+                if prev_ds is not None:
+                    os.environ["HF_DATASETS_CACHE"] = prev_ds
+                else:
+                    os.environ.pop("HF_DATASETS_CACHE", None)
+                if prev_hub is not None:
+                    os.environ["HF_HUB_CACHE"] = prev_hub
+                else:
+                    os.environ.pop("HF_HUB_CACHE", None)
+            print(f"  [data] Fresh cache at {tmp} (safe to rm -rf when done)")
         else:
             raise
     if max_per_category is not None and "category" in dataset.features:
