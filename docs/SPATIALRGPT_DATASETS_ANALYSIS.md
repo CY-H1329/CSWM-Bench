@@ -4,74 +4,81 @@
 
 **SpatialRGPT 모델은 정상 로드됩니다.**
 
-로그에서 확인:
-```
-Loading checkpoint shards: 100%|████| 4/4
-Resuming region extractor from: .../SpatialRGPT-VILA1.5-8B/region_extractor
-```
-
-- **롤 프롬프트**: 가능 (모델이 로드된 후 사용)
-- **이미지 입력**: 가능 (SpatialRGPT는 VLM)
+- **롤 프롬프트**: 가능
+- **이미지 입력**: 가능 (VLM)
 - **실제 오류**: **벤치마크 데이터셋 로딩 단계**에서 발생 (모델 추론 전)
 
 ---
 
-## 2. 오류 발생 위치
+## 2. 오류 발생 흐름
 
 ```
-load_benchmark("cvbench", ...)
-  → load_from_disk (frozen) 실패
+load_benchmark("cvbench")
+  → load_from_disk (frozen) 실패 [datasets 버전 불일치]
   → load_dataset("nyu-visionx/CV-Bench") fallback
-  → DatasetInfo.from_directory(cache_dir)
-  → Features.from_dict(features)
+  → DatasetBuilder.__init__
+  → DatasetInfo.from_directory(self._cache_dir)
+  → Features.from_dict(self.features)
+  → generate_from_dict() → fields(class_type)
   → TypeError: must be called with a dataclass type or instance
 ```
 
-**에러는 `datasets` 라이브러리가 캐시된 `dataset_info.json`을 파싱할 때 발생합니다.**
-
 ---
 
-## 3. 근본 원인
+## 3. 근본 원인 (상세)
 
-| 항목 | 내용 |
+### 3.1 캐시 삭제해도 왜 계속 실패하나?
+
+**HuggingFace에 올라간 CV-Bench 메타데이터 자체가 새 형식입니다.**
+
+| 단계 | 설명 |
 |------|------|
-| **srgpt 환경** | `datasets==2.16.1` (SpatialRGPT pyproject) |
-| **캐시 생성** | `spatial_reasoning` 또는 더 최신 `datasets`로 생성됨 |
-| **캐시 경로** | `~/.cache/huggingface/datasets/` |
-| **문제** | 2.16.1이 새 형식의 Features를 파싱하지 못함 |
+| 1 | `load_dataset("nyu-visionx/CV-Bench")` 호출 |
+| 2 | datasets가 HF에서 다운로드 (parquet + dataset card 등) |
+| 3 | `DatasetInfo.from_directory(cache_dir)` — **HF repo에 있는 metadata** 사용 |
+| 4 | CV-Bench repo의 dataset card/parquet schema는 **최신 datasets**로 생성됨 |
+| 5 | datasets 2.16.1이 이 형식을 파싱하지 못함 |
 
-`Features.from_dict()`가 중첩된 feature 정의(예: `List[Value]`, `Image`)를 처리할 때, 2.16.1과 호환되지 않는 형식이 들어와 `dataclasses.fields()`에서 실패합니다.
+캐시를 지워도, **다시 받는 메타데이터가 같은 새 형식**이라 2.16.1로는 파싱이 불가능합니다.
+
+### 3.2 Python 3.10과의 관계
+
+Python 3.10은 이 오류와 **무관**합니다.  
+문제는 `datasets` 버전과 HF에 저장된 메타데이터 형식의 불일치입니다.
+
+### 3.3 datasets 2.16.1 vs 최신
+
+- `Features.from_dict()` 내부에서 `generate_from_dict()` 호출
+- 중첩 feature (`List[Value]`, `Image` 등) 처리 시 `dataclasses.fields(class_type)` 사용
+- 최신 datasets는 feature 정의 구조가 바뀌어, 2.16.1의 `fields()` 호출 방식과 맞지 않음
 
 ---
 
 ## 4. 해결 방법
 
-### 방법 A: srgpt에서 datasets 업그레이드 (권장)
+### 방법 A: parquet 직접 로드 (구현됨)
+
+`load_dataset`이 실패하면 **parquet 로더**로 fallback합니다.  
+parquet는 스키마를 파일에서 추론하므로 `dataset_info.json`을 사용하지 않습니다.
+
+```python
+# loaders.py에 이미 추가됨
+data_files = {"test": [url_2d, url_3d]}
+ds = load_dataset("parquet", data_files=data_files, split="test")
+```
+
+### 방법 B: datasets 업그레이드
 
 ```bash
-conda activate srgpt
 pip install "datasets>=2.18"
 ```
 
-SpatialRGPT 학습에 영향이 있을 수 있으므로, **추론만** 할 경우 시도해볼 만합니다.
+vila와 의존성 충돌이 있을 수 있음.
 
-### 방법 B: CV-Bench 캐시 삭제 후 재다운로드
+### 방법 C: spatial_reasoning 환경 사용
 
-```bash
-# CV-Bench 캐시 삭제
-rm -rf ~/.cache/huggingface/datasets/nyu-visionx___cv-bench
-
-# 또는 전체 datasets 캐시
-rm -rf ~/.cache/huggingface/datasets/
-```
-
-이후 `load_dataset`을 다시 실행하면 srgpt의 `datasets` 2.16.1로 새 캐시가 생성됩니다.  
-단, HuggingFace에 올라간 CV-Bench 메타데이터 자체가 새 형식이면 여전히 실패할 수 있습니다.
-
-### 방법 C: spatial_reasoning 환경에서 SpatialRGPT 실행
-
-Python 3.9 + 패치 방식으로 SpatialRGPT를 `spatial_reasoning`에서 실행하면,  
-`datasets` 버전이 맞아서 frozen/캐시 로딩이 정상 동작합니다.
+Python 3.9 + 패치로 SpatialRGPT를 `spatial_reasoning`에서 실행.  
+해당 환경의 datasets 버전이 HF 메타데이터와 호환됨.
 
 ---
 
@@ -79,6 +86,7 @@ Python 3.9 + 패치 방식으로 SpatialRGPT를 `spatial_reasoning`에서 실행
 
 | 질문 | 답변 |
 |------|------|
-| 모델이 롤 프롬프트를 못 하나? | **가능함** — 오류는 데이터 로딩 단계에서 발생 |
-| 이미지를 못 받나? | **받을 수 있음** — VLM으로 이미지 입력 지원 |
-| 실제 문제는? | **datasets 버전 불일치**로 인한 캐시/메타데이터 파싱 실패 |
+| 캐시 삭제만으로 해결되나? | **아니요** — HF 메타데이터 자체가 새 형식 |
+| Python 3.10 때문인가? | **아니요** — datasets 버전 문제 |
+| 실제 원인은? | **datasets 2.16.1이 HF CV-Bench 메타데이터 형식을 파싱하지 못함** |
+| 해결책은? | **parquet 직접 로드** (loaders.py에 fallback 추가됨) |
