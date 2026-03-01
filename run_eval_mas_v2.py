@@ -27,6 +27,7 @@ import sys
 import warnings
 from datetime import datetime
 from pathlib import Path
+from typing import List, Optional
 
 # Suppress noisy deprecation/generation warnings
 warnings.filterwarnings("ignore", message=".*torch_dtype.*")
@@ -62,6 +63,7 @@ def build_runners(
     reasoning_local_model_id: str = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
     use_vlm_reasoning: bool = False,
     reasoning_vlm_model_id: str = "Qwen/Qwen3-VL-8B-Instruct",
+    specialist_whitelist: Optional[List[str]] = None,
 ):
     """Instantiate all model runners.
 
@@ -97,6 +99,11 @@ def build_runners(
     _specialist_cache = {}
 
     def _get_specialist(name: str):
+        if specialist_whitelist is not None and name not in specialist_whitelist:
+            raise ValueError(
+                f"Specialist '{name}' not in whitelist {specialist_whitelist}. "
+                "Only whitelisted specialists will be loaded."
+            )
         if name not in _specialist_cache:
             if name == "qwen3_4b":
                 _specialist_cache[name] = _get_head()
