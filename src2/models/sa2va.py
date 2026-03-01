@@ -2,7 +2,15 @@
 Sa2VA inference (ByteDance/Sa2VA-4B).
 Uses model.predict_forward() for image chat.
 Requires: transformers, trust_remote_code=True
+
+Note: Sa2VA model loading triggers PEFT -> bitsandbytes. If you get
+"CUDA Setup failed despite GPU being available", set LD_LIBRARY_PATH
+before importing (e.g. in Jupyter first cell):
+  import os
+  os.environ["LD_LIBRARY_PATH"] = "/usr/local/cuda/lib64:" + os.environ.get("LD_LIBRARY_PATH", "")
+  # Then restart kernel and run your code
 """
+import os
 import warnings
 from typing import Optional
 from PIL import Image
@@ -11,8 +19,30 @@ from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
 
 
+def _setup_cuda_library_path():
+    """Try to fix bitsandbytes CUDA error by adding common CUDA lib paths to LD_LIBRARY_PATH.
+    Sa2VA loading triggers PEFT->bitsandbytes; bitsandbytes needs libcudart.so in path."""
+    current = os.environ.get("LD_LIBRARY_PATH", "")
+    candidates = [
+        "/usr/local/cuda/lib64",
+        "/usr/local/cuda/lib",
+        "/usr/lib/x86_64-linux-gnu",
+        "/opt/conda/lib",
+        os.path.join(os.environ.get("CONDA_PREFIX", ""), "lib") if os.environ.get("CONDA_PREFIX") else None,
+        os.path.join(os.path.dirname(torch.__file__), "lib") if hasattr(torch, "__file__") else None,
+    ]
+    for path in candidates:
+        if path and os.path.isdir(path):
+            lib = os.path.join(path, "libcudart.so")
+            if os.path.exists(lib) and path not in current:
+                os.environ["LD_LIBRARY_PATH"] = (current + ":" + path) if current else path
+                return
+
+
 def _patch_tied_weights_for_sa2va():
     """Sa2VA uses _tied_weights_keys; newer transformers expect all_tied_weights_keys."""
+    if not hasattr(PreTrainedModel, "mark_tied_weights_as_initialized"):
+        return  # Newer transformers: method removed, no patch needed
     _orig = PreTrainedModel.mark_tied_weights_as_initialized
 
     def _patched(self):
@@ -55,6 +85,8 @@ class Sa2VARunner:
     ):
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model_id = model_id
+
+        _setup_cuda_library_path()
 
         load_kwargs = dict(
             **kwargs,
