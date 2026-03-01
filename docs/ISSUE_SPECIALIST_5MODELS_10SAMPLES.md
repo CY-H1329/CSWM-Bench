@@ -254,6 +254,83 @@ python test_specialist_all_roles.py --model spatial_reasoner --max_samples 10
 
 ---
 
+## Experiment 4: SpatialRGPT
+
+**Environment**: conda activate srgpt (datasets 2.16.1, parquet fallback for CV-Bench)
+
+### Overall Summary
+
+| Role | CV-Bench | 3DSRBench |
+|------|----------|-----------|
+| direct_visual_heuristic | 5/10 (50.0%) | 6/10 (60.0%) |
+| explicit_3d_representation | 6/10 (60.0%) | 4/10 (40.0%) |
+| scene_graph_construction | 6/10 (60.0%) | 5/10 (50.0%) |
+
+### Per-Category Detail
+
+**direct_visual_heuristic — CV-Bench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| Count | 33.3% | 1/3 |
+| Distance | 50.0% | 1/2 |
+| Relation | 60.0% | 3/5 |
+
+**direct_visual_heuristic — 3DSRBench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| height_higher | 100.0% | 1/1 |
+| location_above | 100.0% | 3/3 |
+| location_closer_to_camera | 50.0% | 1/2 |
+| location_next_to | 100.0% | 1/1 |
+| multi_object_closer_to | 0.0% | 0/1 |
+| multi_object_parallel | 0.0% | 0/2 |
+
+**explicit_3d_representation — CV-Bench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| Count | 66.7% | 2/3 |
+| Distance | 50.0% | 1/2 |
+| Relation | 60.0% | 3/5 |
+
+**explicit_3d_representation — 3DSRBench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| height_higher | 0.0% | 0/1 |
+| location_above | 66.7% | 2/3 |
+| location_closer_to_camera | 50.0% | 1/2 |
+| location_next_to | 100.0% | 1/1 |
+| multi_object_closer_to | 0.0% | 0/1 |
+| multi_object_parallel | 0.0% | 0/2 |
+
+**scene_graph_construction — CV-Bench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| Count | 66.7% | 2/3 |
+| Distance | 0.0% | 0/2 |
+| Relation | 80.0% | 4/5 |
+
+**scene_graph_construction — 3DSRBench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| height_higher | 0.0% | 0/1 |
+| location_above | 66.7% | 2/3 |
+| location_closer_to_camera | 50.0% | 1/2 |
+| location_next_to | 100.0% | 1/1 |
+| multi_object_closer_to | 0.0% | 0/1 |
+| multi_object_parallel | 50.0% | 1/2 |
+
+### SpatialRGPT Key Insights
+
+| Observation | Implication |
+|-------------|-------------|
+| direct_visual best on 3DSRBench (60%) | Image-only mode works well for 3D spatial questions. |
+| explicit_3d drops on 3DSRBench (40%) | OWL-ViT detection failed (`'Image' object is not subscriptable`); Depth tool placeholder used. |
+| Relation 80% (scene_graph CV-Bench) | Scene graph helps relation-type questions on CV-Bench. |
+| multi_object_closer_to, multi_object_parallel 0% (direct) | Multi-object spatial reasoning remains challenging. |
+| location_above 100% (direct_visual) | Strong on vertical positioning when using direct visual. |
+
+---
+
 ## Combined Summary (All 5 Models)
 
 | Model | direct_visual_heuristic | explicit_3d_representation | scene_graph_construction |
@@ -261,8 +338,8 @@ python test_specialist_all_roles.py --model spatial_reasoner --max_samples 10
 | Sa2VA | CV: 70%, 3D: 60% | CV: 70%, 3D: 50% | CV: 70%, 3D: 60% |
 | SpatialReasoner | CV: 70%, 3D: 60% | **CV: 80%**, 3D: 50% | CV: 60%, 3D: 60% |
 | LLaVA4D | CV: 60%, 3D: 50% | CV: 60%, 3D: 30% | CV: 50%, 3D: 40% |
+| SpatialRGPT | CV: 50%, 3D: 60% | CV: 60%, 3D: 40% | CV: 60%, 3D: 50% |
 | Qwen3-4B | _pending_ | _pending_ | _pending_ |
-| SpatialRGPT | _pending_ | _pending_ | _pending_ |
 
 ---
 
@@ -275,11 +352,11 @@ python test_specialist_all_roles.py --model spatial_reasoner --max_samples 10
 | `src2/models/sa2va.py` | Sa2VARunner (with bitsandbytes fallback) |
 | `src2/models/llava.py` | LLaVARunner (LLaVA4D: llava-v1.6-mistral-7b-hf) |
 | `src2/models/spatial_reasoner.py` | SpatialReasonerRunner |
+| `src2/models/spatial_rgpt.py` | SpatialRGPTRunner (a8cheng/SpatialRGPT-VILA1.5-8B) |
 
 ---
 
 ## Next Steps
 
-* Complete Qwen3-4B, SpatialRGPT runs
-* Update Combined Summary table
+* Complete Qwen3-4B runs
 * Create GitHub issue with full results
