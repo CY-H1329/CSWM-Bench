@@ -148,7 +148,20 @@ def load_benchmark(
         else:
             ds = load_dataset(name, **load_kw)
     except (TypeError, Exception) as cache_err:
-        if "dataclass" in str(cache_err) or "must be called" in str(cache_err):
+        err_str = str(cache_err)
+        if "dataclass" in err_str or "must be called" in err_str:
+            # Cache format incompatible: clear dataset cache and force fresh download
+            import shutil
+            hf_home = Path(os.environ.get("HF_HOME", str(Path.home() / ".cache" / "huggingface")))
+            hub_dir = hf_home / "hub"
+            cache_name = "datasets--" + name.replace("/", "--")
+            if hub_dir.exists():
+                target = hub_dir / cache_name
+                if target.exists():
+                    try:
+                        shutil.rmtree(target)
+                    except Exception:
+                        pass
             load_kw["download_mode"] = "force_redownload"
             if subset:
                 ds = load_dataset(name, subset, **load_kw)
