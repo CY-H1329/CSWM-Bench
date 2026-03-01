@@ -6,9 +6,26 @@ Confidence-based MAS v2 테스트: run_step1 업데이트 + select_agents_by_sco
 - step>0: confidence 기반 LLM 선택
 - 벤치마크당 10개, 스코어 맵 히스토리 기록, 최종 정확도 출력
 
-Usage:
+Usage (CLI):
     python test_confidence_mas_v2.py --benchmark cvbench --max_samples 10
     python test_confidence_mas_v2.py --benchmark 3dsrbench --max_samples 10
+
+Usage (Jupyter):
+    import sys
+    sys.path.insert(0, "/home/jovyan/CY/Spatial_MAS")  # 프로젝트 경로
+
+    from run_eval_mas_v2 import build_runners
+    from test_confidence_mas_v2 import run_confidence_mas_test
+
+    head_gen, spec_gen, reason_gen = build_runners(specialist_device="cuda")
+    results = run_confidence_mas_test(
+        head_gen, spec_gen, reason_gen,
+        benchmark="cvbench",
+        max_samples=10,
+    )
+    print(f"Accuracy: {results['correct']}/{results['total']} = {100*results['accuracy']:.1f}%")
+    # results["score_history"]  # 매 step scores 딕셔너리
+    # results["final_map"]      # 최종 스코어 맵
 """
 import argparse
 import copy
