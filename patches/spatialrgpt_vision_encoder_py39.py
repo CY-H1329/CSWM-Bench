@@ -9,7 +9,6 @@ from abc import abstractmethod
 import torch
 import torch.nn as nn
 from accelerate.hooks import add_hook_to_module
-from s2wrapper import forward as multiscale_forward
 from transformers import AutoConfig, PreTrainedModel
 from transformers.image_processing_utils import BaseImageProcessor
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
@@ -180,6 +179,7 @@ class VisionTowerS2(VisionTower):
 
     @torch.no_grad()
     def forward(self, images):
+        from s2wrapper import forward as multiscale_forward
         if type(images) is list:
             image_features = []
             for image in images:
