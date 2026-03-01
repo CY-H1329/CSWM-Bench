@@ -3,12 +3,11 @@ Sa2VA inference (ByteDance/Sa2VA-4B).
 Uses model.predict_forward() for image chat.
 Requires: transformers, trust_remote_code=True
 
-Note: Sa2VA model loading triggers PEFT -> bitsandbytes. On servers with
-CUDA 12.4 (or when libbitsandbytes_cuda124.so is missing), we mock
-bitsandbytes so PEFT can load. Sa2VA inference does NOT use bitsandbytes.
+Note: Sa2VA loading triggers PEFT -> bitsandbytes. When bitsandbytes CUDA
+fails (e.g. CUDA 12.4), we mock it so PEFT can load. Sa2VA inference does
+not use bitsandbytes.
 """
 import importlib.util
-import os
 import sys
 import types
 import warnings
@@ -21,34 +20,13 @@ from transformers.modeling_utils import PreTrainedModel
 
 
 def _mock_bitsandbytes_for_peft():
-    """Mock bitsandbytes so PEFT can load when bitsandbytes CUDA is broken (e.g. CUDA 12.4).
-    Sa2VA inference does not use bitsandbytes; it's only a transitive dep from PEFT.
-    Uses types.ModuleType with __spec__ so importlib.util.find_spec() succeeds."""
+    """Mock bitsandbytes when CUDA lib not pre-compiled (e.g. CUDA 12.4).
+    PEFT checks via importlib.util.find_spec, so we need __spec__ set."""
     if "bitsandbytes" in sys.modules:
-        return  # Already loaded (or mocked)
+        return
     fake = types.ModuleType("bitsandbytes")
     fake.__spec__ = importlib.util.spec_from_loader("bitsandbytes", loader=None, origin="mock")
     sys.modules["bitsandbytes"] = fake
-
-
-def _setup_cuda_library_path():
-    """Try to fix bitsandbytes CUDA error by adding common CUDA lib paths to LD_LIBRARY_PATH.
-    Sa2VA loading triggers PEFT->bitsandbytes; bitsandbytes needs libcudart.so in path."""
-    current = os.environ.get("LD_LIBRARY_PATH", "")
-    candidates = [
-        "/usr/local/cuda/lib64",
-        "/usr/local/cuda/lib",
-        "/usr/lib/x86_64-linux-gnu",
-        "/opt/conda/lib",
-        os.path.join(os.environ.get("CONDA_PREFIX", ""), "lib") if os.environ.get("CONDA_PREFIX") else None,
-        os.path.join(os.path.dirname(torch.__file__), "lib") if hasattr(torch, "__file__") else None,
-    ]
-    for path in candidates:
-        if path and os.path.isdir(path):
-            lib = os.path.join(path, "libcudart.so")
-            if os.path.exists(lib) and path not in current:
-                os.environ["LD_LIBRARY_PATH"] = (current + ":" + path) if current else path
-                return
 
 
 def _patch_tied_weights_for_sa2va():
@@ -98,7 +76,6 @@ class Sa2VARunner:
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model_id = model_id
 
-        _setup_cuda_library_path()
         _mock_bitsandbytes_for_peft()
 
         load_kwargs = dict(
