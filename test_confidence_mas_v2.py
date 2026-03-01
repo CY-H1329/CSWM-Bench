@@ -50,8 +50,8 @@ from src2.agents.mas_v2.confidence_score_map import (
     ConfidenceScoreMapUpdater,
 )
 
-# 기본: 5개 specialist 모두 사용
-# 로드 실패 시 specialist_llms로 축소 가능 (예: ["qwen3_4b", "llava4d", "spatial_reasoner"])
+# 기본: 3개 specialist (qwen3_4b, llava4d, spatial_reasoner) — Sa2VA/SpatialRGPT 제외
+# 5개 사용 시 specialist_llms=SPECIALIST_LLMS
 from src2.benchmarks.loaders import (
     load_benchmark,
     get_benchmark_image,
@@ -96,7 +96,7 @@ def run_confidence_mas_test(
     rng = random.Random(seed)
     rng.shuffle(samples)
 
-    llms = specialist_llms if specialist_llms is not None else list(SPECIALIST_LLMS)
+    llms = specialist_llms if specialist_llms is not None else ["qwen3_4b", "llava4d", "spatial_reasoner"]
     score_map = ConfidenceScoreMap(categories=ALL_CATEGORIES, llms=llms, seed=seed)
     updater = ConfidenceScoreMapUpdater()
 
