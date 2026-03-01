@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 from spatial_aomas.confidence_score import (
     select_agents_by_score,
     run_step1,
+    run_step2,
     ROLES_MASV2,
 )
 
@@ -79,6 +80,47 @@ class ConfidenceScoreMapUpdater:
             category=category,
             agent_roles=agent_roles,
             kappa=self.kappa,
+        )
+        _scores_to_score_map(updated, score_map)
+
+
+class ConfidenceScoreMapUpdaterStep2:
+    """run_step2 기반 업데이터. N_c(카테고리별 샘플 수) 추적, T로 스케일 조절."""
+
+    def __init__(self, kappa: float = 1.0, T: float = 10.0):
+        self.kappa = kappa
+        self.T = T
+        self._N_c: Dict[str, int] = {}  # category -> 누적 샘플 수
+
+    def update(
+        self,
+        score_map: ScoreMap,
+        category: str,
+        assignments: List[Tuple[str, str]],
+        agent_results: List[Dict],
+        final_answer: str,
+        gt: str,
+        step: int,
+        total_steps: int,
+    ) -> None:
+        """run_step2로 점수 갱신 (스케일된 보상 R̃ 사용)."""
+        self._N_c[category] = self._N_c.get(category, 0) + 1
+        N_c = self._N_c[category]
+
+        agent_answers = {r["llm_name"]: r.get("answer", "") for r in agent_results}
+        agent_roles = {llm: role for role, llm in assignments}
+
+        scores = _score_map_to_scores(score_map)
+        updated = run_step2(
+            scores=scores,
+            agent_answers=agent_answers,
+            final_answer=final_answer,
+            gt_answer=gt,
+            category=category,
+            agent_roles=agent_roles,
+            N_c=N_c,
+            kappa=self.kappa,
+            T=self.T,
         )
         _scores_to_score_map(updated, score_map)
 
