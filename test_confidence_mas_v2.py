@@ -29,6 +29,9 @@ Usage (Jupyter):
     print(f"Accuracy: {results['correct']}/{results['total']} = {100*results['accuracy']:.1f}%")
     # results["score_history"]  # 매 step scores 딕셔너리
     # results["final_map"]      # 최종 스코어 맵
+
+    5개 specialist 사용. 로드 실패 시 specialist_llms로 축소.
+    docs/CONFIDENCE_MAS_SERVER_SETUP.md 참고.
 """
 import argparse
 import copy
@@ -47,9 +50,8 @@ from src2.agents.mas_v2.confidence_score_map import (
     ConfidenceScoreMapUpdater,
 )
 
-# Sa2VA 제외 (bitsandbytes/peft metaclass 충돌)
-# SpatialRGPT 제외 (SPATIALRGPT_PATH 별도 설정 필요)
-SPECIALIST_LLMS_MINIMAL = ["qwen3_4b", "llava4d", "spatial_reasoner"]
+# 기본: 5개 specialist 모두 사용
+# 로드 실패 시 specialist_llms로 축소 가능 (예: ["qwen3_4b", "llava4d", "spatial_reasoner"])
 from src2.benchmarks.loaders import (
     load_benchmark,
     get_benchmark_image,
@@ -94,7 +96,7 @@ def run_confidence_mas_test(
     rng = random.Random(seed)
     rng.shuffle(samples)
 
-    llms = specialist_llms if specialist_llms is not None else SPECIALIST_LLMS_MINIMAL
+    llms = specialist_llms if specialist_llms is not None else list(SPECIALIST_LLMS)
     score_map = ConfidenceScoreMap(categories=ALL_CATEGORIES, llms=llms, seed=seed)
     updater = ConfidenceScoreMapUpdater()
 
