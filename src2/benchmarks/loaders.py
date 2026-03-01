@@ -105,7 +105,7 @@ def load_benchmark(
     Load a benchmark dataset.
 
     When use_frozen=True (default): loads from data/frozen_benchmarks/ for reproducible
-    paper experiments. Ignores max_samples/max_per_category - returns exact frozen set.
+    paper experiments. Applies max_samples/max_per_category if provided.
 
     When use_frozen=False: loads from HuggingFace cache and applies sampling.
 
@@ -117,25 +117,62 @@ def load_benchmark(
     if benchmark not in BENCHMARK_CONFIGS:
         raise ValueError(f"Unknown benchmark: {benchmark}. Choose from {list(BENCHMARK_CONFIGS.keys())}")
 
+    ds = None
     # Try frozen benchmark first
     if use_frozen and benchmark in FROZEN_PATHS:
         frozen_name = FROZEN_PATHS[benchmark]
         frozen_path = FROZEN_BENCHMARK_DIR / frozen_name
         if frozen_path.exists() and (frozen_path / "dataset_info.json").exists():
-            from datasets import load_from_disk
-            ds = load_from_disk(str(frozen_path))
-            return ds
+            try:
+                from datasets import load_from_disk
+                ds = load_from_disk(str(frozen_path))
+            except (TypeError, Exception) as e:
+                # datasets version mismatch (e.g. srgpt env vs spatial_reasoning)
+                import warnings
+                warnings.warn(
+                    f"load_from_disk failed ({e}). Falling back to HuggingFace. "
+                    "For reproducible frozen set, use matching datasets version."
+                )
 
-    # Fallback: load from HuggingFace
+    # Fallback: load from HuggingFace if frozen didn't succeed
     cfg = BENCHMARK_CONFIGS[benchmark]
     name = cfg["name"]
     split = cfg["split"]
     subset = cfg.get("subset")
 
-    if subset:
-        ds = load_dataset(name, subset, split=split)
-    else:
-        ds = load_dataset(name, split=split)
+    if ds is None:
+        load_kw = {"split": split}
+
+        def _try_load():
+            if subset:
+                return load_dataset(name, subset, **load_kw)
+            return load_dataset(name, **load_kw)
+
+        try:
+            ds = _try_load()
+        except (TypeError, Exception) as err1:
+            err_str = str(err1)
+            if "dataclass" in err_str or "must be called" in err_str:
+                # datasets 2.16.1 cannot parse CV-Bench metadata from HF (created with newer datasets).
+                # Fallback: load parquet directly (infers schema from file, bypasses dataset_info.json).
+                if benchmark == "cvbench" and name == "nyu-visionx/CV-Bench":
+                    try:
+                        base = "https://huggingface.co/datasets/nyu-visionx/CV-Bench/resolve/main"
+                        data_files = {"test": [f"{base}/test_2d.parquet", f"{base}/test_3d.parquet"]}
+                        ds = load_dataset("parquet", data_files=data_files, split="test")
+                    except Exception as parquet_err:
+                        raise RuntimeError(
+                            f"CV-Bench load failed: standard ({err1}), parquet fallback ({parquet_err}). "
+                            "Try: pip install datasets>=2.18 (may conflict with vila)"
+                        ) from parquet_err
+                else:
+                    raise
+            else:
+                raise
+
+    if ds is None:
+        raise RuntimeError("load_benchmark failed")
+
 
     rng = random.Random(seed)
     cat_key = cfg.get("category_key")
