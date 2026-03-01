@@ -3,20 +3,38 @@ Sa2VA inference (ByteDance/Sa2VA-4B).
 Uses model.predict_forward() for image chat.
 Requires: transformers, trust_remote_code=True
 
-Note: Sa2VA model loading triggers PEFT -> bitsandbytes. If you get
-"CUDA Setup failed despite GPU being available", set LD_LIBRARY_PATH
-before importing (e.g. in Jupyter first cell):
-  import os
-  os.environ["LD_LIBRARY_PATH"] = "/usr/local/cuda/lib64:" + os.environ.get("LD_LIBRARY_PATH", "")
-  # Then restart kernel and run your code
+Note: Sa2VA model loading triggers PEFT -> bitsandbytes. On servers with
+CUDA 12.4 (or when libbitsandbytes_cuda124.so is missing), we mock
+bitsandbytes so PEFT can load. Sa2VA inference does NOT use bitsandbytes.
 """
 import os
+import sys
 import warnings
 from typing import Optional
+from unittest.mock import MagicMock
+
 from PIL import Image
 import torch
 from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_utils import PreTrainedModel
+
+
+def _mock_bitsandbytes_for_peft():
+    """Mock bitsandbytes so PEFT can load when bitsandbytes CUDA is broken (e.g. CUDA 12.4).
+    Sa2VA inference does not use bitsandbytes; it's only a transitive dep from PEFT."""
+    if "bitsandbytes" in sys.modules:
+        return  # Already loaded (or mocked)
+    mock = MagicMock()
+    sys.modules["bitsandbytes"] = mock
+    sys.modules["bitsandbytes.cuda_setup"] = MagicMock()
+    sys.modules["bitsandbytes.cextension"] = MagicMock()
+    sys.modules["bitsandbytes.utils"] = MagicMock()
+    sys.modules["bitsandbytes.optim"] = MagicMock()
+    sys.modules["bitsandbytes.research"] = MagicMock()
+    sys.modules["bitsandbytes.research.nn"] = MagicMock()
+    sys.modules["bitsandbytes.research.nn.modules"] = MagicMock()
+    sys.modules["bitsandbytes.autograd"] = MagicMock()
+    sys.modules["bitsandbytes.autograd._functions"] = MagicMock()
 
 
 def _setup_cuda_library_path():
@@ -87,6 +105,7 @@ class Sa2VARunner:
         self.model_id = model_id
 
         _setup_cuda_library_path()
+        _mock_bitsandbytes_for_peft()
 
         load_kwargs = dict(
             **kwargs,
