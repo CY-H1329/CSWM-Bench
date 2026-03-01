@@ -14,10 +14,9 @@ Usage (Jupyter):
     import sys
     sys.path.insert(0, "/home/jovyan/CY/Spatial_MAS")  # 프로젝트 경로
 
-    from run_eval_mas_v2 import build_runners
-    from test_confidence_mas_v2 import run_confidence_mas_test
+    from test_confidence_mas_v2 import run_confidence_mas_test, build_runners_for_confidence
 
-    head_gen, spec_gen, reason_gen = build_runners(
+    head_gen, spec_gen, reason_gen = build_runners_for_confidence(
         specialist_device="cuda",
         use_vlm_reasoning=True,  # Qwen3-VL-8B Final Reasoning (로컬, API 불필요)
     )
@@ -51,13 +50,24 @@ from src2.agents.mas_v2.confidence_score_map import (
 )
 
 # 기본: 3개 specialist (qwen3_4b, llava4d, spatial_reasoner) — Sa2VA/SpatialRGPT 제외
-# 5개 사용 시 specialist_llms=SPECIALIST_LLMS
+SPECIALIST_LLMS_3 = ["qwen3_4b", "llava4d", "spatial_reasoner"]
+
 from src2.benchmarks.loaders import (
     load_benchmark,
     get_benchmark_image,
     get_benchmark_prompt,
     get_benchmark_answer,
 )
+
+
+def build_runners_for_confidence(
+    specialist_llms: Optional[List[str]] = None,
+    **kwargs,
+):
+    """build_runners + specialist_whitelist (3개 기본). Jupyter에서 사용."""
+    from run_eval_mas_v2 import build_runners
+    llms = specialist_llms or SPECIALIST_LLMS_3
+    return build_runners(specialist_whitelist=llms, **kwargs)
 
 
 def _prefetch_sample(ex, benchmark, i):
@@ -96,7 +106,7 @@ def run_confidence_mas_test(
     rng = random.Random(seed)
     rng.shuffle(samples)
 
-    llms = specialist_llms if specialist_llms is not None else ["qwen3_4b", "llava4d", "spatial_reasoner"]
+    llms = specialist_llms if specialist_llms is not None else SPECIALIST_LLMS_3
     score_map = ConfidenceScoreMap(categories=ALL_CATEGORIES, llms=llms, seed=seed)
     updater = ConfidenceScoreMapUpdater()
 
@@ -195,8 +205,7 @@ if __name__ == "__main__":
     parser.add_argument("--device", type=str, default="cuda")
     args = parser.parse_args()
 
-    from run_eval_mas_v2 import build_runners
-    head_gen, spec_gen, reason_gen = build_runners(
+    head_gen, spec_gen, reason_gen = build_runners_for_confidence(
         specialist_device=args.device,
         use_vlm_reasoning=True,  # Qwen3-VL-8B 로컬 (API 불필요)
     )
