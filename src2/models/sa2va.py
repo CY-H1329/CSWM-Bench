@@ -12,6 +12,7 @@ import sys
 import types
 import warnings
 from typing import Optional
+from unittest.mock import MagicMock
 
 from PIL import Image
 import torch
@@ -21,11 +22,18 @@ from transformers.modeling_utils import PreTrainedModel
 
 def _mock_bitsandbytes_for_peft():
     """Mock bitsandbytes when CUDA lib not pre-compiled (e.g. CUDA 12.4).
-    PEFT checks via importlib.util.find_spec, so we need __spec__ set."""
+    PEFT checks via importlib.util.find_spec and may access bitsandbytes.nn, .optim, etc."""
     if "bitsandbytes" in sys.modules:
         return
     fake = types.ModuleType("bitsandbytes")
     fake.__spec__ = importlib.util.spec_from_loader("bitsandbytes", loader=None, origin="mock")
+    # PEFT / Sa2VA model code may access these; MagicMock returns mock for any sub-attr
+    fake.nn = MagicMock()
+    fake.optim = MagicMock()
+    fake.cuda_setup = MagicMock()
+    fake.cextension = MagicMock()
+    fake.utils = MagicMock()
+    fake.research = MagicMock()
     sys.modules["bitsandbytes"] = fake
 
 
