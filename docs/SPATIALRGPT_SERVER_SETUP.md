@@ -15,7 +15,17 @@ cd ~/CY  # 또는 원하는 경로
 git clone https://github.com/AnjieCheng/SpatialRGPT
 ```
 
-## 2. SpatialRGPT 패치 적용 (device_map 제거)
+## 2. SpatialRGPT 패치 적용
+
+### 2a. Python 3.9 호환 (vision_encoder.py)
+
+서버가 Python 3.9이면 `match` 문법 오류가 발생합니다. Spatial_MAS에 포함된 패치로 교체하세요:
+
+```bash
+cp ~/CY/Spatial_MAS/patches/spatialrgpt_vision_encoder_py39.py $SPATIALRGPT_PATH/llava/model/multimodal_encoder/vision_encoder.py
+```
+
+### 2b. device_map 제거 (builder.py)
 
 Spatial_MAS와 함께 사용하려면 SpatialRGPT의 `llava/model/builder.py`를 수정해야 합니다.
 
