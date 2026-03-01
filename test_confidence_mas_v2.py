@@ -17,7 +17,10 @@ Usage (Jupyter):
     from run_eval_mas_v2 import build_runners
     from test_confidence_mas_v2 import run_confidence_mas_test
 
-    head_gen, spec_gen, reason_gen = build_runners(specialist_device="cuda")
+    head_gen, spec_gen, reason_gen = build_runners(
+        specialist_device="cuda",
+        use_vlm_reasoning=True,  # Qwen3-VL-8B Final Reasoning (로컬, API 불필요)
+    )
     results = run_confidence_mas_test(
         head_gen, spec_gen, reason_gen,
         benchmark="cvbench",
@@ -69,7 +72,7 @@ def run_confidence_mas_test(
     benchmark: str = "cvbench",
     max_samples: int = 10,
     seed: int = 42,
-    use_vlm_reasoning: bool = False,
+    use_vlm_reasoning: bool = True,
 ):
     """
     Confidence 기반 MAS v2 실행.
@@ -183,7 +186,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     from run_eval_mas_v2 import build_runners
-    head_gen, spec_gen, reason_gen = build_runners(specialist_device=args.device)
+    head_gen, spec_gen, reason_gen = build_runners(
+        specialist_device=args.device,
+        use_vlm_reasoning=True,  # Qwen3-VL-8B 로컬 (API 불필요)
+    )
 
     results = run_confidence_mas_test(
         head_gen, spec_gen, reason_gen,
