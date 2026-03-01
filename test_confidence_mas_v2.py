@@ -37,14 +37,18 @@ import random
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src2.agents.mas_v2 import ALL_CATEGORIES, run_step
+from src2.agents.mas_v2 import ALL_CATEGORIES, SPECIALIST_LLMS, run_step
 from src2.agents.mas_v2.confidence_score_map import (
     ConfidenceScoreMap,
     ConfidenceScoreMapUpdater,
 )
+
+# Sa2VA 제외 (bitsandbytes/peft metaclass 충돌 시)
+SPECIALIST_LLMS_NO_SA2VA = [m for m in SPECIALIST_LLMS if m != "sa2va"]
 from src2.benchmarks.loaders import (
     load_benchmark,
     get_benchmark_image,
@@ -73,6 +77,7 @@ def run_confidence_mas_test(
     max_samples: int = 10,
     seed: int = 42,
     use_vlm_reasoning: bool = True,
+    specialist_llms: Optional[List[str]] = None,
 ):
     """
     Confidence 기반 MAS v2 실행.
@@ -88,7 +93,8 @@ def run_confidence_mas_test(
     rng = random.Random(seed)
     rng.shuffle(samples)
 
-    score_map = ConfidenceScoreMap(categories=ALL_CATEGORIES, seed=seed)
+    llms = specialist_llms if specialist_llms is not None else SPECIALIST_LLMS_NO_SA2VA
+    score_map = ConfidenceScoreMap(categories=ALL_CATEGORIES, llms=llms, seed=seed)
     updater = ConfidenceScoreMapUpdater()
 
     score_history = []
@@ -98,6 +104,7 @@ def run_confidence_mas_test(
 
     print(f"Confidence MAS v2 — {benchmark.upper()} (n={len(samples)})")
     print(f"  step=0: qwen3_4b 고정, step>0: run_step1 기반 선택")
+    print(f"  specialists: {llms}")
     print()
 
     for step, s in enumerate(samples):
