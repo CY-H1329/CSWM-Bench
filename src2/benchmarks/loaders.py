@@ -140,10 +140,23 @@ def load_benchmark(
     split = cfg["split"]
     subset = cfg.get("subset")
 
-    if subset:
-        ds = load_dataset(name, subset, split=split)
-    else:
-        ds = load_dataset(name, split=split)
+    # Use force_redownload when cache format is incompatible (e.g. datasets version mismatch)
+    load_kw = {"split": split}
+    try:
+        if subset:
+            ds = load_dataset(name, subset, **load_kw)
+        else:
+            ds = load_dataset(name, **load_kw)
+    except (TypeError, Exception) as cache_err:
+        if "dataclass" in str(cache_err) or "must be called" in str(cache_err):
+            load_kw["download_mode"] = "force_redownload"
+            if subset:
+                ds = load_dataset(name, subset, **load_kw)
+            else:
+                ds = load_dataset(name, **load_kw)
+        else:
+            raise
+
 
     rng = random.Random(seed)
     cat_key = cfg.get("category_key")
