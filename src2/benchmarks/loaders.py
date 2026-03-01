@@ -140,35 +140,38 @@ def load_benchmark(
     split = cfg["split"]
     subset = cfg.get("subset")
 
-    # Use force_redownload when cache format is incompatible (e.g. datasets version mismatch)
     load_kw = {"split": split}
-    try:
+    ds = None
+
+    def _try_load():
         if subset:
-            ds = load_dataset(name, subset, **load_kw)
-        else:
-            ds = load_dataset(name, **load_kw)
-    except (TypeError, Exception) as cache_err:
-        err_str = str(cache_err)
+            return load_dataset(name, subset, **load_kw)
+        return load_dataset(name, **load_kw)
+
+    try:
+        ds = _try_load()
+    except (TypeError, Exception) as err1:
+        err_str = str(err1)
         if "dataclass" in err_str or "must be called" in err_str:
-            # Cache format incompatible: clear dataset cache and force fresh download
-            import shutil
-            hf_home = Path(os.environ.get("HF_HOME", str(Path.home() / ".cache" / "huggingface")))
-            hub_dir = hf_home / "hub"
-            cache_name = "datasets--" + name.replace("/", "--")
-            if hub_dir.exists():
-                target = hub_dir / cache_name
-                if target.exists():
-                    try:
-                        shutil.rmtree(target)
-                    except Exception:
-                        pass
-            load_kw["download_mode"] = "force_redownload"
-            if subset:
-                ds = load_dataset(name, subset, **load_kw)
+            # datasets 2.16.1 cannot parse CV-Bench metadata from HF (created with newer datasets).
+            # Fallback: load parquet directly (infers schema from file, bypasses dataset_info.json).
+            if benchmark == "cvbench" and name == "nyu-visionx/CV-Bench":
+                try:
+                    base = "https://huggingface.co/datasets/nyu-visionx/CV-Bench/resolve/main"
+                    data_files = {"test": [f"{base}/test_2d.parquet", f"{base}/test_3d.parquet"]}
+                    ds = load_dataset("parquet", data_files=data_files, split="test")
+                except Exception as parquet_err:
+                    raise RuntimeError(
+                        f"CV-Bench load failed: standard ({err1}), parquet fallback ({parquet_err}). "
+                        "Try: pip install datasets>=2.18 (may conflict with vila)"
+                    ) from parquet_err
             else:
-                ds = load_dataset(name, **load_kw)
+                raise
         else:
             raise
+
+    if ds is None:
+        raise RuntimeError("load_benchmark failed")
 
 
     rng = random.Random(seed)

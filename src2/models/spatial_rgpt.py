@@ -139,7 +139,7 @@ class SpatialRGPTRunner(BaseVLM):
             [image_rgb], self.image_processor, self.model.config
         ).to(self.model.device, dtype=torch.float16)
 
-        if self.model.config.get("enable_depth", False):
+        if getattr(self.model.config, "enable_depth", False):
             depth_img = _make_placeholder_depth(image_rgb)
             depths_tensor = self._process_images(
                 [depth_img], self.image_processor, self.model.config
