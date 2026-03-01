@@ -1,0 +1,23 @@
+{
+  "benchmark": "3dsrbench",
+  "split": "train",
+  "n_samples": 300,
+  "excludes": "3dsrbench_500 (frozen)",
+  "seed": 42,
+  "source": "ccvl/3DSRBench",
+  "subset": "benchmark",
+  "per_category": {
+    "height_higher": 25,
+    "location_above": 25,
+    "location_closer_to_camera": 25,
+    "location_next_to": 25,
+    "orientation_in_front_of": 25,
+    "orientation_on_the_left": 25,
+    "orientation_viewpoint": 25,
+    "multi_object_closer_to": 25,
+    "multi_object_facing": 25,
+    "multi_object_parallel": 25,
+    "multi_object_same_direction": 25,
+    "multi_object_viewpoint_towards_object": 25
+  }
+}
