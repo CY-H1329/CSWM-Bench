@@ -1,0 +1,9 @@
+{
+  "frozen_benchmarks": "DO NOT MODIFY - Used for all paper experiments",
+  "seed": 42,
+  "paths": {
+    "cvbench": "cvbench_400",
+    "3dsrbench": "3dsrbench_500",
+    "stvqa": "stvqa_full"
+  }
+}

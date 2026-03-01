@@ -1,0 +1,14 @@
+{
+  "benchmark": "cvbench",
+  "n_samples": 400,
+  "n_per_category": 100,
+  "categories": [
+    "Count",
+    "Relation",
+    "Depth",
+    "Distance"
+  ],
+  "seed": 42,
+  "source": "nyu-visionx/CV-Bench",
+  "split": "test"
+}

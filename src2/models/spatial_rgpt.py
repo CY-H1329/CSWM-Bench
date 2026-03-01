@@ -51,11 +51,13 @@ def _load_via_spatialrgpt_repo(model_id: str, device: str, **kwargs):
 
     from llava.model.builder import load_pretrained_model
 
-    model_name = "vila-siglip-llama-3b"
+    # vila-siglip-llama3-8b for 8B model; vila-siglip-llama-3b for 3B
+    model_name = "vila-siglip-llama3-8b" if "8b" in model_id.lower() or "8B" in model_id else "vila-siglip-llama-3b"
+    # device_map=None: run without accelerate (load on CPU, then .to(device))
     tokenizer, model, image_processor, context_len = load_pretrained_model(
         model_id,
         model_name,
-        device_map="auto" if device == "cuda" else None,
+        device_map=None,
         device=device,
         **kwargs,
     )

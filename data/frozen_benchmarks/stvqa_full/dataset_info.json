@@ -1,0 +1,110 @@
+{
+  "builder_name": "parquet",
+  "citation": "",
+  "config_name": "default",
+  "dataset_name": "stvqa-7_k",
+  "dataset_size": 349810086,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/hunarbatra/STVQA-7K@d8b57fa5faae40d7e8582357e78306decf821eea/data/train-00000-of-00001.parquet": {
+      "num_bytes": 293707447,
+      "checksum": null
+    },
+    "hf://datasets/hunarbatra/STVQA-7K@d8b57fa5faae40d7e8582357e78306decf821eea/data/val-00000-of-00001.parquet": {
+      "num_bytes": 27759539,
+      "checksum": null
+    }
+  },
+  "download_size": 321466986,
+  "features": {
+    "image_id": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "images": {
+      "_type": "Image"
+    },
+    "problem": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "question_only": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "answer_only": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "answer_text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "answer_text_only": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "answer_option_text": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "answer_option_text_only": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "category": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "level": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "question_with_options": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "rating": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "is_correct": {
+      "dtype": "int64",
+      "_type": "Value"
+    },
+    "options": {
+      "feature": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "_type": "List"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 671277072,
+  "splits": {
+    "train": {
+      "name": "train",
+      "num_bytes": 319478533,
+      "num_examples": 6895,
+      "dataset_name": "stvqa-7_k"
+    },
+    "val": {
+      "name": "val",
+      "num_bytes": 30331553,
+      "num_examples": 692,
+      "dataset_name": "stvqa-7_k"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}
