@@ -122,9 +122,17 @@ def load_benchmark(
         frozen_name = FROZEN_PATHS[benchmark]
         frozen_path = FROZEN_BENCHMARK_DIR / frozen_name
         if frozen_path.exists() and (frozen_path / "dataset_info.json").exists():
-            from datasets import load_from_disk
-            ds = load_from_disk(str(frozen_path))
-            return ds
+            try:
+                from datasets import load_from_disk
+                ds = load_from_disk(str(frozen_path))
+                return ds
+            except (TypeError, Exception) as e:
+                # datasets version mismatch (e.g. srgpt env vs spatial_reasoning)
+                import warnings
+                warnings.warn(
+                    f"load_from_disk failed ({e}). Falling back to HuggingFace. "
+                    "For reproducible frozen set, use matching datasets version."
+                )
 
     # Fallback: load from HuggingFace
     cfg = BENCHMARK_CONFIGS[benchmark]
