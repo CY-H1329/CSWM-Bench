@@ -6,9 +6,32 @@ Confidence-based MAS v2 테스트: run_step1 업데이트 + select_agents_by_sco
 - step>0: confidence 기반 LLM 선택
 - 벤치마크당 10개, 스코어 맵 히스토리 기록, 최종 정확도 출력
 
-Usage:
+Usage (CLI):
     python test_confidence_mas_v2.py --benchmark cvbench --max_samples 10
     python test_confidence_mas_v2.py --benchmark 3dsrbench --max_samples 10
+
+Usage (Jupyter):
+    import sys
+    sys.path.insert(0, "/home/jovyan/CY/Spatial_MAS")  # 프로젝트 경로
+
+    from run_eval_mas_v2 import build_runners
+    from test_confidence_mas_v2 import run_confidence_mas_test
+
+    head_gen, spec_gen, reason_gen = build_runners(
+        specialist_device="cuda",
+        use_vlm_reasoning=True,  # Qwen3-VL-8B Final Reasoning (로컬, API 불필요)
+    )
+    results = run_confidence_mas_test(
+        head_gen, spec_gen, reason_gen,
+        benchmark="cvbench",
+        max_samples=10,
+    )
+    print(f"Accuracy: {results['correct']}/{results['total']} = {100*results['accuracy']:.1f}%")
+    # results["score_history"]  # 매 step scores 딕셔너리
+    # results["final_map"]      # 최종 스코어 맵
+
+    5개 specialist 사용. 로드 실패 시 specialist_llms로 축소.
+    docs/CONFIDENCE_MAS_SERVER_SETUP.md 참고.
 """
 import argparse
 import copy
@@ -17,14 +40,18 @@ import random
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src2.agents.mas_v2 import ALL_CATEGORIES, run_step
+from src2.agents.mas_v2 import ALL_CATEGORIES, SPECIALIST_LLMS, run_step
 from src2.agents.mas_v2.confidence_score_map import (
     ConfidenceScoreMap,
     ConfidenceScoreMapUpdater,
 )
+
+# 기본: 3개 specialist (qwen3_4b, llava4d, spatial_reasoner) — Sa2VA/SpatialRGPT 제외
+# 5개 사용 시 specialist_llms=SPECIALIST_LLMS
 from src2.benchmarks.loaders import (
     load_benchmark,
     get_benchmark_image,
@@ -52,7 +79,8 @@ def run_confidence_mas_test(
     benchmark: str = "cvbench",
     max_samples: int = 10,
     seed: int = 42,
-    use_vlm_reasoning: bool = False,
+    use_vlm_reasoning: bool = True,
+    specialist_llms: Optional[List[str]] = None,
 ):
     """
     Confidence 기반 MAS v2 실행.
@@ -68,7 +96,8 @@ def run_confidence_mas_test(
     rng = random.Random(seed)
     rng.shuffle(samples)
 
-    score_map = ConfidenceScoreMap(categories=ALL_CATEGORIES, seed=seed)
+    llms = specialist_llms if specialist_llms is not None else ["qwen3_4b", "llava4d", "spatial_reasoner"]
+    score_map = ConfidenceScoreMap(categories=ALL_CATEGORIES, llms=llms, seed=seed)
     updater = ConfidenceScoreMapUpdater()
 
     score_history = []
@@ -78,6 +107,7 @@ def run_confidence_mas_test(
 
     print(f"Confidence MAS v2 — {benchmark.upper()} (n={len(samples)})")
     print(f"  step=0: qwen3_4b 고정, step>0: run_step1 기반 선택")
+    print(f"  specialists: {llms}")
     print()
 
     for step, s in enumerate(samples):
@@ -166,7 +196,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     from run_eval_mas_v2 import build_runners
-    head_gen, spec_gen, reason_gen = build_runners(specialist_device=args.device)
+    head_gen, spec_gen, reason_gen = build_runners(
+        specialist_device=args.device,
+        use_vlm_reasoning=True,  # Qwen3-VL-8B 로컬 (API 불필요)
+    )
 
     results = run_confidence_mas_test(
         head_gen, spec_gen, reason_gen,
