@@ -21,13 +21,17 @@ from transformers.modeling_utils import PreTrainedModel
 
 
 def _mock_bitsandbytes_for_peft():
-    """Mock bitsandbytes when CUDA lib not pre-compiled (e.g. CUDA 12.4).
-    PEFT checks via importlib.util.find_spec and may access bitsandbytes.nn, .optim, etc."""
+    """Use real bitsandbytes when available (e.g. conda spatial_reasoning).
+    Mock only when CUDA lib fails (e.g. CUDA 12.4, libbitsandbytes_cuda124.so missing)."""
     if "bitsandbytes" in sys.modules:
         return
+    try:
+        import bitsandbytes  # noqa: F401
+        return  # Real one works (e.g. conda activate spatial_reasoning)
+    except (RuntimeError, ImportError, OSError):
+        sys.modules.pop("bitsandbytes", None)  # Remove partial/failed load
     fake = types.ModuleType("bitsandbytes")
     fake.__spec__ = importlib.util.spec_from_loader("bitsandbytes", loader=None, origin="mock")
-    # PEFT / Sa2VA model code may access these; MagicMock returns mock for any sub-attr
     fake.nn = MagicMock()
     fake.optim = MagicMock()
     fake.cuda_setup = MagicMock()
