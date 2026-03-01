@@ -25,6 +25,14 @@ git clone https://github.com/AnjieCheng/SpatialRGPT
 cp ~/CY/Spatial_MAS/patches/spatialrgpt_vision_encoder_py39.py $SPATIALRGPT_PATH/llava/model/multimodal_encoder/vision_encoder.py
 ```
 
+### 2a-2. flash_attn 없이 실행 (multimodal_encoder/builder.py)
+
+SIGLIP 사용 시 `flash_attn`이 필요 없습니다. intern_encoder를 lazy import로 변경:
+
+```bash
+cp ~/CY/Spatial_MAS/patches/spatialrgpt_builder_py39.py $SPATIALRGPT_PATH/llava/model/multimodal_encoder/builder.py
+```
+
 ### 2b. device_map 제거 (builder.py)
 
 Spatial_MAS와 함께 사용하려면 SpatialRGPT의 `llava/model/builder.py`를 수정해야 합니다.
