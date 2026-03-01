@@ -33,6 +33,19 @@ SIGLIP 사용 시 `flash_attn`이 필요 없습니다. intern_encoder를 lazy im
 cp ~/CY/Spatial_MAS/patches/spatialrgpt_builder_py39.py $SPATIALRGPT_PATH/llava/model/multimodal_encoder/builder.py
 ```
 
+### 2a-3. Python 3.9 타입 힌트 (llava/train/utils.py)
+
+`str | None` 구문은 Python 3.10+ 전용입니다. Python 3.9에서는 아래로 수정:
+
+```bash
+# 방법 1: patch 적용
+cd $SPATIALRGPT_PATH && patch -p1 < ~/CY/Spatial_MAS/patches/spatialrgpt_utils_py39.patch
+
+# 방법 2: sed로 직접 수정
+sed -i 's/) -> str | None:/) -> Optional[str]:/' $SPATIALRGPT_PATH/llava/train/utils.py
+sed -i '/^from dataclasses import dataclass$/a from typing import Optional' $SPATIALRGPT_PATH/llava/train/utils.py
+```
+
 ### 2b. device_map 제거 (builder.py)
 
 Spatial_MAS와 함께 사용하려면 SpatialRGPT의 `llava/model/builder.py`를 수정해야 합니다.
