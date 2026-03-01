@@ -141,7 +141,7 @@ def load_benchmark(
     subset = cfg.get("subset")
 
     # Use force_redownload when cache format is incompatible (e.g. datasets version mismatch)
-    load_kw = {"split": split, "trust_remote_code": True}
+    load_kw = {"split": split}
     try:
         if subset:
             ds = load_dataset(name, subset, **load_kw)
