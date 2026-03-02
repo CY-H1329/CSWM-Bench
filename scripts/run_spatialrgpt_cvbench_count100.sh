@@ -2,13 +2,14 @@
 # SpatialRGPT 전문가로 Count 100 평가
 # cvbench_400 Count 카테고리 100개
 #
-# 사용법:
-#   1) 의존성 설치 (최초 1회): bash scripts/install_spatialrgpt_deps.sh
-#   2) conda activate spatial_mas   # 또는 spatial_mas_rgpt
-#   3) ./scripts/run_spatialrgpt_cvbench_count100.sh
+# 사용법 (SpatialRGPT 전용 환경):
+#   1) 환경 생성: cd SpatialRGPT && bash setup_env_srgpt.sh
+#   2) conda activate srgpt
+#   3) cd 프로젝트루트 && ./scripts/run_spatialrgpt_cvbench_count100.sh
 #
-# 또는 CONDA_ENV 지정:
-#   CONDA_ENV=spatial_mas ./scripts/run_spatialrgpt_cvbench_count100.sh
+# 또는 기존 spatial_mas 환경:
+#   conda activate spatial_mas
+#   ./scripts/run_spatialrgpt_cvbench_count100.sh
 
 set -e
 

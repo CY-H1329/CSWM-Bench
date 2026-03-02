@@ -290,6 +290,8 @@ The questions can be diverse: spatial relations (above/below, left/right), depth
 ## Specialist Agent Outputs
 {shared_memory_text}
 
+//todo: score map 각 에이전트의 task 해당되는 role score 를 보고, 클수록 신뢰도가 높다는 점을 인지하고 , 그거에 가중치를 두어서 최종 결과를 내보내게끔 프롬프팅해야함.
+
 ## Reasoning Protocol (think through each step)
 
 ### Step 1: Understand the question

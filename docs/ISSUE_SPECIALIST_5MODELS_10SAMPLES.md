@@ -331,15 +331,95 @@ python test_specialist_all_roles.py --model spatial_reasoner --max_samples 10
 
 ---
 
+## Experiment 5: Qwen3-4B
+
+**Environment**: transformers>=4.51 (Qwen3VLForConditionalGeneration)
+
+### Overall Summary
+
+| Role | CV-Bench | 3DSRBench |
+|------|----------|-----------|
+| direct_visual_heuristic | 8/9 (88.9%) | 5/10 (50.0%) |
+| explicit_3d_representation | 7/9 (77.8%) | 5/10 (50.0%) |
+| scene_graph_construction | 8/9 (88.9%) | 4/10 (40.0%) |
+
+*Note: CV-Bench evaluated 9 samples (1 skipped per run); 3DSRBench 10 samples.*
+
+### Per-Category Detail
+
+**direct_visual_heuristic — CV-Bench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| Count | 100.0% | 3/3 |
+| Distance | 100.0% | 3/3 |
+| Relation | 66.7% | 2/3 |
+
+**direct_visual_heuristic — 3DSRBench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| height_higher | 0.0% | 0/1 |
+| location_above | 66.7% | 2/3 |
+| location_closer_to_camera | 50.0% | 1/2 |
+| location_next_to | 100.0% | 1/1 |
+| multi_object_closer_to | 0.0% | 0/1 |
+| multi_object_parallel | 50.0% | 1/2 |
+
+**explicit_3d_representation — CV-Bench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| Count | 100.0% | 3/3 |
+| Distance | 66.7% | 2/3 |
+| Relation | 66.7% | 2/3 |
+
+**explicit_3d_representation — 3DSRBench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| height_higher | 0.0% | 0/1 |
+| location_above | 66.7% | 2/3 |
+| location_closer_to_camera | 50.0% | 1/2 |
+| location_next_to | 100.0% | 1/1 |
+| multi_object_closer_to | 0.0% | 0/1 |
+| multi_object_parallel | 50.0% | 1/2 |
+
+**scene_graph_construction — CV-Bench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| Count | 100.0% | 3/3 |
+| Distance | 100.0% | 3/3 |
+| Relation | 66.7% | 2/3 |
+
+**scene_graph_construction — 3DSRBench**
+| Category | Accuracy | Correct/Total |
+|----------|----------|---------------|
+| height_higher | 0.0% | 0/1 |
+| location_above | 66.7% | 2/3 |
+| location_closer_to_camera | 0.0% | 0/2 |
+| location_next_to | 100.0% | 1/1 |
+| multi_object_closer_to | 0.0% | 0/1 |
+| multi_object_parallel | 50.0% | 1/2 |
+
+### Qwen3-4B Key Insights
+
+| Observation | Implication |
+|-------------|-------------|
+| **CV-Bench 77–89%** | Qwen3-4B is strongest on CV-Bench among all 5 models. |
+| Count 100% (all roles) | Excellent counting ability on CV-Bench. |
+| Distance 100% (direct, scene_graph) | Strong distance estimation on CV-Bench. |
+| 3DSRBench 40–50% | Weaker on 3D spatial reasoning vs CV-Bench. |
+| scene_graph 3DSRBench 40% | Scene graph does not help Qwen3 on 3DSRBench. |
+| height_higher 0% | Height comparison remains challenging. |
+
+---
+
 ## Combined Summary (All 5 Models)
 
 | Model | direct_visual_heuristic | explicit_3d_representation | scene_graph_construction |
 |-------|-------------------------|----------------------------|---------------------------|
+| **Qwen3-4B** | **CV: 89%, 3D: 50%** | **CV: 78%, 3D: 50%** | **CV: 89%, 3D: 40%** |
 | Sa2VA | CV: 70%, 3D: 60% | CV: 70%, 3D: 50% | CV: 70%, 3D: 60% |
-| SpatialReasoner | CV: 70%, 3D: 60% | **CV: 80%**, 3D: 50% | CV: 60%, 3D: 60% |
+| SpatialReasoner | CV: 70%, 3D: 60% | CV: 80%, 3D: 50% | CV: 60%, 3D: 60% |
 | LLaVA4D | CV: 60%, 3D: 50% | CV: 60%, 3D: 30% | CV: 50%, 3D: 40% |
 | SpatialRGPT | CV: 50%, 3D: 60% | CV: 60%, 3D: 40% | CV: 60%, 3D: 50% |
-| Qwen3-4B | _pending_ | _pending_ | _pending_ |
 
 ---
 
@@ -353,10 +433,10 @@ python test_specialist_all_roles.py --model spatial_reasoner --max_samples 10
 | `src2/models/llava.py` | LLaVARunner (LLaVA4D: llava-v1.6-mistral-7b-hf) |
 | `src2/models/spatial_reasoner.py` | SpatialReasonerRunner |
 | `src2/models/spatial_rgpt.py` | SpatialRGPTRunner (a8cheng/SpatialRGPT-VILA1.5-8B) |
+| `src2/models/qwen3.py` | Qwen3Runner (Qwen/Qwen3-VL-4B-Instruct) |
 
 ---
 
 ## Next Steps
 
-* Complete Qwen3-4B runs
 * Create GitHub issue with full results
