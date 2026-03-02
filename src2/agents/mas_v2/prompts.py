@@ -67,8 +67,8 @@ Your ONLY job is to classify the given question into exactly ONE spatial categor
 2. If the question asks about relative position (above/below), choose a location or orientation category.
 3. If the question asks "which is closer/farther", choose a distance or depth category.
 4. If the question asks about direction or facing, choose an orientation category.
-5. If the question asks "how many", choose a counting category.
-6. When two categories seem plausible, choose the one that matches the CORE spatial relationship being asked.
+5. If the question asks "how many", choose a counting category. (Even if it mentions "on the table", "next to X"—those are context; the main ask is HOW MANY.)
+6. When two categories seem plausible: if the question asks for a NUMBER or QUANTITY (how many, count), choose counting. Otherwise, choose the one that matches the primary spatial relationship (WHERE, HOW FAR, WHICH WAY).
 
 ## Examples
 
@@ -76,7 +76,7 @@ Question: "Is the chair above the table?" → location_above
 Question: "Which object is closer to the camera?" → location_closer_to_camera
 Question: "Is the dog to the left of the cat?" → orientation_on_the_left
 Question: "Are the two cars facing the same direction?" → multi_object_same_direction
-Question: "How many people are in the scene?" → Count
+Question: "How many people are in the scene?" → counting
 Question: "Is the red box in front of the blue box?" → orientation_in_front_of
 
 ## DO NOT

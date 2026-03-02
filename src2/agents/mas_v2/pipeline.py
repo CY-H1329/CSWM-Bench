@@ -131,6 +131,7 @@ def run_step(
     shared_object_extraction: bool = True,
     use_vlm_reasoning: bool = False,
     answer_type: Optional[str] = None,
+    force_category: Optional[str] = None,
 ) -> Dict:
     """Execute one step of the MAS v2 pipeline.
 
@@ -138,15 +139,19 @@ def run_step(
     The Head Agent classifies any question into the best-fit category.
 
     answer_type: 'multiple_choice' | 'free_form'. If None, inferred from query (Options: present -> multiple_choice).
+    force_category: If set (e.g. "counting" for Count-only benchmark), skip Head Agent and use this category.
     """
     t0 = time.time()
     if answer_type is None:
         answer_type = _infer_answer_type(query)
 
-    # 1. Head Agent -> category inference (Qwen3-VL-4B, image + text)
-    head_prompt = build_head_agent_prompt(query, ALL_CATEGORIES, CATEGORY_DESCRIPTIONS)
-    head_raw = head_generate(image, head_prompt)
-    category = parse_category(head_raw, ALL_CATEGORIES)
+    # 1. Head Agent -> category inference (or use force_category)
+    if force_category and force_category in ALL_CATEGORIES:
+        category = force_category
+    else:
+        head_prompt = build_head_agent_prompt(query, ALL_CATEGORIES, CATEGORY_DESCRIPTIONS)
+        head_raw = head_generate(image, head_prompt)
+        category = parse_category(head_raw, ALL_CATEGORIES)
 
     # 2. Agent selection from score map
     assignments = score_map.select_agents(category, step)

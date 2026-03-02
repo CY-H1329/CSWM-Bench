@@ -129,10 +129,17 @@ def run_fixed_specialist_mas_test(
     total = 0
     by_category = defaultdict(lambda: {"correct": 0, "total": 0})
 
+    # Count 전용이면 Head Agent 건너뛰고 category="counting" 고정 (spatial_relation 오분류 방지)
+    force_cat = "counting" if (
+        (category_filter and "Count" in category_filter) or benchmark == "cvbench_counting_100"
+    ) else None
+
     print(f"Fixed Specialist MAS v2 — {benchmark.upper()} (n={len(samples)})")
     print(f"  specialist: {specialist} (3 roles 모두 고정)")
     if category_filter:
         print(f"  category_filter: {category_filter} (해당 카테고리만)")
+    if force_cat:
+        print(f"  force_category: {force_cat} (Head Agent 생략)")
     print(f"  trust/confidence: 없음")
     print()
 
@@ -145,6 +152,7 @@ def run_fixed_specialist_mas_test(
             total_steps=len(samples),
             score_map=score_map,
             answer_type=s.get("answer_type"),
+            force_category=force_cat,
             head_generate=head_generate,
             specialist_generate=specialist_generate,
             reasoning_generate=reasoning_generate,
