@@ -11,6 +11,7 @@ SPECIALIST_LLMS = [
     "sa2va",
     "llava4d",
     "spatial_rgpt",
+    "spaceom",
     "spatial_reasoner",
 ]
 

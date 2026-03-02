@@ -11,7 +11,7 @@ import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from PIL import Image
 import requests
 
@@ -138,6 +138,34 @@ def load_benchmark(
         indices.sort()
         ds = ds.select(indices)
 
+    return ds
+
+
+def load_benchmark_from_dataset(
+    benchmark: str,
+    dataset_subdir: str,
+    project_root: Optional[str] = None,
+    max_samples: Optional[int] = None,
+    seed: int = 42,
+):
+    """
+    Load benchmark from local data/dataset/<dataset_subdir> (e.g. 3dsrbench_train_300).
+    Uses load_from_disk for datasets prepared by scripts/prepare_train_datasets.py.
+    """
+    root = Path(project_root) if project_root else Path(__file__).resolve().parents[2]
+    dataset_path = root / "data" / "dataset" / dataset_subdir
+    if not dataset_path.exists():
+        raise FileNotFoundError(
+            f"Dataset not found: {dataset_path}\n"
+            "Run: git pull (or clone) and ensure data/dataset exists. "
+            "Or: python scripts/prepare_train_datasets.py"
+        )
+    ds = load_from_disk(str(dataset_path))
+    rng = random.Random(seed)
+    if max_samples is not None and len(ds) > max_samples:
+        indices = rng.sample(range(len(ds)), max_samples)
+        indices.sort()
+        ds = ds.select(indices)
     return ds
 
 

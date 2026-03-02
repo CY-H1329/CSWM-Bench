@@ -2,7 +2,7 @@
 ScoreMap: per-category 2D score maps (LLM x Role).
 
 Each benchmark has K categories.  For every category there is a
-|ROLES| x |LLMS| matrix of scores in [0, 1].
+|ROLES| x |LLMS| matrix of scores (unbounded).
 
 Step 0  -> random agent selection (per-role independent).
 Step >0 -> argmax selection per role (ties broken by first occurrence).
@@ -76,7 +76,7 @@ class ScoreMap:
 
     def set_score(self, category: str, role: str, llm: str, value: float):
         if category in self._maps and role in self._maps[category]:
-            self._maps[category][role][llm] = max(0.0, min(1.0, value))
+            self._maps[category][role][llm] = value  # no clamp (unbounded)
 
     def get_category_map(self, category: str) -> Optional[Dict[str, Dict[str, float]]]:
         return self._maps.get(category)

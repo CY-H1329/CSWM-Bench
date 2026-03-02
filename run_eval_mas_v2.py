@@ -40,7 +40,7 @@ from src2.agents.mas_v2 import (
     ScoreMap, ScoreMapUpdater,
     run_train, run_test, compute_accuracy,
 )
-from src2.benchmarks.loaders import load_benchmark
+from src2.benchmarks.loaders import load_benchmark, load_benchmark_from_dataset
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,10 +58,14 @@ def build_runners(
     reasoning_api_key: str = "EMPTY",
     reasoning_model_name: str = "deepseek-r1",
     specialist_device: str = "cuda",
+    specialist_only_device: str | None = None,
+    specialist_offload_after_use: bool = False,
+    specialist_whitelist: list | None = None,
     use_local_reasoning: bool = False,
     reasoning_local_model_id: str = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
     use_vlm_reasoning: bool = False,
     reasoning_vlm_model_id: str = "Qwen/Qwen3-VL-8B-Instruct",
+    **kwargs,
 ):
     """Instantiate all model runners.
 
@@ -72,9 +76,18 @@ def build_runners(
       specialist_generate(llm_name, image, prompt) -> str
       reasoning_generate(prompt, image=None) -> str  DeepSeek-R1 (text) or Qwen3-VL-8B (image+text)
 
+    specialist_only_device: If set (e.g. "cpu"), specialists load on this device to avoid OOM
+      when head+reasoning already fill GPU. Head and reasoning stay on specialist_device.
+    specialist_offload_after_use: If True, specialists are loaded to CPU and moved to GPU only
+      during inference, then offloaded back to CPU. Saves GPU memory (올렸다 내렸다).
+    specialist_whitelist: If set, only load these specialists (e.g. ["qwen3_4b","llava4d","spatial_reasoner"]).
+      Step2 호환용. None이면 전체 로드.
     use_local_reasoning: If True, load DeepSeek-R1-Distill locally (no API).
     use_vlm_reasoning: If True, use Qwen3-VL-8B for Final Reasoning (image+SharedMemory). Overrides use_local_reasoning for reasoning.
     """
+    _spec_device = specialist_only_device if specialist_only_device is not None else specialist_device
+    if specialist_offload_after_use:
+        _spec_device = "cpu"  # load to CPU, move to GPU only during inference
     from src2.models.qwen3 import Qwen3Runner
     from src2.models.llava import LLaVARunner
     from src2.models.sa2va import Sa2VARunner
@@ -95,26 +108,48 @@ def build_runners(
 
     # --- 5 Specialist VLMs (lazy-loaded, cached) ---
     _specialist_cache = {}
+    _last_specialist_on_gpu: str | None = None
+
+    def _offload_specialist_to_cpu(name: str):
+        if name not in _specialist_cache:
+            return
+        runner = _specialist_cache[name]
+        if hasattr(runner, "model"):
+            runner.model = runner.model.to("cpu")
+        import torch
+        torch.cuda.empty_cache()
+
+    def _ensure_specialist_on_gpu(name: str):
+        if name not in _specialist_cache:
+            return
+        runner = _specialist_cache[name]
+        if hasattr(runner, "model"):
+            runner.model = runner.model.to(specialist_device)
 
     def _get_specialist(name: str):
+        if specialist_whitelist is not None and name not in specialist_whitelist:
+            raise ValueError(f"Specialist {name} not in whitelist {specialist_whitelist}")
         if name not in _specialist_cache:
             if name == "qwen3_4b":
                 _specialist_cache[name] = _get_head()
             elif name == "sa2va":
-                _specialist_cache[name] = Sa2VARunner(device=specialist_device)
+                _specialist_cache[name] = Sa2VARunner(device=_spec_device)
             elif name == "llava4d":
                 _specialist_cache[name] = LLaVARunner(
                     model_id="llava-hf/llava-v1.6-mistral-7b-hf",
-                    device=specialist_device,
+                    device=_spec_device,
                 )
             elif name == "spatial_rgpt":
                 from src2.models.spatial_rgpt import SpatialRGPTRunner
-                _specialist_cache[name] = SpatialRGPTRunner(device=specialist_device)
+                _specialist_cache[name] = SpatialRGPTRunner(device=_spec_device)
+            elif name == "spaceom":
+                from src2.models.spaceom import SpaceOmRunner
+                _specialist_cache[name] = SpaceOmRunner(device=_spec_device)
             elif name == "spatial_reasoner":
                 from src2.models.spatial_reasoner import SpatialReasonerRunner
                 _specialist_cache[name] = SpatialReasonerRunner(
                     model_id="ccvl/SpatialReasoner",
-                    device=specialist_device,
+                    device=_spec_device,
                 )
             else:
                 raise ValueError(f"Unknown specialist: {name}")
@@ -122,7 +157,22 @@ def build_runners(
 
     def specialist_generate(llm_name: str, image, prompt: str) -> str:
         runner = _get_specialist(llm_name)
-        return runner.generate(image, prompt, temperature=0.0, max_new_tokens=1024)
+        if specialist_offload_after_use and llm_name != "qwen3_4b":
+            nonlocal _last_specialist_on_gpu
+            # Offload previous specialist from GPU if different
+            if _last_specialist_on_gpu and _last_specialist_on_gpu != llm_name:
+                _offload_specialist_to_cpu(_last_specialist_on_gpu)
+                _last_specialist_on_gpu = None
+            # Move current specialist to GPU
+            _ensure_specialist_on_gpu(llm_name)
+            _last_specialist_on_gpu = llm_name
+        out = runner.generate(image, prompt, temperature=0.0, max_new_tokens=1024)
+        if specialist_offload_after_use and llm_name != "qwen3_4b":
+            _offload_specialist_to_cpu(llm_name)
+            _last_specialist_on_gpu = None
+            import torch
+            torch.cuda.empty_cache()
+        return out
 
     # --- Final Reasoning Agent ---
     if use_vlm_reasoning:
@@ -186,15 +236,27 @@ def run_test_only(
     output_dir: str = None,
     random_agents: bool = True,
     use_vlm_reasoning: bool = False,
+    specialist_llms: list = None,
+    dataset_subdir: str = None,
 ):
     """Run MAS v2 pipeline on N samples — testing only, no ScoreMap training.
 
     Pipeline: Head → ScoreMap (random) → 3 Specialists → SharedMemory → Final Reasoning.
     """
-    dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
+    if dataset_subdir:
+        dataset = load_benchmark_from_dataset(
+            benchmark, dataset_subdir,
+            project_root=Path(__file__).resolve().parent,
+            max_samples=max_samples,
+            seed=seed,
+        )
+        logger.info("Loaded from data/dataset/%s (%d samples)", dataset_subdir, len(dataset))
+    else:
+        dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
     logger.info("Loaded %d samples (test only, no train)", len(dataset))
 
-    score_map = ScoreMap(categories=ALL_CATEGORIES, seed=seed)
+    specialist_llms = specialist_llms or SPECIALIST_LLMS
+    score_map = ScoreMap(categories=ALL_CATEGORIES, llms=specialist_llms, seed=seed)
 
     logger.info("=" * 60)
     logger.info("TESTING (%d samples, random_agents=%s)", len(dataset), random_agents)
@@ -229,7 +291,7 @@ def run_test_only(
             "correct": metrics["correct"],
             "total": metrics["total"],
             "per_category": metrics["per_category"],
-            "specialist_llms": SPECIALIST_LLMS,
+            "specialist_llms": specialist_llms,
             "roles": ROLES,
             "timestamp": ts,
         }
@@ -258,18 +320,31 @@ def run_experiment(
     updater: ScoreMapUpdater = None,
     max_samples: int = None,
     use_vlm_reasoning: bool = False,
+    specialist_llms: list = None,
+    dataset_subdir: str = None,
 ):
     """Run full MAS v2 experiment: load data -> split -> train -> test -> report."""
 
-    logger.info("Benchmark: %s | Categories: %d (fixed) | Seed: %d", benchmark, len(ALL_CATEGORIES), seed)
+    specialist_llms = specialist_llms or SPECIALIST_LLMS
+    logger.info("Benchmark: %s | Categories: %d (fixed) | Specialists: %s | Seed: %d",
+                benchmark, len(ALL_CATEGORIES), specialist_llms, seed)
 
-    dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
+    if dataset_subdir:
+        dataset = load_benchmark_from_dataset(
+            benchmark, dataset_subdir,
+            project_root=Path(__file__).resolve().parent,
+            max_samples=max_samples,
+            seed=seed,
+        )
+        logger.info("Loaded from data/dataset/%s (%d samples)", dataset_subdir, len(dataset))
+    else:
+        dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
     logger.info("Loaded %d samples", len(dataset))
 
     train_ds, test_ds = split_dataset(dataset, train_ratio=train_ratio, seed=seed)
     logger.info("Train: %d | Test: %d", len(train_ds), len(test_ds))
 
-    score_map = ScoreMap(categories=ALL_CATEGORIES, seed=seed)
+    score_map = ScoreMap(categories=ALL_CATEGORIES, llms=specialist_llms, seed=seed)
     updater = updater or ScoreMapUpdater()
 
     # --- Train phase ---
@@ -332,7 +407,7 @@ def run_experiment(
             "train_per_category": train_metrics["per_category"],
             "test_accuracy": test_metrics["accuracy"],
             "test_per_category": test_metrics["per_category"],
-            "specialist_llms": SPECIALIST_LLMS,
+            "specialist_llms": specialist_llms,
             "roles": ROLES,
             "timestamp": ts,
         }
@@ -388,7 +463,50 @@ def main():
         default="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
         help="Local reasoning model when --use_local_reasoning",
     )
+    parser.add_argument(
+        "--specialist_offload_after_use",
+        action="store_true",
+        help="Load specialists to CPU, move to GPU only during inference, then offload (올렸다 내렸다)",
+    )
+    parser.add_argument(
+        "--use_vlm_reasoning",
+        action="store_true",
+        help="Use Qwen3-VL-8B for Final Reasoning (image+SharedMemory)",
+    )
+    parser.add_argument(
+        "--specialist_whitelist",
+        type=str,
+        default=None,
+        help="Comma-separated specialist subset, e.g. qwen3_4b,llava4d,sa2va,spatial_rgpt. "
+             "Use to avoid Sa2VA/SpatialRGPT when env incompatible (H100).",
+    )
+    parser.add_argument(
+        "--dataset_subdir",
+        type=str,
+        default=None,
+        help="Load from data/dataset/<subdir> instead of HuggingFace. e.g. 3dsrbench_train_300",
+    )
+    parser.add_argument(
+        "--use_tto",
+        action="store_true",
+        help="Use TTO (Trust Score) updater: trust_score.run_step4 (Beta+EMA).",
+    )
+    parser.add_argument(
+        "--trust_step",
+        type=int,
+        default=4,
+        choices=[1, 2, 3, 4],
+        help="TTO step when --use_tto: 1=s+=R, 2=s+=R̃, 3=s+=γ·R̃, 4=Beta+EMA.",
+    )
     args = parser.parse_args()
+
+    specialist_whitelist = None
+    if args.specialist_whitelist:
+        specialist_whitelist = [s.strip() for s in args.specialist_whitelist.split(",") if s.strip()]
+        if specialist_whitelist:
+            logger.info("Specialist whitelist: %s (excludes sa2va/spatial_rgpt when 3-agent)", specialist_whitelist)
+        else:
+            specialist_whitelist = None
 
     if args.test_only and not args.max_samples:
         parser.error("--max_samples required when --test_only")
@@ -398,9 +516,33 @@ def main():
         reasoning_api_key=args.reasoning_api_key,
         reasoning_model_name=args.reasoning_model_name,
         specialist_device=args.device,
+        specialist_offload_after_use=args.specialist_offload_after_use,
+        specialist_whitelist=specialist_whitelist,
         use_local_reasoning=args.use_local_reasoning,
         reasoning_local_model_id=args.reasoning_local_model,
+        use_vlm_reasoning=args.use_vlm_reasoning,
     )
+
+    specialist_llms = specialist_whitelist or SPECIALIST_LLMS
+
+    updater = None
+    if args.use_tto:
+        try:
+            if args.trust_step == 1:
+                from test_confidence_mas_v3_step1 import TrustScoreMapUpdaterStep1
+                updater = TrustScoreMapUpdaterStep1(kappa=1.0)
+            elif args.trust_step == 2:
+                from test_confidence_mas_v2_step2 import TrustScoreMapUpdaterStep2
+                updater = TrustScoreMapUpdaterStep2(T=10.0, kappa=1.0)
+            elif args.trust_step == 3:
+                from test_confidence_mas_v3_step3 import TrustScoreMapUpdaterStep3
+                updater = TrustScoreMapUpdaterStep3(T=10.0, kappa=1.0, gamma=0.1)
+            else:
+                from test_confidence_mas_v3_step4 import TrustScoreMapUpdaterStep4
+                updater = TrustScoreMapUpdaterStep4(T=10.0, kappa=1.0, gamma=0.1)
+            logger.info("Using TTO trust updater (step %d)", args.trust_step)
+        except ImportError as e:
+            logger.warning("TTO updater not available: %s. Using default ScoreMapUpdater.", e)
 
     if args.test_only:
         out_dir = f"{args.output_dir}/{args.benchmark}/{args.max_samples}samples"
@@ -412,6 +554,8 @@ def main():
             max_samples=args.max_samples,
             seed=args.seed,
             output_dir=out_dir,
+            specialist_llms=specialist_llms,
+            dataset_subdir=args.dataset_subdir,
         )
     else:
         if args.max_samples:
@@ -427,6 +571,10 @@ def main():
             seed=args.seed,
             output_dir=out_dir,
             max_samples=args.max_samples,
+            specialist_llms=specialist_llms,
+            updater=updater,
+            use_vlm_reasoning=args.use_vlm_reasoning,
+            dataset_subdir=args.dataset_subdir,
         )
 
 
