@@ -42,23 +42,40 @@ def _mock_bitsandbytes_for_peft():
 
 
 def _patch_tied_weights_for_sa2va():
-    """Sa2VA uses _tied_weights_keys; newer transformers expect all_tied_weights_keys."""
-    if not hasattr(PreTrainedModel, "mark_tied_weights_as_initialized"):
-        return  # Newer transformers: method removed, no patch needed
-    _orig = PreTrainedModel.mark_tied_weights_as_initialized
+    """Sa2VA uses _tied_weights_keys; transformers 5.x expects all_tied_weights_keys."""
+    # transformers 5.x: _adjust_tied_keys_with_tied_pointers uses all_tied_weights_keys
+    import transformers.modeling_utils as _mu
+    if hasattr(_mu.PreTrainedModel, "_adjust_tied_keys_with_tied_pointers"):
+        _orig_adj = _mu.PreTrainedModel._adjust_tied_keys_with_tied_pointers
 
-    def _patched(self):
-        if not hasattr(self, "all_tied_weights_keys"):
-            old = getattr(self, "_tied_weights_keys", None)
-            if old is not None and hasattr(old, "keys"):
-                self.all_tied_weights_keys = old
-            elif isinstance(old, (list, tuple)):
-                self.all_tied_weights_keys = {k: None for x in old for k in (x if isinstance(x, (list, tuple)) else [x])}
-            else:
-                self.all_tied_weights_keys = {}
-        _orig(self)
+        def _patched_adj(self, *args, **kwargs):
+            if not hasattr(self, "all_tied_weights_keys"):
+                old = getattr(self, "_tied_weights_keys", None)
+                if old is not None and hasattr(old, "keys"):
+                    self.all_tied_weights_keys = dict(old)
+                elif isinstance(old, (list, tuple)):
+                    self.all_tied_weights_keys = {k: None for x in old for k in (x if isinstance(x, (list, tuple)) else [x])}
+                else:
+                    self.all_tied_weights_keys = {}
+            return _orig_adj(self, *args, **kwargs)
 
-    PreTrainedModel.mark_tied_weights_as_initialized = _patched
+        _mu.PreTrainedModel._adjust_tied_keys_with_tied_pointers = _patched_adj
+
+    if hasattr(PreTrainedModel, "mark_tied_weights_as_initialized"):
+        _orig = PreTrainedModel.mark_tied_weights_as_initialized
+
+        def _patched(self):
+            if not hasattr(self, "all_tied_weights_keys"):
+                old = getattr(self, "_tied_weights_keys", None)
+                if old is not None and hasattr(old, "keys"):
+                    self.all_tied_weights_keys = old
+                elif isinstance(old, (list, tuple)):
+                    self.all_tied_weights_keys = {k: None for x in old for k in (x if isinstance(x, (list, tuple)) else [x])}
+                else:
+                    self.all_tied_weights_keys = {}
+            _orig(self)
+
+        PreTrainedModel.mark_tied_weights_as_initialized = _patched
 
 
 def _patch_torch_linspace_for_sa2va():
