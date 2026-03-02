@@ -94,12 +94,21 @@ def run_fixed_specialist_mas_test(
     max_samples: int = 50,
     seed: int = 42,
     use_vlm_reasoning: bool = True,
+    category_filter: Optional[List[str]] = None,
 ):
     """
     전문가 LLM 고정 MAS v2 실행 (trust 없음).
+
+    Args:
+        category_filter: counting만 100개: benchmark="cvbench"일 때 ["Count"] 전달.
     Returns: accuracy, correct, total, per_category
     """
-    dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
+    dataset = load_benchmark(
+        benchmark,
+        max_samples=max_samples,
+        category_filter=category_filter,
+        seed=seed,
+    )
     samples = []
     for i in range(len(dataset)):
         r = _prefetch_sample(dataset[i], benchmark, i)
@@ -117,6 +126,8 @@ def run_fixed_specialist_mas_test(
 
     print(f"Fixed Specialist MAS v2 — {benchmark.upper()} (n={len(samples)})")
     print(f"  specialist: {specialist} (3 roles 모두 고정)")
+    if category_filter:
+        print(f"  category_filter: {category_filter} (해당 카테고리만)")
     print(f"  trust/confidence: 없음")
     print()
 
@@ -181,6 +192,7 @@ if __name__ == "__main__":
     parser.add_argument("--specialist", default="sa2va", help="고정 specialist (sa2va, qwen3_4b, llava4d, spatial_reasoner, spatial_rgpt)")
     parser.add_argument("--benchmark", default="cvbench", choices=["cvbench", "3dsrbench"])
     parser.add_argument("--max_samples", type=int, default=50)
+    parser.add_argument("--category_filter", nargs="+", default=None, help="counting만: --category_filter Count (cvbench)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", type=str, default="cuda")
     args = parser.parse_args()
@@ -197,4 +209,5 @@ if __name__ == "__main__":
         benchmark=args.benchmark,
         max_samples=args.max_samples,
         seed=args.seed,
+        category_filter=args.category_filter,
     )
