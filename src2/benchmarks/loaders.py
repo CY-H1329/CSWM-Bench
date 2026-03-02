@@ -234,6 +234,31 @@ def get_benchmark_image(example: Dict, benchmark: str) -> Optional[Image.Image]:
     return img
 
 
+def is_multiple_choice(example: Dict, benchmark: str) -> bool:
+    """True if the question has multiple-choice options (A/B/C/D...), False for free-form/numeric."""
+    cfg = BENCHMARK_CONFIGS[benchmark]
+    opts_key = cfg.get("options_key")
+    opts_keys = cfg.get("options_keys")
+    if opts_key and opts_key in example:
+        opts = example[opts_key]
+        return bool(opts and len(opts) > 0)
+    if opts_keys:
+        opts = [example.get(k) for k in opts_keys if example.get(k)]
+        return bool(opts)
+    return False
+
+
+def infer_answer_type_from_query(query: str) -> str:
+    """Infer 'multiple_choice' or 'free_form' from query string.
+    Use when example is not available (e.g. pipeline only has query)."""
+    if not query or not query.strip():
+        return "free_form"
+    q = query.strip().upper()
+    if "OPTIONS:" in q and ("(A)" in q or "(B)" in q):
+        return "multiple_choice"
+    return "free_form"
+
+
 def get_benchmark_prompt(example: Dict, benchmark: str, include_options: bool = True) -> str:
     """Build prompt (question + options if any)."""
     cfg = BENCHMARK_CONFIGS[benchmark]

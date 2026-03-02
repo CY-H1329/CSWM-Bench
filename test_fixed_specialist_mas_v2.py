@@ -45,6 +45,7 @@ from src2.benchmarks.loaders import (
     get_benchmark_image,
     get_benchmark_prompt,
     get_benchmark_answer,
+    is_multiple_choice,
 )
 
 
@@ -79,10 +80,14 @@ def _prefetch_sample(ex, benchmark, i):
         return None
     query = get_benchmark_prompt(ex, benchmark)
     gt_raw = get_benchmark_answer(ex, benchmark)
-    gt = (gt_raw or "").strip().upper()
-    if not any(c in gt for c in "ABCD"):
-        return None
-    return {"index": i, "image": image, "query": query, "gt": gt}
+    gt = (gt_raw or "").strip()
+    mc = is_multiple_choice(ex, benchmark)
+    if mc:
+        gt_upper = gt.upper()
+        if not any(c in gt_upper for c in "ABCDEF"):
+            return None
+        gt = gt_upper
+    return {"index": i, "image": image, "query": query, "gt": gt, "answer_type": "multiple_choice" if mc else "free_form"}
 
 
 def run_fixed_specialist_mas_test(
@@ -139,6 +144,7 @@ def run_fixed_specialist_mas_test(
             step=step,
             total_steps=len(samples),
             score_map=score_map,
+            answer_type=s.get("answer_type"),
             head_generate=head_generate,
             specialist_generate=specialist_generate,
             reasoning_generate=reasoning_generate,

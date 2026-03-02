@@ -4,8 +4,38 @@ MAS v2 prompts.
 - Head Agent (Qwen3-VL-4B): category inference from image + query
 - 3 Specialist Role prompts: Direct Visual Heuristic, Explicit 3D Repr, Scene Graph
 - Final Reasoning Agent (DeepSeek-R1, text-only): synthesis from SharedMemory
+
+Supports both multiple-choice (A/B/C/D/E/F) and free-form (numeric, short text) answer formats.
 """
 from typing import Dict, List, Optional
+
+
+def _get_output_format_specialist(answer_type: str) -> str:
+    """Output format block for specialist prompts. answer_type: 'multiple_choice' | 'free_form'."""
+    if answer_type == "free_form":
+        return """**Answer FIRST**, then brief justification. Keep Reason under 150 words.
+
+```
+Answer: <your answer as a number or short phrase, e.g. 3, two, red, left>
+
+Reason:
+[For Count: Unit definition, Scan, Occlusion rule, List instances]
+[For Spatial: Decompose, Reference, Cues + Resolve]
+```
+
+CRITICAL: First line MUST be "Answer: <value>" where value is the direct answer (number, word, or short phrase). No (A)/(B) options. Then 2–4 sentences of Reason."""
+    # multiple_choice (default)
+    return """**Answer FIRST**, then brief justification. Keep Reason under 150 words.
+
+```
+Answer: (A) or (B) or (C) or (D) or (E) or (F) — choose the letter matching the correct option in the question.
+
+Reason:
+[For Count: Unit definition, Scan, Occlusion rule, List instances]
+[For Spatial: Decompose, Reference, Cues + Resolve]
+```
+
+CRITICAL: First line MUST be "Answer: (X)" where X is the letter (A–F) of the correct option. Then 2–4 sentences of Reason."""
 
 
 # ======================================================================
@@ -102,17 +132,7 @@ Question: {query}
 
 ## Output Format (STRICT)
 
-**Answer FIRST**, then brief justification. Keep Reason under 150 words.
-
-```
-Answer: (A) or (B) or (C) or (D)
-
-Reason:
-[For Count: Unit definition, Scan, Occlusion rule, List instances]
-[For Spatial: Decompose, Reference, Cues + Resolve]
-```
-
-CRITICAL: First line MUST be "Answer: (X)" where X is A, B, C, or D. Then 2–4 sentences of Reason.
+{output_format}
 
 Output your response now.""",
 
@@ -155,19 +175,7 @@ Question: {query}
 
 ## Output Format (STRICT)
 
-**Answer FIRST**, then brief justification. Reference the 3D tool data explicitly.
-
-```
-Answer: (A) or (B) or (C) or (D)
-
-Reason:
-[1] Question objects: X, Y
-[2] From tool: X rank N, Y rank M (or Pairwise: X in front of Y)
-[3] Depth inference: X closer than Y (or vice versa)
-[4] Conclusion → option (X)
-```
-
-CRITICAL: First line MUST be "Answer: (X)". If the tool failed, say so and reason from the image only.
+{output_format}
 
 Output your response now.""",
 
@@ -195,23 +203,23 @@ If the tool failed or graph is empty: reason from the image alone and state "Too
 Question: {query}
 
 ## Output Format (STRICT)
-Answer: (A) or (B) or (C) or (D)
 
-Reason:
-[1] From query: reference objects, relation asked
-[2] From graph: edge(s) found
-[3] From image: cross-check (if used)
-[4] Conclusion → option (X)
-
-CRITICAL: First line MUST be "Answer: (X)".""",
+{output_format}""",
 }
 
 
-def build_role_prompt(role: str, query: str, tool_output: Optional[str] = None) -> str:
+def build_role_prompt(
+    role: str,
+    query: str,
+    tool_output: Optional[str] = None,
+    answer_type: str = "multiple_choice",
+) -> str:
     """Build the specialist prompt for *role* with the given *query*.
 
     For explicit_3d_representation and scene_graph_construction, pass tool_output
     to inject depth or scene graph data (C hybrid approach).
+
+    answer_type: 'multiple_choice' (A/B/C/D/E/F) or 'free_form' (numeric, short text).
     """
     template = _ROLE_PROMPTS.get(role)
     if template is None:
@@ -222,7 +230,27 @@ def build_role_prompt(role: str, query: str, tool_output: Optional[str] = None) 
     else:
         tool_section = ""
 
-    return template.format(query=query, tool_section=tool_section)
+    output_format = _get_output_format_specialist(answer_type)
+    return template.format(query=query, tool_section=tool_section, output_format=output_format)
+
+
+def _get_output_format_final_reasoning(answer_type: str) -> str:
+    """Output format block for Final Reasoning prompt."""
+    if answer_type == "free_form":
+        return """- First line MUST be: **Answer: <value>** (number, word, or short phrase—e.g. 3, two, red).
+- Then: **Reason:** Write 2–5 sentences explaining your synthesis.
+
+## Output Format (STRICT)
+Answer: <your direct answer>
+
+Reason: <Your synthesis and justification.>"""
+    return """- First line MUST be: **Answer: (A)** or **(B)** or **(C)** or **(D)** or **(E)** or **(F)**.
+- Then: **Reason:** Write 2–5 sentences. Explain: (a) what the question asks, (b) which specialist(s) you found most relevant and why, (c) how you synthesized their reasoning, (d) why you chose this answer.
+
+## Output Format (STRICT)
+Answer: (A) or (B) or (C) or (D) or (E) or (F)
+
+Reason: <Your synthesis and justification.>"""
 
 
 # ======================================================================
@@ -232,6 +260,7 @@ def build_final_reasoning_prompt(
     query: str,
     shared_memory_text: str,
     with_image: bool = False,
+    answer_type: str = "multiple_choice",
 ) -> str:
     image_note = (
         "\n\n**You also see the image** that the specialists analysed. "
@@ -248,6 +277,7 @@ def build_final_reasoning_prompt(
         "\n- **Use the image to resolve disagreements**: When specialists disagree, look at the image to see which answer is correct."
     ) if with_image else ""
 
+    output_format_final = _get_output_format_final_reasoning(answer_type)
     return f"""# ROLE: Final Reasoning Agent
 
 You are the final decision-maker. Three specialist agents have independently analysed the same image and question. Each used a different strategy and produced their own reasoning and answer. Your job is to **read all of them carefully**, **think through the question and their analyses together**, and **synthesize a final conclusion**.{image_note}
@@ -286,10 +316,6 @@ The questions can be diverse: spatial relations (above/below, left/right), depth
 - If the question is ambiguous or the reasoning is inconclusive, choose the best-supported answer and state the uncertainty.
 
 ### Step 5: Output
-- First line MUST be: **Answer: (A)** or **(B)** or **(C)** or **(D)**.
-- Then: **Reason:** Write 2–5 sentences. Explain: (a) what the question asks, (b) which specialist(s) you found most relevant and why, (c) how you synthesized their reasoning, (d) why you chose this answer.
+{output_format_final}
 
-## Output Format (STRICT)
-Answer: (A) or (B) or (C) or (D)
-
-Reason: <Your synthesis and justification.>"""
+"""

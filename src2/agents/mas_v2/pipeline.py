@@ -25,6 +25,16 @@ from .score_map import ScoreMap
 from .score_map_updater import ScoreMapUpdater
 from .shared_memory import SharedMemory
 
+
+def _infer_answer_type(query: str) -> str:
+    """Infer 'multiple_choice' or 'free_form' from query. Avoids circular import."""
+    if not query or not query.strip():
+        return "free_form"
+    q = query.strip().upper()
+    if "OPTIONS:" in q and ("(A)" in q or "(B)" in q):
+        return "multiple_choice"
+    return "free_form"
+
 # C (Hybrid): tools only for explicit_3d and scene_graph
 _ROLES_WITH_TOOLS = {"explicit_3d_representation", "scene_graph_construction"}
 
@@ -46,50 +56,58 @@ def parse_category(raw: str, valid_categories: List[str]) -> str:
     return valid_categories[0]
 
 
-def parse_specialist_output(raw: str) -> Tuple[str, str]:
+def parse_specialist_output(raw: str, answer_type: str = "multiple_choice") -> Tuple[str, str]:
     """Extract (answer, reason) from specialist output."""
     raw = (raw or "").strip()
     answer = ""
     reason = ""
 
-    ans_m = re.search(
-        r"Answer\s*:\s*\(?([A-D])\)?",
-        raw, re.IGNORECASE,
-    )
-    if ans_m:
-        answer = f"({ans_m.group(1).upper()})"
+    if answer_type == "free_form":
+        # "Answer: 3", "Answer: two", "Answer: red"
+        m = re.search(r"Answer\s*:\s*(.+?)(?=\n|Reason\s*:|\Z)", raw, re.IGNORECASE | re.DOTALL)
+        if m:
+            answer = m.group(1).strip()[:100]
+        if not answer:
+            lines = [l.strip() for l in raw.split("\n") if l.strip()]
+            answer = lines[0][:100] if lines else ""
+    else:
+        # multiple_choice: (A)~(F)
+        ans_m = re.search(r"Answer\s*:\s*\(?([A-F])\)?", raw, re.IGNORECASE)
+        if ans_m:
+            answer = f"({ans_m.group(1).upper()})"
+        if not answer:
+            fallback = re.search(r"\(([A-F])\)", raw)
+            if fallback:
+                answer = f"({fallback.group(1).upper()})"
+            if not answer:
+                for pat in [r"answer\s+is\s+\(?([A-F])\)?", r"choose\s+\(?([A-F])\)?",
+                            r"therefore\s+\(?([A-F])\)?", r"option\s+\(?([A-F])\)?"]:
+                    m = re.search(pat, raw, re.IGNORECASE)
+                    if m:
+                        answer = f"({m.group(1).upper()})"
+                        break
 
-    reason_m = re.search(
-        r"Reason\s*:\s*(.+?)(?=\nAnswer\s*:|\Z)",
-        raw, re.IGNORECASE | re.DOTALL,
-    )
+    reason_m = re.search(r"Reason\s*:\s*(.+?)(?=\nAnswer\s*:|\Z)", raw, re.IGNORECASE | re.DOTALL)
     if reason_m:
         reason = reason_m.group(1).strip()[:2000]
-
-    if not answer:
-        # Fallback: (A), "answer is A", "therefore (B)", "choose C", etc.
-        fallback = re.search(r"\(([A-D])\)", raw)
-        if fallback:
-            answer = f"({fallback.group(1)})"
-        if not answer:
-            for pat in [r"answer\s+is\s+\(?([A-D])\)?", r"choose\s+\(?([A-D])\)?",
-                        r"therefore\s+\(?([A-D])\)?", r"conclude\s+\(?([A-D])\)?",
-                        r"option\s+\(?([A-D])\)?", r"correct\s+is\s+\(?([A-D])\)?"]:
-                m = re.search(pat, raw, re.IGNORECASE)
-                if m:
-                    answer = f"({m.group(1).upper()})"
-                    break
 
     return answer, reason
 
 
-def parse_final_answer(raw: str) -> str:
-    """Extract the final answer letter from Reasoning Agent output."""
+def parse_final_answer(raw: str, answer_type: str = "multiple_choice") -> str:
+    """Extract the final answer from Reasoning Agent output."""
     raw = (raw or "").strip()
-    m = re.search(r"Answer\s*:\s*\(?([A-D])\)?", raw, re.IGNORECASE)
+    if answer_type == "free_form":
+        m = re.search(r"Answer\s*:\s*(.+?)(?=\n|Reason\s*:|\Z)", raw, re.IGNORECASE | re.DOTALL)
+        if m:
+            return m.group(1).strip()[:100]
+        lines = [l.strip() for l in raw.split("\n") if l.strip()]
+        return lines[0][:100] if lines else ""
+    # multiple_choice
+    m = re.search(r"Answer\s*:\s*\(?([A-F])\)?", raw, re.IGNORECASE)
     if m:
         return f"({m.group(1).upper()})"
-    m = re.search(r"\(([A-D])\)", raw)
+    m = re.search(r"\(([A-F])\)", raw)
     if m:
         return f"({m.group(1)})"
     return raw[:20]
@@ -112,13 +130,18 @@ def run_step(
     update_scores: bool = True,
     shared_object_extraction: bool = True,
     use_vlm_reasoning: bool = False,
+    answer_type: Optional[str] = None,
 ) -> Dict:
     """Execute one step of the MAS v2 pipeline.
 
     Categories are always the fixed ALL_CATEGORIES (16 types).
     The Head Agent classifies any question into the best-fit category.
+
+    answer_type: 'multiple_choice' | 'free_form'. If None, inferred from query (Options: present -> multiple_choice).
     """
     t0 = time.time()
+    if answer_type is None:
+        answer_type = _infer_answer_type(query)
 
     # 1. Head Agent -> category inference (Qwen3-VL-4B, image + text)
     head_prompt = build_head_agent_prompt(query, ALL_CATEGORIES, CATEGORY_DESCRIPTIONS)
@@ -163,9 +186,9 @@ def run_step(
                 logger.warning("Tool for %s failed: %s", role, e)
                 tool_output_cache[role] = ""
         tool_output = tool_output_cache.get(role, None)
-        role_prompt = build_role_prompt(role, query, tool_output=tool_output)
+        role_prompt = build_role_prompt(role, query, tool_output=tool_output, answer_type=answer_type)
         raw_output = specialist_generate(llm_name, image, role_prompt)
-        answer, reason = parse_specialist_output(raw_output)
+        answer, reason = parse_specialist_output(raw_output, answer_type=answer_type)
         shared_memory.add(role, llm_name, answer, reason)
         agent_details.append({
             "role": role,
@@ -177,10 +200,10 @@ def run_step(
 
     # 4. Final Reasoning Agent (DeepSeek-R1 text-only, or Qwen3-VL-8B image+text)
     reasoning_prompt = build_final_reasoning_prompt(
-        query, shared_memory.to_prompt_text(), with_image=use_vlm_reasoning
+        query, shared_memory.to_prompt_text(), with_image=use_vlm_reasoning, answer_type=answer_type
     )
     reasoning_raw = reasoning_generate(reasoning_prompt, image=image)
-    final_answer = parse_final_answer(reasoning_raw)
+    final_answer = parse_final_answer(reasoning_raw, answer_type=answer_type)
 
     # 5. Score map update (train phase only)
     if update_scores and updater and gt:
@@ -203,7 +226,7 @@ def run_step(
         "agent_details": agent_details,
         "final_answer": final_answer,
         "gt": gt,
-        "correct": _norm_letter(final_answer) == _norm_letter(gt) if gt else None,
+        "correct": _is_correct(final_answer, gt, answer_type) if gt else None,
         "reasoning_raw": reasoning_raw[:3000],
         "elapsed_sec": round(elapsed, 2),
     }
@@ -346,11 +369,28 @@ def run_test(
 # ======================================================================
 # Helpers
 # ======================================================================
+def _is_correct(pred: str, gt: str, answer_type: str) -> bool:
+    """Compare predicted vs ground-truth answer."""
+    if answer_type == "free_form":
+        return _norm_free_form(pred) == _norm_free_form(gt)
+    return _norm_letter(pred) == _norm_letter(gt)
+
+
 def _norm_letter(s: str) -> str:
+    """Normalize multiple-choice answer (A~F)."""
     s = (s or "").strip().upper()
-    for c in "ABCD":
-        if c in s:
+    for c in "ABCDEF":
+        if c in s or f"({c})" in s:
             return c
+    return s
+
+
+def _norm_free_form(s: str) -> str:
+    """Normalize free-form answer for comparison (lowercase, strip, basic number handling)."""
+    s = (str(s or "").strip().lower())
+    if not s:
+        return ""
+    # Optional: "3" == "three" — keep simple for now
     return s
 
 
