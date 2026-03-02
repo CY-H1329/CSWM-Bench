@@ -49,6 +49,22 @@ def _load_via_spatialrgpt_repo(model_id: str, device: str, **kwargs):
     if repo_path not in sys.path:
         sys.path.insert(0, repo_path)
 
+    # Patch for transformers >= 4.40: no_init_weights was removed
+    import transformers.modeling_utils as _mutils
+    if not hasattr(_mutils, "no_init_weights"):
+        from contextlib import nullcontext
+
+        def _no_init_weights(_enable=True):
+            if _enable:
+                try:
+                    from accelerate import init_empty_weights
+                    return init_empty_weights()
+                except ImportError:
+                    return nullcontext()
+            return nullcontext()
+
+        _mutils.no_init_weights = _no_init_weights
+
     from llava.model.builder import load_pretrained_model
 
     # vila-siglip-llama3-8b for 8B model; vila-siglip-llama-3b for 3B
