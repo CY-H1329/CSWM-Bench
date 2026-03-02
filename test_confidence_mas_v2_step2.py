@@ -187,7 +187,7 @@ def run_confidence_mas_test_step2(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--benchmark", default="cvbench", choices=["cvbench", "3dsrbench"])
+    parser.add_argument("--benchmark", default="cvbench", choices=["cvbench", "cvbench_counting_100", "3dsrbench"])
     parser.add_argument("--max_samples", type=int, default=50)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--T", type=float, default=10.0, help="step2 scale parameter")

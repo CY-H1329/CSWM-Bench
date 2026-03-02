@@ -190,7 +190,7 @@ def run_fixed_specialist_mas_test(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--specialist", default="sa2va", help="고정 specialist (sa2va, qwen3_4b, llava4d, spatial_reasoner, spatial_rgpt)")
-    parser.add_argument("--benchmark", default="cvbench", choices=["cvbench", "3dsrbench"])
+    parser.add_argument("--benchmark", default="cvbench", choices=["cvbench", "cvbench_counting_100", "3dsrbench"])
     parser.add_argument("--max_samples", type=int, default=50)
     parser.add_argument("--category_filter", nargs="+", default=None, help="counting만: --category_filter Count (cvbench)")
     parser.add_argument("--seed", type=int, default=42)

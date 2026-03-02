@@ -198,7 +198,7 @@ def run_confidence_mas_test(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--benchmark", default="cvbench", choices=["cvbench", "3dsrbench"])
+    parser.add_argument("--benchmark", default="cvbench", choices=["cvbench", "cvbench_counting_100", "3dsrbench"])
     parser.add_argument("--max_samples", type=int, default=10)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=str, default="", help="Save results JSON path")

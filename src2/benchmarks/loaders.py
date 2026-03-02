@@ -22,6 +22,7 @@ import requests
 FROZEN_BENCHMARK_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "frozen_benchmarks"
 FROZEN_PATHS = {
     "cvbench": "cvbench_400",
+    "cvbench_counting_100": "cvbench_counting_100",  # scripts/create_cvbench_counting_100.py로 생성
     "3dsrbench": "3dsrbench_500",
 }
 
@@ -43,6 +44,15 @@ SPATIAL_TASK_CATEGORIES = [
 
 BENCHMARK_CONFIGS = {
     "cvbench": {
+        "name": "nyu-visionx/CV-Bench",
+        "split": "test",
+        "image_key": "image",
+        "question_key": "question",
+        "options_key": "choices",
+        "answer_key": "answer",
+        "category_key": "task",
+    },
+    "cvbench_counting_100": {
         "name": "nyu-visionx/CV-Bench",
         "split": "test",
         "image_key": "image",

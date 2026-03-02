@@ -1,0 +1,106 @@
+{
+  "builder_name": "parquet",
+  "citation": "",
+  "config_name": "default",
+  "dataset_name": "cv-bench",
+  "dataset_size": 406147038,
+  "description": "",
+  "download_checksums": {
+    "hf://datasets/nyu-visionx/CV-Bench@bc284db50d036958861cb60cdd7b77612052ce0d/test_2d.parquet": {
+      "num_bytes": 184906137,
+      "checksum": null
+    },
+    "hf://datasets/nyu-visionx/CV-Bench@bc284db50d036958861cb60cdd7b77612052ce0d/test_3d.parquet": {
+      "num_bytes": 219902227,
+      "checksum": null
+    }
+  },
+  "download_size": 404808364,
+  "features": {
+    "idx": {
+      "dtype": "int32",
+      "_type": "Value"
+    },
+    "type": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "task": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "image": {
+      "_type": "Image"
+    },
+    "question": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "choices": {
+      "feature": {
+        "dtype": "string",
+        "_type": "Value"
+      },
+      "_type": "List"
+    },
+    "answer": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "prompt": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "filename": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "source": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "source_dataset": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "source_filename": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "target_class": {
+      "dtype": "string",
+      "_type": "Value"
+    },
+    "target_size": {
+      "dtype": "int32",
+      "_type": "Value"
+    },
+    "bbox": {
+      "feature": {
+        "feature": {
+          "dtype": "float32",
+          "_type": "Value"
+        },
+        "_type": "List"
+      },
+      "_type": "List"
+    }
+  },
+  "homepage": "",
+  "license": "",
+  "size_in_bytes": 810955402,
+  "splits": {
+    "test": {
+      "name": "test",
+      "num_bytes": 406147038,
+      "num_examples": 2638,
+      "dataset_name": "cv-bench"
+    }
+  },
+  "version": {
+    "version_str": "0.0.0",
+    "major": 0,
+    "minor": 0,
+    "patch": 0
+  }
+}
