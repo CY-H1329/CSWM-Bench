@@ -158,17 +158,31 @@ def main():
     )
 
     metrics = compute_accuracy(eval_results)
+    per_cat = metrics.get("per_category", {})
+    per_cat_counts = metrics.get("per_category_counts", {})
+
     print("\n" + "=" * 70)
     print("FINAL EVAL (frozen cvbench)")
     print("=" * 70)
-    print(f"Accuracy: {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%")
-    for cat, v in sorted(metrics.get("per_category", {}).items(), key=lambda x: -x[1]):
-        print(f"  {cat}: {100*v:.1f}%")
+    print(f"Overall: {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%")
+    print("-" * 70)
+    print(f"{'Category':<14} | {'Correct':>7} | {'Total':>5} | {'Accuracy':>8}")
+    print("-" * 70)
+    for cat, acc in sorted(per_cat.items(), key=lambda x: -x[1]):
+        cnt = per_cat_counts.get(cat, {})
+        c, t = cnt.get("correct", 0), cnt.get("total", 0)
+        print(f"{cat:<14} | {c:>7} | {t:>5} | {100*acc:>6.1f}%")
     print("=" * 70)
 
-    # Save eval summary
+    # Save eval summary (JSON + 발표용 카테고리별 표)
     import json
     from datetime import datetime
+    per_cat_detail = {
+        cat: {"correct": per_cat_counts.get(cat, {}).get("correct", 0),
+              "total": per_cat_counts.get(cat, {}).get("total", 0),
+              "accuracy": per_cat.get(cat, 0.0)}
+        for cat in per_cat
+    }
     summary = {
         "inference_only": args.inference_only,
         "train_samples": train_samples,
@@ -176,7 +190,7 @@ def main():
         "eval_total": metrics["total"],
         "eval_correct": metrics["correct"],
         "eval_accuracy": metrics["accuracy"],
-        "per_category": metrics.get("per_category", {}),
+        "per_category": per_cat_detail,
         "T": args.T,
         "kappa": args.kappa,
         "gamma": args.gamma,
@@ -185,6 +199,23 @@ def main():
     }
     (out_dir / "eval_summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
     print(f"\n[Save] Eval summary → {out_dir / 'eval_summary.json'}")
+
+    # 발표용 Markdown 테이블 (카테고리별 성능)
+    md_lines = [
+        "## CV-Bench (frozen) - Category별 성능",
+        "",
+        f"**Overall:** {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%",
+        "",
+        "| Category | Correct | Total | Accuracy |",
+        "|----------|---------|-------|----------|",
+    ]
+    for cat, acc in sorted(per_cat.items(), key=lambda x: -x[1]):
+        cnt = per_cat_counts.get(cat, {})
+        c, t = cnt.get("correct", 0), cnt.get("total", 0)
+        md_lines.append(f"| {cat} | {c} | {t} | {100*acc:.1f}% |")
+    md_lines.append("")
+    (out_dir / "eval_by_category.md").write_text("\n".join(md_lines))
+    print(f"[Save] Category table → {out_dir / 'eval_by_category.md'}")
 
 
 if __name__ == "__main__":
