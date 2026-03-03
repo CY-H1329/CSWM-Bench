@@ -73,6 +73,13 @@ def _load_via_spatialrgpt_repo(model_id: str, device: str, **kwargs):
     if not hasattr(_import_utils, "is_torch_fx_available"):
         _import_utils.is_torch_fx_available = lambda: False
 
+    # Patch: flash_attn ABI mismatch with PyTorch 2.4 → use SDPA fallback
+    _no_flash = lambda: False
+    if hasattr(_tu, "is_flash_attn_2_available"):
+        _tu.is_flash_attn_2_available = _no_flash
+    if hasattr(_import_utils, "is_flash_attn_2_available"):
+        _import_utils.is_flash_attn_2_available = _no_flash
+
     from llava.model.builder import load_pretrained_model
 
     # vila-siglip-llama3-8b for 8B model; vila-siglip-llama-3b for 3B
