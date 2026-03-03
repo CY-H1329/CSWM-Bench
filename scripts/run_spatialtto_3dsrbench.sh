@@ -1,8 +1,8 @@
 #!/bin/bash
-# SpatialTTO 3DSRBench: 3dsrbench_train_300 → TTO 고정 → frozen 3dsrbench_500 inference
+# SpatialTTO 3DSRBench: 200 samples (GitHub data/dataset/3dsrbench_train_300) → TTO 고정 → frozen 3dsrbench_500 inference
 #
 # Usage:
-#   bash scripts/run_spatialtto_3dsrbench.sh              # Train 300 + Eval frozen
+#   bash scripts/run_spatialtto_3dsrbench.sh              # Train 200 + Eval frozen
 #   bash scripts/run_spatialtto_3dsrbench.sh --inference_only   # Eval only
 #
 set -e

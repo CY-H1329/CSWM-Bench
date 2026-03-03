@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-SpatialTTO: train 300 samples → score map 고정 → frozen benchmark으로 inference.
+SpatialTTO: train → score map 고정 → frozen benchmark으로 inference.
 
-지원: cvbench, 3dsrbench
+지원: cvbench (300), 3dsrbench (200)
 
-1. Train: data/dataset/<train_subdir> 300 samples, SpatialTTO로 score 업데이트 (4 agents)
+1. Train: data/dataset/<train_subdir> (GitHub 데이터), SpatialTTO로 confidence score 업데이트 (4 agents)
 2. Score map 저장
 3. Eval: frozen benchmark으로 inference (TTO 업데이트 없음)
 
 Usage:
-    # CV-Bench
+    # CV-Bench: 300 samples
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench
-    # 3DSRBench
+    # 3DSRBench: 200 samples (GitHub data/dataset/3dsrbench_train_300에서 200개)
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench
     # Inference only
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench --inference_only
@@ -37,14 +37,16 @@ from test_confidence_mas_v3_step4 import TrustScoreMapUpdaterStep4, build_runner
 BENCHMARK_CONFIG = {
     "cvbench": {
         "train_subdir": "cvbench_train_300",
+        "train_samples": 300,
         "output_dir": "results/spatialtto_300_frozen_cvbench",
         "score_map_name": "score_map_after_300.json",
         "frozen_size": 400,
     },
     "3dsrbench": {
         "train_subdir": "3dsrbench_train_300",
-        "output_dir": "results/spatialtto_300_frozen_3dsrbench",
-        "score_map_name": "score_map_after_300.json",
+        "train_samples": 200,
+        "output_dir": "results/spatialtto_200_frozen_3dsrbench",
+        "score_map_name": "score_map_after_200.json",
         "frozen_size": 500,
     },
 }
@@ -55,8 +57,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", type=str, default="cvbench", choices=["cvbench", "3dsrbench"],
                         help="Benchmark: cvbench or 3dsrbench")
-    parser.add_argument("--train_samples", type=int, default=300,
-                        help="Train samples (default: 300)")
+    parser.add_argument("--train_samples", type=int, default=None,
+                        help="Train samples (default: from benchmark config)")
     parser.add_argument("--train_subdir", type=str, default=None,
                         help="Override data/dataset/<subdir> (default: from benchmark)")
     parser.add_argument("--output_dir", type=str, default=None,
@@ -75,6 +77,7 @@ def main():
 
     bm_cfg = BENCHMARK_CONFIG[args.benchmark]
     train_subdir = args.train_subdir or bm_cfg["train_subdir"]
+    train_samples = args.train_samples if args.train_samples is not None else bm_cfg["train_samples"]
     out_dir = Path(args.output_dir or bm_cfg["output_dir"])
     score_map_name = bm_cfg["score_map_name"]
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -113,12 +116,12 @@ def main():
             train_ds = load_benchmark_from_dataset(
                 args.benchmark, train_subdir,
                 project_root=PROJECT_ROOT,
-                max_samples=args.train_samples,
+                max_samples=train_samples,
                 seed=args.seed,
             )
             print(f"[Train] Loaded {len(train_ds)} samples from data/dataset/{train_subdir}")
         else:
-            train_ds = load_benchmark(args.benchmark, max_samples=args.train_samples, use_frozen=False, seed=args.seed)
+            train_ds = load_benchmark(args.benchmark, max_samples=train_samples, use_frozen=False, seed=args.seed)
             print(f"[Train] Loaded {len(train_ds)} samples from HuggingFace (use_frozen=False)")
 
         print("\n" + "=" * 70)
