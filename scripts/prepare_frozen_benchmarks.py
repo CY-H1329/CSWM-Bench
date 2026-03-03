@@ -115,6 +115,16 @@ def prepare_cvbench_400(cfg: dict, output_dir: Path, seed: int) -> dict:
 
     indices.sort()
     sampled = ds.select(indices)
+
+    # Verify per-category counts (must be 100 each)
+    per_cat = {}
+    for i in indices:
+        c = ds[i].get(cat_key) or "unknown"
+        per_cat[c] = per_cat.get(c, 0) + 1
+    for c in cfg["categories"]:
+        if per_cat.get(c, 0) != cfg["n_per_category"]:
+            raise ValueError(f"CV-Bench: {c} has {per_cat.get(c, 0)}, expected {cfg['n_per_category']}")
+
     out_path = output_dir / "cvbench_400"
     out_path.mkdir(parents=True, exist_ok=True)
     sampled.save_to_disk(str(out_path))
@@ -124,6 +134,7 @@ def prepare_cvbench_400(cfg: dict, output_dir: Path, seed: int) -> dict:
         "n_samples": len(sampled),
         "n_per_category": cfg["n_per_category"],
         "categories": cfg["categories"],
+        "per_category": per_cat,
         "seed": seed,
         "source": cfg["source"],
         "split": cfg["split"],

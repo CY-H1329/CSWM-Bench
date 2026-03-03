@@ -331,6 +331,7 @@ def run_test(
     """
     from src2.benchmarks.loaders import (
         get_benchmark_image, get_benchmark_prompt, get_benchmark_answer,
+        get_benchmark_category,
     )
     _img = get_image_fn or (lambda ex: get_benchmark_image(ex, benchmark))
     _prompt = get_prompt_fn or (lambda ex: get_benchmark_prompt(ex, benchmark))
@@ -344,6 +345,7 @@ def run_test(
         image = _img(example)
         query = _prompt(example)
         gt = _answer(example)
+        gt_category = get_benchmark_category(example, benchmark)
 
         if image is None:
             logger.warning("Test step %d: image is None, skipping.", step)
@@ -364,6 +366,8 @@ def run_test(
             update_scores=update_scores and updater is not None,
             use_vlm_reasoning=use_vlm_reasoning,
         )
+        if gt_category is not None:
+            result["gt_category"] = gt_category
         results.append(result)
 
         correct_so_far = sum(1 for r in results if r.get("correct"))
@@ -418,8 +422,13 @@ def _norm_free_form(s: str) -> str:
     return s
 
 
-def compute_accuracy(results: List[Dict]) -> Dict:
-    """Compute overall and per-category accuracy from result dicts."""
+def compute_accuracy(results: List[Dict], use_gt_category: bool = True) -> Dict:
+    """Compute overall and per-category accuracy from result dicts.
+
+    use_gt_category: If True and results have gt_category (from dataset), use it for
+        per_category breakdown (e.g. CV-Bench: Count, Relation, Depth, Distance).
+        Otherwise use Head's predicted category (unified: spatial_relation, etc.).
+    """
     total = 0
     correct = 0
     by_cat: Dict[str, Dict[str, int]] = {}
@@ -430,7 +439,7 @@ def compute_accuracy(results: List[Dict]) -> Dict:
         total += 1
         if r["correct"]:
             correct += 1
-        cat = r.get("category", "unknown")
+        cat = (r.get("gt_category") if use_gt_category and r.get("gt_category") else None) or r.get("category", "unknown")
         if cat not in by_cat:
             by_cat[cat] = {"correct": 0, "total": 0}
         by_cat[cat]["total"] += 1
