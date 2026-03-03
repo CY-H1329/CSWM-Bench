@@ -80,6 +80,24 @@ def _load_via_spatialrgpt_repo(model_id: str, device: str, **kwargs):
     if hasattr(_import_utils, "is_flash_attn_2_available"):
         _import_utils.is_flash_attn_2_available = _no_flash
 
+    # Patch: transformers 5.x all_tied_weights_keys (MultimodalProjector 등)
+    import transformers.modeling_utils as _mu
+    if hasattr(_mu.PreTrainedModel, "_adjust_tied_keys_with_tied_pointers"):
+        _orig_adj = _mu.PreTrainedModel._adjust_tied_keys_with_tied_pointers
+
+        def _patched_adj(self, *args, **kwargs):
+            if not hasattr(self, "all_tied_weights_keys"):
+                old = getattr(self, "_tied_weights_keys", None)
+                if old is not None and hasattr(old, "keys"):
+                    self.all_tied_weights_keys = dict(old)
+                elif isinstance(old, (list, tuple)):
+                    self.all_tied_weights_keys = {k: None for x in old for k in (x if isinstance(x, (list, tuple)) else [x])}
+                else:
+                    self.all_tied_weights_keys = {}
+            return _orig_adj(self, *args, **kwargs)
+
+        _mu.PreTrainedModel._adjust_tied_keys_with_tied_pointers = _patched_adj
+
     from llava.model.builder import load_pretrained_model
 
     # vila-siglip-llama3-8b for 8B model; vila-siglip-llama-3b for 3B
