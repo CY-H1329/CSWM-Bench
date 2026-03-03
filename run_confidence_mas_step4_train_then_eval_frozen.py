@@ -2,7 +2,7 @@
 """
 SpatialTTO: train → score map 고정 → frozen benchmark으로 inference.
 
-지원: cvbench (20), 3dsrbench (20) — 기본 20 samples, 카테고리 균등
+지원: cvbench (200), 3dsrbench (20) — cvbench 200 samples 카테고리 균등, 기본 3 agents (SpaceOm 제외)
 
 1. Train: data/dataset/<train_subdir> (GitHub 데이터), SpatialTTO로 confidence score 업데이트 (4 agents)
 2. Score map 저장
@@ -33,6 +33,7 @@ from src2.benchmarks.loaders import (
     get_benchmark_image,
     get_benchmark_prompt,
     get_benchmark_answer,
+    get_benchmark_category,
 )
 from src2.agents.mas_v2 import run_step
 from test_confidence_mas_v3_step4 import TrustScoreMapUpdaterStep4, build_runners_for_confidence
@@ -41,10 +42,10 @@ from test_confidence_mas_v3_step4 import TrustScoreMapUpdaterStep4, build_runner
 BENCHMARK_CONFIG = {
     "cvbench": {
         "train_subdir": "cvbench_train_300",
-        "train_samples": 20,
-        "max_per_category": 5,  # 4 cats × 5 = 20
-        "output_dir": "results/spatialtto_20_frozen_cvbench",
-        "score_map_name": "score_map_after_20.json",
+        "train_samples": 200,
+        "max_per_category": 50,  # 4 cats × 50 = 200
+        "output_dir": "results/spatialtto_200_frozen_cvbench",
+        "score_map_name": "score_map_after_200.json",
         "frozen_size": 400,
     },
     "3dsrbench": {
@@ -81,8 +82,10 @@ def main():
                         help="Run eval phase after train (default: train only)")
     parser.add_argument("--score_map_path", type=str, default=None,
                         help="Path to saved score_map JSON")
-    parser.add_argument("--no_spaceom", action="store_true",
-                        help="Skip SpaceOm (3 agents only). Use when accelerate is not installed.")
+    parser.add_argument("--with_spaceom", action="store_true",
+                        help="Include SpaceOm (4 agents). Default: 3 agents (qwen3_4b, llava4d, spatial_reasoner)")
+    parser.add_argument("--specialist_offload", action="store_true",
+                        help="Offload specialists to CPU after use (saves GPU memory, slower)")
     parser.add_argument("--verbose_markdown", action="store_true",
                         help="Print markdown summary per step (question, category, scores, agents, updated table)")
     parser.add_argument("--save_step_text", type=str, default=None,
@@ -127,8 +130,8 @@ def main():
         train_samples = 0
 
     if not args.inference_only:
-        specialist_llms = ["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"] if not args.no_spaceom else ["qwen3_4b", "llava4d", "spatial_reasoner"]
-        if args.no_spaceom:
+        specialist_llms = ["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"] if args.with_spaceom else ["qwen3_4b", "llava4d", "spatial_reasoner"]
+        if not args.with_spaceom:
             specialist_whitelist = specialist_llms
 
     # --- 1. Build runners ---
@@ -136,6 +139,7 @@ def main():
         specialist_device="cuda",
         specialist_whitelist=specialist_whitelist,
         use_vlm_reasoning=True,
+        specialist_offload_after_use=args.specialist_offload,
     )
 
     if not args.inference_only:
@@ -167,12 +171,14 @@ def main():
         updater = TrustScoreMapUpdaterStep4(T=args.T, kappa=args.kappa, gamma=args.gamma)
 
         import random
+        from collections import defaultdict
         rng = random.Random(args.seed)
         indices = list(range(len(train_ds)))
         rng.shuffle(indices)
         samples = [train_ds[i] for i in indices]
 
         correct_train = 0
+        per_cat_train = defaultdict(lambda: {"correct": 0, "total": 0})
         for step, ex in enumerate(samples):
             image = get_benchmark_image(ex, args.benchmark)
             if image is None:
@@ -205,6 +211,10 @@ def main():
                 print(result["verbose_markdown"])
             if result.get("correct"):
                 correct_train += 1
+            cat = get_benchmark_category(ex, args.benchmark) or result.get("category") or "unknown"
+            per_cat_train[cat]["total"] += 1
+            if result.get("correct"):
+                per_cat_train[cat]["correct"] += 1
             acc = 100 * correct_train / (step + 1)
             pred = (result.get("final_answer") or "").strip()[:20]
             gt_s = (result.get("gt") or "").strip()[:20]
@@ -212,6 +222,14 @@ def main():
             print(f"  Step {step + 1}/{len(samples)} | {ok} | acc: {acc:.1f}% | cat: {result.get('category')} | assign: {result.get('assignments')} | pred: {pred} | gt: {gt_s}")
 
         print(f"\n[Train] Accuracy: {correct_train}/{len(samples)} = {100*correct_train/len(samples):.1f}%")
+        print("-" * 50)
+        print(f"{'Category':<14} | {'Correct':>7} | {'Total':>5} | {'Accuracy':>8}")
+        print("-" * 50)
+        for cat in sorted(per_cat_train.keys()):
+            c, t = per_cat_train[cat]["correct"], per_cat_train[cat]["total"]
+            acc = 100 * c / t if t else 0
+            print(f"{cat:<14} | {c:>7} | {t:>5} | {acc:>6.1f}%")
+        print("-" * 50)
         train_samples = len(samples)
 
         # Save score map
@@ -306,15 +324,25 @@ def main():
         (out_dir / "eval_by_category.md").write_text("\n".join(md_lines))
         print(f"[Save] Category table → {out_dir / 'eval_by_category.md'}")
     else:
-        # train only (no eval): save train summary
+        # train only (no eval): save train summary + per-category accuracy
         if not args.inference_only:
             import json
             from datetime import datetime
+            per_cat_detail = {}
+            for cat, cnt in per_cat_train.items():
+                t = cnt["total"]
+                c = cnt["correct"]
+                per_cat_detail[cat] = {
+                    "correct": c,
+                    "total": t,
+                    "accuracy": (c / t) if t else 0.0,
+                }
             summary = {
                 "benchmark": args.benchmark,
                 "train_only": True,
                 "train_samples": train_samples,
                 "train_accuracy": (correct_train / train_samples) if train_samples else None,
+                "per_category": per_cat_detail,
                 "T": args.T,
                 "kappa": args.kappa,
                 "gamma": args.gamma,
@@ -323,6 +351,26 @@ def main():
             }
             (out_dir / "train_summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
             print(f"\n[Save] Train summary → {out_dir / 'train_summary.json'}")
+            # 카테고리별 accuracy 로그
+            md_lines = [
+                "## Train — Category별 Accuracy",
+                "",
+                "**Overall:** {}/{} = {:.1f}%".format(
+                    correct_train, train_samples,
+                    100 * correct_train / train_samples if train_samples else 0,
+                ),
+                "",
+                "| Category | Correct | Total | Accuracy |",
+                "|----------|---------|-------|----------|",
+            ]
+            for cat in sorted(per_cat_detail.keys()):
+                d = per_cat_detail[cat]
+                md_lines.append("| {} | {} | {} | {:.1f}% |".format(
+                    cat, d["correct"], d["total"], 100 * d["accuracy"],
+                ))
+            md_lines.append("")
+            (out_dir / "train_by_category.md").write_text("\n".join(md_lines))
+            print(f"[Save] Category accuracy → {out_dir / 'train_by_category.md'}")
 
 
 if __name__ == "__main__":
