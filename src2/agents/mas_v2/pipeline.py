@@ -372,7 +372,9 @@ def run_test(
                 "  Step %d/%d | acc: %.1f%% | cat: %s | assign: %s",
                 step + 1, total, acc_pct, cat, assign,
             )
-            if (step + 1) % 5 == 0 or step == 0:
+            # scores: every 5 steps, or every step when total <= 10
+            show_scores = (step + 1) % 5 == 0 or step == 0 or total <= 10
+            if show_scores:
                 maps = score_map.get_all_maps()
                 logger.info("    scores (step %d): %s", step + 1, maps)
         elif (step + 1) % 50 == 0 or step == total - 1:

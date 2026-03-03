@@ -42,10 +42,11 @@ LOW_MEMORY=1 bash scripts/run_mas_tto.sh --test_only --max_samples 20
 bash scripts/run_mas_tto.sh --low_memory --test_only --max_samples 20
 ```
 
-**4-agent avec SpaceOm** (test, script séparé):
+**4-agent avec SpaceOm + LLaVA-4D** (test, script séparé):
 
 ```bash
 LOW_MEMORY=1 bash scripts/run_mas_tto_lowmem4.sh --test_only --max_samples 20
+# Specialists: qwen3_4b, llava4d, spaceom, spatial_reasoner
 # Résultats: results/mas_tto_lowmem4_3dsrbench/
 ```
 
