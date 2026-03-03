@@ -2,7 +2,7 @@
 """
 SpatialTTO: train → score map 고정 → frozen benchmark으로 inference.
 
-지원: cvbench (300), 3dsrbench (200)
+지원: cvbench (50), 3dsrbench (50) — 기본 50 samples
 
 1. Train: data/dataset/<train_subdir> (GitHub 데이터), SpatialTTO로 confidence score 업데이트 (4 agents)
 2. Score map 저장
@@ -39,16 +39,16 @@ from test_confidence_mas_v3_step4 import TrustScoreMapUpdaterStep4, build_runner
 BENCHMARK_CONFIG = {
     "cvbench": {
         "train_subdir": "cvbench_train_300",
-        "train_samples": 300,
-        "output_dir": "results/spatialtto_300_frozen_cvbench",
-        "score_map_name": "score_map_after_300.json",
+        "train_samples": 50,
+        "output_dir": "results/spatialtto_50_frozen_cvbench",
+        "score_map_name": "score_map_after_50.json",
         "frozen_size": 400,
     },
     "3dsrbench": {
         "train_subdir": "3dsrbench_train_300",
-        "train_samples": 200,
-        "output_dir": "results/spatialtto_200_frozen_3dsrbench",
-        "score_map_name": "score_map_after_200.json",
+        "train_samples": 50,
+        "output_dir": "results/spatialtto_50_frozen_3dsrbench",
+        "score_map_name": "score_map_after_50.json",
         "frozen_size": 500,
     },
 }
@@ -190,9 +190,10 @@ def main():
             if result.get("correct"):
                 correct_train += 1
             acc = 100 * correct_train / (step + 1)
-            log_every = 10 if len(samples) > 100 else 1
-            if (step + 1) % log_every == 0 or step + 1 == len(samples):
-                print(f"  Step {step + 1}/{len(samples)} | acc: {acc:.1f}% | cat: {result.get('category')} | assign: {result.get('assignments')}")
+            pred = (result.get("final_answer") or "").strip()[:20]
+            gt_s = (result.get("gt") or "").strip()[:20]
+            ok = "✓" if result.get("correct") else "✗"
+            print(f"  Step {step + 1}/{len(samples)} | {ok} | acc: {acc:.1f}% | cat: {result.get('category')} | assign: {result.get('assignments')} | pred: {pred} | gt: {gt_s}")
 
         print(f"\n[Train] Accuracy: {correct_train}/{len(samples)} = {100*correct_train/len(samples):.1f}%")
         train_samples = len(samples)
