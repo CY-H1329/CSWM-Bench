@@ -52,10 +52,12 @@ class SpaceOmRunner(BaseVLM):
                 **kwargs,
             )
         else:
+            # Fallback when accelerate missing: load to CPU, then .to(device)
             load_kwargs = dict(
                 torch_dtype=torch.bfloat16 if use_cuda else torch.float32,
                 trust_remote_code=True,
-                **kwargs,
+                low_cpu_mem_usage=False,
+                **{k: v for k, v in kwargs.items() if k not in ("device_map",)},
             )
         if use_flash_attn and device == "cuda":
             try:
