@@ -210,10 +210,15 @@ cd Spatial_MAS
 # 2. SpatialRGPT 없으면
 git clone https://github.com/AnjieCheng/SpatialRGPT SpatialRGPT
 
-# 3. 환경 설정
+# 3. 가상환경 생성
+conda create -n srgpt_axhub python=3.10 -y
+
+# 4. 가상환경 활성화
+conda activate srgpt_axhub
+
+# 5. 환경설정 (pip install)
 bash scripts/setup_axhub_srgpt_env.sh
 
-# 4. 실행
-conda activate srgpt_axhub
+# 6. 실행
 ./scripts/run_axhub_srgpt_cvbench_count.sh
 ```

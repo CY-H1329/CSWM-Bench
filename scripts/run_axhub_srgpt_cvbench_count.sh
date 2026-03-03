@@ -3,9 +3,10 @@
 # Head + Final은 그대로, Specialist 3개 전부 SpatialRGPT
 #
 # 사용:
-#   1) 환경 설정: bash scripts/setup_axhub_srgpt_env.sh
-#   2) conda activate srgpt_axhub
-#   3) ./scripts/run_axhub_srgpt_cvbench_count.sh
+#   1) 가상환경 생성: conda create -n srgpt_axhub python=3.10 -y
+#   2) 가상환경 활성화: conda activate srgpt_axhub
+#   3) 환경설정: bash scripts/setup_axhub_srgpt_env.sh
+#   4) 실행: ./scripts/run_axhub_srgpt_cvbench_count.sh
 #
 # 샘플 수 변경: MAX_SAMPLES=50 ./scripts/run_axhub_srgpt_cvbench_count.sh
 
