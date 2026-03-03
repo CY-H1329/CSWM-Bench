@@ -1,0 +1,33 @@
+{
+  "categories": ["spatial_relation", "distance_depth", "size", "orientation", "counting"],
+  "llms": ["qwen3_4b", "llava4d", "spatial_reasoner"],
+  "roles": ["direct_visual_heuristic", "explicit_3d_representation", "scene_graph_construction"],
+  "initial_score": 0.5,
+  "maps": {
+    "spatial_relation": {
+      "direct_visual_heuristic": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.4730399462059601},
+      "explicit_3d_representation": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5},
+      "scene_graph_construction": {"qwen3_4b": 1.0, "llava4d": 0.5, "spatial_reasoner": 0.5}
+    },
+    "distance_depth": {
+      "direct_visual_heuristic": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5},
+      "explicit_3d_representation": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5},
+      "scene_graph_construction": {"qwen3_4b": 1.0, "llava4d": 0.5, "spatial_reasoner": 0.5}
+    },
+    "size": {
+      "direct_visual_heuristic": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5},
+      "explicit_3d_representation": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5},
+      "scene_graph_construction": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5}
+    },
+    "orientation": {
+      "direct_visual_heuristic": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5},
+      "explicit_3d_representation": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5},
+      "scene_graph_construction": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5}
+    },
+    "counting": {
+      "direct_visual_heuristic": {"qwen3_4b": 0.5, "llava4d": 0.5, "spatial_reasoner": 0.5},
+      "explicit_3d_representation": {"qwen3_4b": 1.0, "llava4d": 0.5, "spatial_reasoner": 0.5},
+      "scene_graph_construction": {"qwen3_4b": 0.4855299560633716, "llava4d": 0.4035091345191676, "spatial_reasoner": 0.8548542391658668}
+    }
+  }
+}

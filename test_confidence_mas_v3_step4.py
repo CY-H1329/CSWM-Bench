@@ -183,6 +183,7 @@ class TrustScoreMapUpdaterStep4:
 def build_runners_for_confidence(
     specialist_device: str = "cuda",
     specialist_llms: list = None,
+    specialist_whitelist: list = None,
     use_vlm_reasoning: bool = True,
     specialist_offload_after_use: bool = False,
 ):
@@ -193,6 +194,8 @@ def build_runners_for_confidence(
         specialist_device=specialist_device,
         use_vlm_reasoning=use_vlm_reasoning,
     )
+    if specialist_whitelist is not None:
+        kwargs["specialist_whitelist"] = specialist_whitelist
     if specialist_offload_after_use:
         kwargs["specialist_offload_after_use"] = True
     try:
