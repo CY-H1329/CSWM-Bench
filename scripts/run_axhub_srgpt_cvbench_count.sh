@@ -32,9 +32,13 @@ echo "  Specialist: SpatialRGPT (3 roles)"
 echo "  Final: Qwen3-VL-8B"
 echo "=============================================="
 
+EXTRA_ARGS=()
+[[ -n "$SAVE_STEP_ACC" ]] && EXTRA_ARGS+=(--save_step_acc "$SAVE_STEP_ACC")
+
 python test_fixed_specialist_mas_v2.py \
   --specialist spatial_rgpt \
   --benchmark cvbench \
   --category_filter Count \
   --max_samples "$MAX_SAMPLES" \
-  --device cuda
+  --device cuda \
+  "${EXTRA_ARGS[@]}"

@@ -100,6 +100,7 @@ def run_fixed_specialist_mas_test(
     seed: int = 42,
     use_vlm_reasoning: bool = True,
     category_filter: Optional[List[str]] = None,
+    save_step_acc_path: Optional[str] = None,
 ):
     """
     전문가 LLM 고정 MAS v2 실행 (trust 없음).
@@ -127,6 +128,7 @@ def run_fixed_specialist_mas_test(
 
     correct = 0
     total = 0
+    step_accuracies: List[float] = []
     by_category = defaultdict(lambda: {"correct": 0, "total": 0})
 
     # Count 전용이면 Head Agent 건너뛰고 category="counting" 고정 (spatial_relation 오분류 방지)
@@ -171,6 +173,7 @@ def run_fixed_specialist_mas_test(
             by_category[cat]["correct"] += 1
 
         acc = correct / total if total > 0 else 0
+        step_accuracies.append(100 * acc)
         print(f"  Step {step+1}/{len(samples)} | acc: {100*acc:.1f}% | cat: {cat} | "
               f"assign: {[(r, l) for r, l in result.get('assignments', [])]}")
 
@@ -191,6 +194,12 @@ def run_fixed_specialist_mas_test(
     print()
     print(f"Accuracy: {correct}/{total} = {100*correct/total:.1f}%")
 
+    if save_step_acc_path:
+        import json
+        with open(save_step_acc_path, "w") as f:
+            json.dump({"step_accuracies": step_accuracies, "correct": correct, "total": total}, f, indent=2)
+        print(f"  (step_accuracies saved to {save_step_acc_path})")
+
     return {
         "benchmark": benchmark,
         "specialist": specialist,
@@ -198,6 +207,7 @@ def run_fixed_specialist_mas_test(
         "correct": correct,
         "total": total,
         "per_category": dict(by_category),
+        "step_accuracies": step_accuracies,
     }
 
 
@@ -209,6 +219,7 @@ if __name__ == "__main__":
     parser.add_argument("--category_filter", nargs="+", default=None, help="counting만: --category_filter Count (cvbench)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--save_step_acc", type=str, default=None, help="Save step_accuracies to JSON for plotting")
     args = parser.parse_args()
 
     head_gen, spec_gen, reason_gen = build_runners_fixed(
@@ -224,4 +235,5 @@ if __name__ == "__main__":
         max_samples=args.max_samples,
         seed=args.seed,
         category_filter=args.category_filter,
+        save_step_acc_path=args.save_step_acc,
     )
