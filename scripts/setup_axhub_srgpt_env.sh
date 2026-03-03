@@ -35,10 +35,10 @@ fi
 
 pip install --upgrade pip
 
-# PyTorch
+# PyTorch 2.4+ (transformers 4.51+ 요구)
 echo ""
-echo "[1] PyTorch ($CUDA_VER)..."
-pip install torch==2.3.0 torchvision==0.18.0 --index-url "https://download.pytorch.org/whl/${CUDA_VER}"
+echo "[1] PyTorch 2.4 ($CUDA_VER)..."
+pip install torch==2.4.0 torchvision==0.19.0 --index-url "https://download.pytorch.org/whl/${CUDA_VER}"
 
 # FlashAttention
 echo ""
@@ -48,6 +48,7 @@ pip install flash-attn --no-build-isolation 2>/dev/null || echo "  flash_attn �
 # SpatialRGPT 의존성
 echo ""
 echo "[3] SpatialRGPT 의존성..."
+pip install deepspeed
 pip install "s2wrapper@git+https://github.com/bfshi/scaling_on_scales.git"
 pip install einops==0.6.1 einops-exts==0.0.4 timm==0.9.12
 pip install sentencepiece shortuuid "pydantic<2" markdown2 requests httpx

@@ -65,6 +65,11 @@ def _load_via_spatialrgpt_repo(model_id: str, device: str, **kwargs):
 
         _mutils.no_init_weights = _no_init_weights
 
+    # Patch for transformers 5.x: is_tf_available was removed
+    import transformers.utils as _tu
+    if not hasattr(_tu, "is_tf_available"):
+        _tu.is_tf_available = lambda: False
+
     from llava.model.builder import load_pretrained_model
 
     # vila-siglip-llama3-8b for 8B model; vila-siglip-llama-3b for 3B
