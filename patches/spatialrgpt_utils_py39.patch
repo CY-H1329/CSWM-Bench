@@ -1,0 +1,19 @@
+--- a/llava/train/utils.py
++++ b/llava/train/utils.py
+@@ -5,6 +5,7 @@
+ import re
+ import warnings
+ from dataclasses import dataclass
++from typing import Optional
+ 
+ import torch
+ import torch.distributed as dist
+@@ -39,7 +40,7 @@
+ def is_local(model_name_or_path: str) -> bool:
+     return os.path.isdir(model_name_or_path)
+ 
+ 
+-def get_checkpoint_path(output_dir: str, checkpoint_prefix: str = "checkpoint") -> str | None:
++def get_checkpoint_path(output_dir: str, checkpoint_prefix: str = "checkpoint") -> Optional[str]:
+     output_dir = os.path.abspath(output_dir)
+     pathlib_dir = pathlib.Path(output_dir)

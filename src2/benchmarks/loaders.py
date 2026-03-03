@@ -3,6 +3,9 @@ Unified loaders for all 4 benchmarks.
 Returns normalized format: image, question, options (list or None), answer, category (optional).
 
 3DSRBench: images are fetched from URL. Use image_cache_dir to cache locally for faster reruns.
+
+Supports frozen benchmarks: when use_frozen=True (default), loads from data/frozen_benchmarks/
+for reproducible paper experiments.
 """
 import hashlib
 import io
@@ -14,6 +17,14 @@ from typing import Any, Dict, List, Optional
 from datasets import load_dataset, load_from_disk
 from PIL import Image
 import requests
+
+# Frozen benchmark paths (DO NOT MODIFY - used for all paper experiments)
+FROZEN_BENCHMARK_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "frozen_benchmarks"
+FROZEN_PATHS = {
+    "cvbench": "cvbench_400",
+    "cvbench_counting_100": "cvbench_counting_100",  # scripts/create_cvbench_counting_100.py로 생성
+    "3dsrbench": "3dsrbench_500",
+}
 
 # Local cache for 3DSRBench URL images (set to enable)
 IMAGE_CACHE_DIR = os.environ.get("SPATIAL_MAS_IMAGE_CACHE")
@@ -33,6 +44,15 @@ SPATIAL_TASK_CATEGORIES = [
 
 BENCHMARK_CONFIGS = {
     "cvbench": {
+        "name": "nyu-visionx/CV-Bench",
+        "split": "test",
+        "image_key": "image",
+        "question_key": "question",
+        "options_key": "choices",
+        "answer_key": "answer",
+        "category_key": "task",
+    },
+    "cvbench_counting_100": {
         "name": "nyu-visionx/CV-Bench",
         "split": "test",
         "image_key": "image",
@@ -89,26 +109,80 @@ def load_benchmark(
     max_per_category: Optional[int] = None,
     category_filter: Optional[List[str]] = None,
     seed: int = 42,
+    use_frozen: bool = True,
 ):
     """
-    Load a benchmark dataset. Uses HuggingFace cache (from setup_datasets.py).
+    Load a benchmark dataset.
+
+    When use_frozen=True (default): loads from data/frozen_benchmarks/ for reproducible
+    paper experiments. Applies max_samples/max_per_category if provided.
+
+    When use_frozen=False: loads from HuggingFace cache and applies sampling.
+
     Returns dataset with normalized access via get_benchmark_* helpers.
 
     Args:
-        category_filter: If set, keep only samples whose category is in this list.
+        category_filter: If set (and use_frozen=False), keep only samples whose category is in this list.
     """
     if benchmark not in BENCHMARK_CONFIGS:
         raise ValueError(f"Unknown benchmark: {benchmark}. Choose from {list(BENCHMARK_CONFIGS.keys())}")
 
+    ds = None
+    # Try frozen benchmark first
+    if use_frozen and benchmark in FROZEN_PATHS:
+        frozen_name = FROZEN_PATHS[benchmark]
+        frozen_path = FROZEN_BENCHMARK_DIR / frozen_name
+        if frozen_path.exists() and (frozen_path / "dataset_info.json").exists():
+            try:
+                from datasets import load_from_disk
+                ds = load_from_disk(str(frozen_path))
+            except (TypeError, Exception) as e:
+                # datasets version mismatch (e.g. srgpt env vs spatial_reasoning)
+                import warnings
+                warnings.warn(
+                    f"load_from_disk failed ({e}). Falling back to HuggingFace. "
+                    "For reproducible frozen set, use matching datasets version."
+                )
+
+    # Fallback: load from HuggingFace if frozen didn't succeed
     cfg = BENCHMARK_CONFIGS[benchmark]
     name = cfg["name"]
     split = cfg["split"]
     subset = cfg.get("subset")
 
-    if subset:
-        ds = load_dataset(name, subset, split=split)
-    else:
-        ds = load_dataset(name, split=split)
+    if ds is None:
+        load_kw = {"split": split}
+
+        def _try_load():
+            if subset:
+                return load_dataset(name, subset, **load_kw)
+            return load_dataset(name, **load_kw)
+
+        try:
+            ds = _try_load()
+        except (TypeError, Exception) as err1:
+            err_str = str(err1)
+            if "dataclass" in err_str or "must be called" in err_str:
+                # datasets 2.16.1 cannot parse CV-Bench metadata from HF (created with newer datasets).
+                # Fallback: load parquet directly (infers schema from file, bypasses dataset_info.json).
+                if benchmark == "cvbench" and name == "nyu-visionx/CV-Bench":
+                    try:
+                        base = "https://huggingface.co/datasets/nyu-visionx/CV-Bench/resolve/main"
+                        data_files = {"test": [f"{base}/test_2d.parquet", f"{base}/test_3d.parquet"]}
+                        ds = load_dataset("parquet", data_files=data_files, split="test")
+                    except Exception as parquet_err:
+                        raise RuntimeError(
+                            f"CV-Bench load failed: standard ({err1}), parquet fallback ({parquet_err}). "
+                            "Try: pip install datasets>=2.18 (may conflict with vila)"
+                        ) from parquet_err
+                else:
+                    raise
+            else:
+                raise
+
+    if ds is None:
+        raise RuntimeError("load_benchmark failed")
+
 
     rng = random.Random(seed)
     cat_key = cfg.get("category_key")
@@ -186,6 +260,31 @@ def get_benchmark_image(example: Dict, benchmark: str) -> Optional[Image.Image]:
     if hasattr(img, "convert"):
         return img.convert("RGB")
     return img
+
+
+def is_multiple_choice(example: Dict, benchmark: str) -> bool:
+    """True if the question has multiple-choice options (A/B/C/D...), False for free-form/numeric."""
+    cfg = BENCHMARK_CONFIGS[benchmark]
+    opts_key = cfg.get("options_key")
+    opts_keys = cfg.get("options_keys")
+    if opts_key and opts_key in example:
+        opts = example[opts_key]
+        return bool(opts and len(opts) > 0)
+    if opts_keys:
+        opts = [example.get(k) for k in opts_keys if example.get(k)]
+        return bool(opts)
+    return False
+
+
+def infer_answer_type_from_query(query: str) -> str:
+    """Infer 'multiple_choice' or 'free_form' from query string.
+    Use when example is not available (e.g. pipeline only has query)."""
+    if not query or not query.strip():
+        return "free_form"
+    q = query.strip().upper()
+    if "OPTIONS:" in q and ("(A)" in q or "(B)" in q):
+        return "multiple_choice"
+    return "free_form"
 
 
 def get_benchmark_prompt(example: Dict, benchmark: str, include_options: bool = True) -> str:

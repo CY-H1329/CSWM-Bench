@@ -1,0 +1,24 @@
+# Spatial_MAS + Sa2VA 호환 환경
+# Sa2VA: transformers 4.57.1 (ByteDance Sa2VA pyproject)
+# Qwen3-VL: transformers>=4.51 (둘 다 만족)
+
+torch>=2.1.0
+torchvision
+transformers==4.57.1
+datasets
+huggingface_hub
+accelerate
+peft
+qwen-vl-utils
+pillow
+openai>=1.0.0
+tqdm
+pyyaml
+requests
+pandas
+numpy
+
+# Sa2VA 의존성
+einops
+timm
+# peft (이미 위에 있음)

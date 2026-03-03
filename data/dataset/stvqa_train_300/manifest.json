@@ -1,0 +1,18 @@
+{
+  "benchmark": "stvqa",
+  "split": "train",
+  "n_samples": 300,
+  "source": "hunarbatra/STVQA-7K",
+  "seed": 42,
+  "per_category": {
+    "relation": 33,
+    "reach": 33,
+    "size": 33,
+    "orientation": 33,
+    "instance_location": 33,
+    "depth": 34,
+    "distance": 34,
+    "count": 34,
+    "existence": 33
+  }
+}

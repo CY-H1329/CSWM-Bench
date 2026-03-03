@@ -9,6 +9,8 @@ from .loaders import (
     get_benchmark_answer,
     get_benchmark_image,
     get_benchmark_category,
+    is_multiple_choice,
+    infer_answer_type_from_query,
     SPATIAL_TASK_CATEGORIES,
 )
 
@@ -19,5 +21,7 @@ __all__ = [
     "get_benchmark_answer",
     "get_benchmark_image",
     "get_benchmark_category",
+    "is_multiple_choice",
+    "infer_answer_type_from_query",
     "SPATIAL_TASK_CATEGORIES",
 ]

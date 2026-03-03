@@ -1,0 +1,9 @@
+{
+  "train_datasets": "Disjoint from frozen_benchmarks (used for training)",
+  "seed": 42,
+  "paths": {
+    "cvbench": "cvbench_train_300",
+    "3dsrbench": "3dsrbench_train_300",
+    "stvqa": "stvqa_train_300"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "benchmark": "cvbench",
+  "split": "train",
+  "n_samples": 300,
+  "excludes": "cvbench_400 (frozen)",
+  "seed": 42,
+  "source": "nyu-visionx/CV-Bench",
+  "per_category": {
+    "Count": 75,
+    "Relation": 75,
+    "Depth": 75,
+    "Distance": 75
+  }
+}

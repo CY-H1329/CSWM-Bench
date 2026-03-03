@@ -35,13 +35,21 @@ def load_stvqa(
     max_samples: Optional[int] = None,
     max_per_category: Optional[int] = None,
     seed: int = 42,
+    use_frozen: bool = True,
 ):
     """
     Load STVQA-7K for evaluation.
     - split: "val" (692) or "train" (6895)
     - max_samples: 전체 상한 (앞에서부터)
     - max_per_category: 카테고리별 최대 개수 (균등 샘플링). 모든 task를 골고루 실험할 때 사용.
+    - use_frozen: If True (default), load from data/frozen_benchmarks/stvqa_full for paper experiments.
     """
+    from pathlib import Path
+    frozen_path = Path(__file__).resolve().parent.parent / "data" / "frozen_benchmarks" / "stvqa_full"
+    if use_frozen and frozen_path.exists() and (frozen_path / "dataset_info.json").exists():
+        from datasets import load_from_disk
+        return load_from_disk(str(frozen_path))
+
     try:
         dataset = load_dataset(dataset_name, split=split)
     except TypeError as e:

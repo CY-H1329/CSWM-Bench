@@ -2,26 +2,17 @@
 """
 Confidence MAS v2 — run_step2 (s += R̃, gamma=1.0, 보상 스케일 후 누적).
 
+Usage (CLI):
+    python test_confidence_mas_v2_step2.py --benchmark cvbench --max_samples 50
+    python test_confidence_mas_v2_step2.py --benchmark 3dsrbench --max_samples 50
+
 Usage (Jupyter):
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path("/home/jovyan/CY/Spatial_MAS")))
-
     from test_confidence_mas_v2_step2 import run_confidence_mas_test_step2, build_runners_for_confidence
-
-    head_gen, spec_gen, reason_gen = build_runners_for_confidence(
-        specialist_device="cuda",
-        use_vlm_reasoning=True,
-    )
-    results = run_confidence_mas_test_step2(
-        head_gen, spec_gen, reason_gen,
-        benchmark="cvbench",
-        max_samples=50,
-        T=10.0,
-        kappa=1.0,
-    )
+    head_gen, spec_gen, reason_gen = build_runners_for_confidence(use_vlm_reasoning=True)
+    results = run_confidence_mas_test_step2(head_gen, spec_gen, reason_gen, benchmark="cvbench", max_samples=50)
     print(f"Accuracy: {results['correct']}/{results['total']} = {100*results['accuracy']:.1f}%")
 """
+import argparse
 import logging
 import random
 import sys
@@ -33,7 +24,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from src2.agents.mas_v2 import (
     ALL_CATEGORIES,
     ROLES,
-    SPECIALIST_LLMS,
     ScoreMap,
     run_step,
 )
@@ -179,7 +169,6 @@ def run_confidence_mas_test_step2(
 ):
     """
     Run Confidence MAS with run_step2 (s += R̃, gamma=1.0).
-
     Returns: {correct, total, accuracy, per_category, score_map, ...}
     """
     specialist_llms = specialist_llms or ["qwen3_4b", "llava4d", "spatial_reasoner"]
@@ -278,12 +267,11 @@ def run_confidence_mas_test_step2(
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("--benchmark", default="cvbench")
+    parser.add_argument("--benchmark", default="cvbench", choices=["cvbench", "cvbench_counting_100", "3dsrbench"])
     parser.add_argument("--max_samples", type=int, default=50)
-    parser.add_argument("--T", type=float, default=10.0)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--T", type=float, default=10.0, help="step2 scale parameter")
     parser.add_argument("--kappa", type=float, default=1.0)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--use_vlm_reasoning", action="store_true", default=True)
@@ -297,6 +285,7 @@ if __name__ == "__main__":
         head_gen, spec_gen, reason_gen,
         benchmark=args.benchmark,
         max_samples=args.max_samples,
+        seed=args.seed,
         T=args.T,
         kappa=args.kappa,
         use_vlm_reasoning=args.use_vlm_reasoning,

@@ -1,0 +1,31 @@
+# SpatialRGPT + Spatial_MAS 의존성 (한 번에 설치)
+# 사용: pip install -r requirements-spatialrgpt.txt
+
+# Spatial_MAS 기본
+torch>=2.1.0
+torchvision
+transformers>=4.51.0
+datasets
+huggingface_hub
+accelerate
+peft
+qwen-vl-utils
+pillow
+openai>=1.0.0
+tqdm
+pyyaml
+requests
+pandas
+numpy
+
+# SpatialRGPT 전용
+einops
+timm
+sentencepiece
+shortuuid
+
+# s2wrapper (SpatialRGPT vision encoder)
+s2wrapper @ git+https://github.com/bfshi/scaling_on_scales.git
+
+# flash-attn (선택, CUDA 필요; 실패 시 install_spatialrgpt_deps.sh가 폴백 패치 적용)
+# flash-attn
