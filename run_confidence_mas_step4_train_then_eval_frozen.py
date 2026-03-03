@@ -15,6 +15,8 @@ Usage:
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench
     # Inference only
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench --inference_only
+    # Train only (TTO, skip eval)
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench --train_only
 """
 import sys
 from pathlib import Path
@@ -71,10 +73,16 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--inference_only", action="store_true",
                         help="Skip train phase; load saved TTO score map and run eval only")
+    parser.add_argument("--train_only", action="store_true",
+                        help="Run TTO train only; skip eval phase")
     parser.add_argument("--score_map_path", type=str, default=None,
                         help="Path to saved score_map JSON")
     parser.add_argument("--no_spaceom", action="store_true",
                         help="Skip SpaceOm (3 agents only). Use when accelerate is not installed.")
+    parser.add_argument("--verbose_markdown", action="store_true",
+                        help="Print markdown summary per step (question, category, scores, agents, updated table)")
+    parser.add_argument("--save_step_text", type=str, default=None,
+                        help="Save step data to text files in this dir: routing, per-agent CoT, final")
     args = parser.parse_args()
 
     bm_cfg = BENCHMARK_CONFIG[args.benchmark]
@@ -83,6 +91,11 @@ def main():
     out_dir = Path(args.output_dir or bm_cfg["output_dir"])
     score_map_name = bm_cfg["score_map_name"]
     out_dir.mkdir(parents=True, exist_ok=True)
+    save_step_dir = None
+    if args.save_step_text:
+        save_step_dir = Path(args.save_step_text)
+        save_step_dir.mkdir(parents=True, exist_ok=True)
+        print(f"[Save] Step text files → {save_step_dir}/{{train,eval}}/")
     score_map_path = Path(args.score_map_path) if args.score_map_path else out_dir / score_map_name
     _bundled = PROJECT_ROOT / "data" / "score_maps" / "score_map_50step.json"
 
@@ -155,6 +168,7 @@ def main():
             if not any(c in gt for c in "ABCD"):
                 continue
 
+            _step_dir = (save_step_dir / "train") if save_step_dir else None
             result = run_step(
                 image=image,
                 query=query,
@@ -168,7 +182,11 @@ def main():
                 updater=updater,
                 update_scores=True,
                 use_vlm_reasoning=True,
+                verbose_markdown=args.verbose_markdown,
+                save_step_dir=_step_dir,
             )
+            if args.verbose_markdown and result.get("verbose_markdown"):
+                print(result["verbose_markdown"])
             if result.get("correct"):
                 correct_train += 1
             acc = 100 * correct_train / (step + 1)
@@ -184,88 +202,109 @@ def main():
         print(f"[Save] Score map → {score_map_path}")
 
     # --- 4. Eval: frozen benchmark (no TTO updates) ---
-    frozen_name = {"cvbench": "cvbench_400", "3dsrbench": "3dsrbench_500"}[args.benchmark]
-    print("\n" + "=" * 70)
-    print(f"PHASE 2: Eval (frozen {frozen_name}, no TTO updates)")
-    print("=" * 70)
+    if not args.train_only:
+        frozen_name = {"cvbench": "cvbench_400", "3dsrbench": "3dsrbench_500"}[args.benchmark]
+        print("\n" + "=" * 70)
+        print(f"PHASE 2: Eval (frozen {frozen_name}, no TTO updates)")
+        print("=" * 70)
 
-    eval_ds = load_benchmark(args.benchmark, max_samples=args.eval_max, use_frozen=True, seed=args.seed)
-    print(f"[Eval] Loaded {len(eval_ds)} samples from frozen {frozen_name}")
+        eval_ds = load_benchmark(args.benchmark, max_samples=args.eval_max, use_frozen=True, seed=args.seed)
+        print(f"[Eval] Loaded {len(eval_ds)} samples from frozen {frozen_name}")
 
-    eval_results = run_test(
-        dataset=eval_ds,
-        benchmark=args.benchmark,
-        score_map=score_map,
-        head_generate=head_gen,
-        specialist_generate=spec_gen,
-        reasoning_generate=reason_gen,
-        random_agents=False,
-        use_vlm_reasoning=True,
-        verbose=True,
-        updater=None,
-        update_scores=False,
-    )
+        _eval_step_dir = (save_step_dir / "eval") if save_step_dir else None
+        eval_results = run_test(
+            dataset=eval_ds,
+            benchmark=args.benchmark,
+            score_map=score_map,
+            head_generate=head_gen,
+            specialist_generate=spec_gen,
+            reasoning_generate=reason_gen,
+            random_agents=False,
+            use_vlm_reasoning=True,
+            verbose=True,
+            verbose_markdown=args.verbose_markdown,
+            updater=None,
+            update_scores=False,
+            save_step_dir=_eval_step_dir,
+        )
 
-    metrics = compute_accuracy(eval_results)
-    per_cat = metrics.get("per_category", {})
-    per_cat_counts = metrics.get("per_category_counts", {})
+        metrics = compute_accuracy(eval_results)
+        per_cat = metrics.get("per_category", {})
+        per_cat_counts = metrics.get("per_category_counts", {})
 
-    print("\n" + "=" * 70)
-    print(f"FINAL EVAL (frozen {args.benchmark})")
-    print("=" * 70)
-    print(f"Overall: {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%")
-    print("-" * 70)
-    print(f"{'Category':<14} | {'Correct':>7} | {'Total':>5} | {'Accuracy':>8}")
-    print("-" * 70)
-    for cat, acc in sorted(per_cat.items(), key=lambda x: -x[1]):
-        cnt = per_cat_counts.get(cat, {})
-        c, t = cnt.get("correct", 0), cnt.get("total", 0)
-        print(f"{cat:<14} | {c:>7} | {t:>5} | {100*acc:>6.1f}%")
-    print("=" * 70)
+        print("\n" + "=" * 70)
+        print(f"FINAL EVAL (frozen {args.benchmark})")
+        print("=" * 70)
+        print(f"Overall: {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%")
+        print("-" * 70)
+        print(f"{'Category':<14} | {'Correct':>7} | {'Total':>5} | {'Accuracy':>8}")
+        print("-" * 70)
+        for cat, acc in sorted(per_cat.items(), key=lambda x: -x[1]):
+            cnt = per_cat_counts.get(cat, {})
+            c, t = cnt.get("correct", 0), cnt.get("total", 0)
+            print(f"{cat:<14} | {c:>7} | {t:>5} | {100*acc:>6.1f}%")
+        print("=" * 70)
 
-    # Save eval summary (JSON + 발표용 카테고리별 표)
-    import json
-    from datetime import datetime
-    per_cat_detail = {
-        cat: {"correct": per_cat_counts.get(cat, {}).get("correct", 0),
-              "total": per_cat_counts.get(cat, {}).get("total", 0),
-              "accuracy": per_cat.get(cat, 0.0)}
-        for cat in per_cat
-    }
-    summary = {
-        "benchmark": args.benchmark,
-        "inference_only": args.inference_only,
-        "train_samples": train_samples,
-        "train_accuracy": (correct_train / train_samples) if train_samples else None,
-        "eval_total": metrics["total"],
-        "eval_correct": metrics["correct"],
-        "eval_accuracy": metrics["accuracy"],
-        "per_category": per_cat_detail,
-        "T": args.T,
-        "kappa": args.kappa,
-        "gamma": args.gamma,
-        "specialist_llms": specialist_llms,
-        "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
-    }
-    (out_dir / "eval_summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
-    print(f"\n[Save] Eval summary → {out_dir / 'eval_summary.json'}")
+        # Save eval summary (JSON + 발표용 카테고리별 표)
+        import json
+        from datetime import datetime
+        per_cat_detail = {
+            cat: {"correct": per_cat_counts.get(cat, {}).get("correct", 0),
+                  "total": per_cat_counts.get(cat, {}).get("total", 0),
+                  "accuracy": per_cat.get(cat, 0.0)}
+            for cat in per_cat
+        }
+        summary = {
+            "benchmark": args.benchmark,
+            "inference_only": args.inference_only,
+            "train_samples": train_samples,
+            "train_accuracy": (correct_train / train_samples) if train_samples else None,
+            "eval_total": metrics["total"],
+            "eval_correct": metrics["correct"],
+            "eval_accuracy": metrics["accuracy"],
+            "per_category": per_cat_detail,
+            "T": args.T,
+            "kappa": args.kappa,
+            "gamma": args.gamma,
+            "specialist_llms": specialist_llms,
+            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+        }
+        (out_dir / "eval_summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+        print(f"\n[Save] Eval summary → {out_dir / 'eval_summary.json'}")
 
-    # 발표용 Markdown 테이블 (카테고리별 성능)
-    md_lines = [
-        f"## {args.benchmark.upper()} (frozen) - Category별 성능",
-        "",
-        f"**Overall:** {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%",
-        "",
-        "| Category | Correct | Total | Accuracy |",
-        "|----------|---------|-------|----------|",
-    ]
-    for cat, acc in sorted(per_cat.items(), key=lambda x: -x[1]):
-        cnt = per_cat_counts.get(cat, {})
-        c, t = cnt.get("correct", 0), cnt.get("total", 0)
-        md_lines.append(f"| {cat} | {c} | {t} | {100*acc:.1f}% |")
-    md_lines.append("")
-    (out_dir / "eval_by_category.md").write_text("\n".join(md_lines))
-    print(f"[Save] Category table → {out_dir / 'eval_by_category.md'}")
+        # 발표용 Markdown 테이블 (카테고리별 성능)
+        md_lines = [
+            f"## {args.benchmark.upper()} (frozen) - Category별 성능",
+            "",
+            f"**Overall:** {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%",
+            "",
+            "| Category | Correct | Total | Accuracy |",
+            "|----------|---------|-------|----------|",
+        ]
+        for cat, acc in sorted(per_cat.items(), key=lambda x: -x[1]):
+            cnt = per_cat_counts.get(cat, {})
+            c, t = cnt.get("correct", 0), cnt.get("total", 0)
+            md_lines.append(f"| {cat} | {c} | {t} | {100*acc:.1f}% |")
+        md_lines.append("")
+        (out_dir / "eval_by_category.md").write_text("\n".join(md_lines))
+        print(f"[Save] Category table → {out_dir / 'eval_by_category.md'}")
+    else:
+        # train_only: save train summary
+        import json
+        from datetime import datetime
+        summary = {
+            "benchmark": args.benchmark,
+            "train_only": True,
+            "train_samples": train_samples,
+            "train_accuracy": (correct_train / train_samples) if train_samples else None,
+            "T": args.T,
+            "kappa": args.kappa,
+            "gamma": args.gamma,
+            "specialist_llms": specialist_llms,
+            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+        }
+        (out_dir / "train_summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+        print(f"\n[Save] Train summary → {out_dir / 'train_summary.json'}")
 
 
 if __name__ == "__main__":

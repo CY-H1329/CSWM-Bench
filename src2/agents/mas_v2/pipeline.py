@@ -15,11 +15,13 @@ Models:
 import logging
 import re
 import time
-from typing import Callable, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from PIL import Image
 
 from .config import SPECIALIST_LLMS, ROLES, ALL_CATEGORIES, CATEGORY_DESCRIPTIONS
+from .markdown_verbose import format_step_markdown, save_step_to_files
 from .prompts import build_head_agent_prompt, build_role_prompt, build_final_reasoning_prompt
 from .score_map import ScoreMap
 from .score_map_updater import ScoreMapUpdater
@@ -132,6 +134,8 @@ def run_step(
     use_vlm_reasoning: bool = False,
     answer_type: Optional[str] = None,
     force_category: Optional[str] = None,
+    verbose_markdown: bool = False,
+    save_step_dir: Optional[Union[str, Path]] = None,
 ) -> Dict:
     """Execute one step of the MAS v2 pipeline.
 
@@ -146,6 +150,7 @@ def run_step(
         answer_type = _infer_answer_type(query)
 
     # 1. Head Agent -> category inference (or use force_category)
+    head_raw = None
     if force_category and force_category in ALL_CATEGORIES:
         category = force_category
     else:
@@ -195,13 +200,20 @@ def run_step(
         raw_output = specialist_generate(llm_name, image, role_prompt)
         answer, reason = parse_specialist_output(raw_output, answer_type=answer_type)
         shared_memory.add(role, llm_name, answer, reason)
-        agent_details.append({
+        raw_store = raw_output if save_step_dir else raw_output[:3000]
+        entry = {
             "role": role,
             "llm_name": llm_name,
             "answer": answer,
             "reason": reason,
-            "raw_output": raw_output[:3000],
-        })
+            "raw_output": raw_store,
+        }
+        if save_step_dir:
+            obj_names = object_names_cache if object_names_cache else None
+            entry["tool_output"] = (tool_output or "").strip()
+            entry["object_names"] = obj_names  # list of str or None
+            entry["role_prompt"] = role_prompt
+        agent_details.append(entry)
 
     # 4. Final Reasoning Agent (DeepSeek-R1 text-only, or Qwen3-VL-8B image+text)
     reasoning_prompt = build_final_reasoning_prompt(
@@ -224,17 +236,47 @@ def run_step(
         )
 
     elapsed = time.time() - t0
-    return {
+    correct = _is_correct(final_answer, gt, answer_type) if gt else None
+    result = {
         "step": step,
         "category": category,
         "assignments": [(r, l) for r, l in assignments],
         "agent_details": agent_details,
         "final_answer": final_answer,
         "gt": gt,
-        "correct": _is_correct(final_answer, gt, answer_type) if gt else None,
+        "correct": correct,
         "reasoning_raw": reasoning_raw[:3000],
         "elapsed_sec": round(elapsed, 2),
     }
+    if verbose_markdown:
+        result["verbose_markdown"] = format_step_markdown(
+            step=step,
+            query=query,
+            category=category,
+            head_raw=head_raw,
+            assignments=assignments,
+            agent_details=agent_details,
+            final_answer=final_answer or "",
+            gt=gt,
+            correct=correct,
+            score_map=score_map,
+        )
+    if save_step_dir:
+        save_step_to_files(
+            output_dir=Path(save_step_dir),
+            step=step,
+            query=query,
+            category=category,
+            head_raw=head_raw,
+            assignments=assignments,
+            agent_details=agent_details,
+            final_answer=final_answer or "",
+            gt=gt,
+            correct=correct,
+            score_map=score_map,
+            reasoning_raw=reasoning_raw,
+        )
+    return result
 
 
 # ======================================================================
@@ -319,8 +361,10 @@ def run_test(
     random_agents: bool = False,
     use_vlm_reasoning: bool = False,
     verbose: bool = False,
+    verbose_markdown: bool = False,
     updater: "ScoreMapUpdater" = None,
     update_scores: bool = False,
+    save_step_dir: Optional[Union[str, Path]] = None,
 ) -> List[Dict]:
     """Test phase: iterate over dataset.
 
@@ -365,10 +409,15 @@ def run_test(
             updater=updater,
             update_scores=update_scores and updater is not None,
             use_vlm_reasoning=use_vlm_reasoning,
+            verbose_markdown=verbose_markdown,
+            save_step_dir=save_step_dir,
         )
         if gt_category is not None:
             result["gt_category"] = gt_category
         results.append(result)
+
+        if verbose_markdown and result.get("verbose_markdown"):
+            print(result["verbose_markdown"])
 
         correct_so_far = sum(1 for r in results if r.get("correct"))
         acc_pct = 100.0 * correct_so_far / len(results) if results else 0
