@@ -73,6 +73,8 @@ def main():
                         help="Skip train phase; load saved TTO score map and run eval only")
     parser.add_argument("--score_map_path", type=str, default=None,
                         help="Path to saved score_map JSON")
+    parser.add_argument("--no_spaceom", action="store_true",
+                        help="Skip SpaceOm (3 agents only). Use when accelerate is not installed.")
     args = parser.parse_args()
 
     bm_cfg = BENCHMARK_CONFIG[args.benchmark]
@@ -101,15 +103,17 @@ def main():
         correct_train = None
         train_samples = 0
 
+    if not args.inference_only:
+        specialist_llms = ["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"] if not args.no_spaceom else ["qwen3_4b", "llava4d", "spatial_reasoner"]
+        if args.no_spaceom:
+            specialist_whitelist = specialist_llms
+
     # --- 1. Build runners ---
     head_gen, spec_gen, reason_gen = build_runners_for_confidence(
         specialist_device="cuda",
         specialist_whitelist=specialist_whitelist,
         use_vlm_reasoning=True,
     )
-
-    if not args.inference_only:
-        specialist_llms = ["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"]
         # --- 2. Train: dataset with SpatialTTO ---
         train_path = PROJECT_ROOT / "data" / "dataset" / train_subdir
         if train_path.exists():
