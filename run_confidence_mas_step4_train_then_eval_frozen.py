@@ -2,7 +2,7 @@
 """
 SpatialTTO: train → score map 고정 → frozen benchmark으로 inference.
 
-지원: cvbench (50), 3dsrbench (50) — 기본 50 samples
+지원: cvbench (20), 3dsrbench (20) — 기본 20 samples, 카테고리 균등
 
 1. Train: data/dataset/<train_subdir> (GitHub 데이터), SpatialTTO로 confidence score 업데이트 (4 agents)
 2. Score map 저장
@@ -15,8 +15,10 @@ Usage:
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench
     # Inference only
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench --inference_only
-    # Train only (TTO, skip eval)
-    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench --train_only
+    # Train only (TTO, skip eval) — default
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench
+    # Train + Eval
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench --eval
 """
 import sys
 from pathlib import Path
@@ -39,16 +41,18 @@ from test_confidence_mas_v3_step4 import TrustScoreMapUpdaterStep4, build_runner
 BENCHMARK_CONFIG = {
     "cvbench": {
         "train_subdir": "cvbench_train_300",
-        "train_samples": 50,
-        "output_dir": "results/spatialtto_50_frozen_cvbench",
-        "score_map_name": "score_map_after_50.json",
+        "train_samples": 20,
+        "max_per_category": 5,  # 4 cats × 5 = 20
+        "output_dir": "results/spatialtto_20_frozen_cvbench",
+        "score_map_name": "score_map_after_20.json",
         "frozen_size": 400,
     },
     "3dsrbench": {
         "train_subdir": "3dsrbench_train_300",
-        "train_samples": 50,
-        "output_dir": "results/spatialtto_50_frozen_3dsrbench",
-        "score_map_name": "score_map_after_50.json",
+        "train_samples": 20,
+        "max_per_category": 2,  # 12 cats × 2 = 24, cap at 20
+        "output_dir": "results/spatialtto_20_frozen_3dsrbench",
+        "score_map_name": "score_map_after_20.json",
         "frozen_size": 500,
     },
 }
@@ -73,8 +77,8 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--inference_only", action="store_true",
                         help="Skip train phase; load saved TTO score map and run eval only")
-    parser.add_argument("--train_only", action="store_true",
-                        help="Run TTO train only; skip eval phase")
+    parser.add_argument("--eval", action="store_true",
+                        help="Run eval phase after train (default: train only)")
     parser.add_argument("--score_map_path", type=str, default=None,
                         help="Path to saved score_map JSON")
     parser.add_argument("--no_spaceom", action="store_true",
@@ -88,6 +92,7 @@ def main():
     bm_cfg = BENCHMARK_CONFIG[args.benchmark]
     train_subdir = args.train_subdir or bm_cfg["train_subdir"]
     train_samples = args.train_samples if args.train_samples is not None else bm_cfg["train_samples"]
+    max_per_category = bm_cfg.get("max_per_category")
     out_dir = Path(args.output_dir or bm_cfg["output_dir"])
     score_map_name = bm_cfg["score_map_name"]
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -136,11 +141,16 @@ def main():
                 args.benchmark, train_subdir,
                 project_root=PROJECT_ROOT,
                 max_samples=train_samples,
+                max_per_category=max_per_category,
                 seed=args.seed,
             )
-            print(f"[Train] Loaded {len(train_ds)} samples from data/dataset/{train_subdir}")
+            print(f"[Train] Loaded {len(train_ds)} samples from data/dataset/{train_subdir} (max_per_cat={max_per_category})")
         else:
-            train_ds = load_benchmark(args.benchmark, max_samples=train_samples, use_frozen=False, seed=args.seed)
+            train_ds = load_benchmark(
+                args.benchmark, max_samples=train_samples,
+                max_per_category=max_per_category,
+                use_frozen=False, seed=args.seed,
+            )
             print(f"[Train] Loaded {len(train_ds)} samples from HuggingFace (use_frozen=False)")
 
         print("\n" + "=" * 70)
@@ -203,7 +213,7 @@ def main():
         print(f"[Save] Score map → {score_map_path}")
 
     # --- 4. Eval: frozen benchmark (no TTO updates) ---
-    if not args.train_only:
+    if args.eval:
         frozen_name = {"cvbench": "cvbench_400", "3dsrbench": "3dsrbench_500"}[args.benchmark]
         print("\n" + "=" * 70)
         print(f"PHASE 2: Eval (frozen {frozen_name}, no TTO updates)")
@@ -290,22 +300,23 @@ def main():
         (out_dir / "eval_by_category.md").write_text("\n".join(md_lines))
         print(f"[Save] Category table → {out_dir / 'eval_by_category.md'}")
     else:
-        # train_only: save train summary
-        import json
-        from datetime import datetime
-        summary = {
-            "benchmark": args.benchmark,
-            "train_only": True,
-            "train_samples": train_samples,
-            "train_accuracy": (correct_train / train_samples) if train_samples else None,
-            "T": args.T,
-            "kappa": args.kappa,
-            "gamma": args.gamma,
-            "specialist_llms": specialist_llms,
-            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
-        }
-        (out_dir / "train_summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
-        print(f"\n[Save] Train summary → {out_dir / 'train_summary.json'}")
+        # train only (no eval): save train summary
+        if not args.inference_only:
+            import json
+            from datetime import datetime
+            summary = {
+                "benchmark": args.benchmark,
+                "train_only": True,
+                "train_samples": train_samples,
+                "train_accuracy": (correct_train / train_samples) if train_samples else None,
+                "T": args.T,
+                "kappa": args.kappa,
+                "gamma": args.gamma,
+                "specialist_llms": specialist_llms,
+                "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            }
+            (out_dir / "train_summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+            print(f"\n[Save] Train summary → {out_dir / 'train_summary.json'}")
 
 
 if __name__ == "__main__":

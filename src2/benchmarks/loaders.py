@@ -220,11 +220,14 @@ def load_benchmark_from_dataset(
     dataset_subdir: str,
     project_root: Optional[str] = None,
     max_samples: Optional[int] = None,
+    max_per_category: Optional[int] = None,
     seed: int = 42,
 ):
     """
     Load benchmark from local data/dataset/<dataset_subdir> (e.g. 3dsrbench_train_300).
     Uses load_from_disk for datasets prepared by scripts/prepare_train_datasets.py.
+    max_per_category: sample evenly across categories (e.g. 5 per category for 20 total on 4 cats).
+    If both set: stratified by category first, then cap at max_samples.
     """
     root = Path(project_root) if project_root else Path(__file__).resolve().parents[2]
     dataset_path = root / "data" / "dataset" / dataset_subdir
@@ -236,7 +239,25 @@ def load_benchmark_from_dataset(
         )
     ds = load_from_disk(str(dataset_path))
     rng = random.Random(seed)
-    if max_samples is not None and len(ds) > max_samples:
+    cfg = BENCHMARK_CONFIGS.get(benchmark, {})
+    cat_key = cfg.get("category_key")
+    if max_per_category is not None and cat_key and cat_key in ds.features:
+        by_cat = {}
+        for i in range(len(ds)):
+            c = (ds[i].get(cat_key) or "unknown").strip()
+            if c not in by_cat:
+                by_cat[c] = []
+            by_cat[c].append(i)
+        indices = []
+        for c in sorted(by_cat.keys()):
+            idx_list = by_cat[c]
+            k = min(max_per_category, len(idx_list))
+            indices.extend(rng.sample(idx_list, k))
+        rng.shuffle(indices)
+        if max_samples is not None and len(indices) > max_samples:
+            indices = indices[:max_samples]
+        ds = ds.select(indices)
+    elif max_samples is not None and len(ds) > max_samples:
         indices = rng.sample(range(len(ds)), max_samples)
         indices.sort()
         ds = ds.select(indices)
