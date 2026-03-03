@@ -24,6 +24,7 @@ FROZEN_PATHS = {
     "cvbench": "cvbench_400",
     "cvbench_counting_100": "cvbench_counting_100",  # scripts/create_cvbench_counting_100.py로 생성
     "3dsrbench": "3dsrbench_500",
+    "stvqa": "stvqa_full",
 }
 
 # Local cache for 3DSRBench URL images (set to enable)
@@ -69,6 +70,17 @@ BENCHMARK_CONFIGS = {
         "question_key": "question",
         "options_keys": ["A", "B", "C", "D"],
         "answer_key": "answer",
+        "category_key": "category",
+    },
+    "stvqa": {
+        "name": "hunarbatra/STVQA-7K",
+        "split": "train",
+        "image_key": "images",
+        "question_key": "question_with_options",
+        "question_fallback": "question_only",
+        "options_key": "options",
+        "answer_key": "answer",
+        "answer_fallback": "answer_only",
         "category_key": "category",
     },
 }
@@ -312,7 +324,9 @@ def get_benchmark_prompt(example: Dict, benchmark: str, include_options: bool = 
     """Build prompt (question + options if any)."""
     cfg = BENCHMARK_CONFIGS[benchmark]
     q_key = cfg["question_key"]
-    question = example.get(q_key) or ""
+    question = (example.get(q_key) or "").strip()
+    if not question and cfg.get("question_fallback"):
+        question = (example.get(cfg["question_fallback"]) or "").strip()
 
     if not include_options:
         return question
@@ -345,6 +359,8 @@ def get_benchmark_answer(example: Dict, benchmark: str) -> str:
     cfg = BENCHMARK_CONFIGS[benchmark]
     ans_key = cfg["answer_key"]
     ans = example.get(ans_key) or ""
+    if not ans and cfg.get("answer_fallback"):
+        ans = example.get(cfg["answer_fallback"]) or ""
     s = str(ans).strip()
     # Benchmarks with options: extract letter (CV-Bench uses "(C)")
     if cfg.get("options_key") or cfg.get("options_keys"):

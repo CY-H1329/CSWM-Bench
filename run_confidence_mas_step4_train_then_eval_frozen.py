@@ -2,17 +2,19 @@
 """
 SpatialTTO: train → score map 고정 → frozen benchmark으로 inference.
 
-지원: cvbench (200), 3dsrbench (20) — cvbench 200 samples 카테고리 균등, 기본 3 agents (SpaceOm 제외)
+지원: cvbench (200), 3dsrbench (20), stvqa (200) — 기본 3 agents (SpaceOm 제외)
 
-1. Train: data/dataset/<train_subdir> (GitHub 데이터), SpatialTTO로 confidence score 업데이트 (4 agents)
+1. Train: data/dataset/<train_subdir> (GitHub 데이터), SpatialTTO로 confidence score 업데이트
 2. Score map 저장
 3. Eval: frozen benchmark으로 inference (TTO 업데이트 없음)
 
 Usage:
-    # CV-Bench: 300 samples
+    # CV-Bench: 200 samples
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench
-    # 3DSRBench: 200 samples (GitHub data/dataset/3dsrbench_train_300에서 200개)
+    # 3DSRBench: 20 samples
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench
+    # STVQA-7K: 200 samples (data/dataset/stvqa_train_300, run: python scripts/prepare_train_datasets.py --datasets stvqa)
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark stvqa
     # Inference only
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench --inference_only
     # Train only (TTO, skip eval) — default
@@ -28,6 +30,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, run_test, compute_accuracy
 from src2.benchmarks.loaders import (
+    FROZEN_PATHS,
     load_benchmark,
     load_benchmark_from_dataset,
     get_benchmark_image,
@@ -56,14 +59,22 @@ BENCHMARK_CONFIG = {
         "score_map_name": "score_map_after_20.json",
         "frozen_size": 500,
     },
+    "stvqa": {
+        "train_subdir": "stvqa_train_300",
+        "train_samples": 200,
+        "max_per_category": 25,  # 9 cats × 25 = 225, cap at 200
+        "output_dir": "results/spatialtto_200_frozen_stvqa",
+        "score_map_name": "score_map_after_200.json",
+        "frozen_size": 692,
+    },
 }
 
 
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--benchmark", type=str, default="cvbench", choices=["cvbench", "3dsrbench"],
-                        help="Benchmark: cvbench or 3dsrbench")
+    parser.add_argument("--benchmark", type=str, default="cvbench", choices=["cvbench", "3dsrbench", "stvqa"],
+                        help="Benchmark: cvbench, 3dsrbench, or stvqa")
     parser.add_argument("--train_samples", type=int, default=None,
                         help="Train samples (default: from benchmark config)")
     parser.add_argument("--train_subdir", type=str, default=None,
@@ -186,7 +197,8 @@ def main():
             query = get_benchmark_prompt(ex, args.benchmark)
             gt_raw = get_benchmark_answer(ex, args.benchmark)
             gt = (gt_raw or "").strip().upper()
-            if not any(c in gt for c in "ABCD"):
+            # Skip only for multiple-choice benchmarks when answer has no A/B/C/D
+            if args.benchmark != "stvqa" and not any(c in gt for c in "ABCD"):
                 continue
 
             _step_dir = (save_step_dir / "train") if save_step_dir else None
@@ -220,6 +232,14 @@ def main():
             gt_s = (result.get("gt") or "").strip()[:20]
             ok = "✓" if result.get("correct") else "✗"
             print(f"  Step {step + 1}/{len(samples)} | {ok} | acc: {acc:.1f}% | cat: {result.get('category')} | assign: {result.get('assignments')} | pred: {pred} | gt: {gt_s}")
+            # 카테고리별 성능 실시간 출력
+            cat_lines = []
+            for c in sorted(per_cat_train.keys()):
+                t = per_cat_train[c]["total"]
+                cr = per_cat_train[c]["correct"]
+                pct = 100 * cr / t if t else 0
+                cat_lines.append(f"{c}:{cr}/{t}({pct:.0f}%)")
+            print("    " + " | ".join(cat_lines))
 
         print(f"\n[Train] Accuracy: {correct_train}/{len(samples)} = {100*correct_train/len(samples):.1f}%")
         print("-" * 50)
@@ -238,7 +258,7 @@ def main():
 
     # --- 4. Eval: frozen benchmark (no TTO updates) ---
     if args.eval:
-        frozen_name = {"cvbench": "cvbench_400", "3dsrbench": "3dsrbench_500"}[args.benchmark]
+        frozen_name = FROZEN_PATHS.get(args.benchmark, "cvbench_400")
         print("\n" + "=" * 70)
         print(f"PHASE 2: Eval (frozen {frozen_name}, no TTO updates)")
         print("=" * 70)
