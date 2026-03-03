@@ -499,10 +499,18 @@ def main():
         choices=[1, 2, 3, 4],
         help="TTO step when --use_tto: 1=s+=R, 2=s+=R̃, 3=s+=γ·R̃, 4=Beta+EMA.",
     )
+    parser.add_argument(
+        "--low_memory",
+        action="store_true",
+        help="3-agent mode (qwen3_4b,llava4d,spatial_reasoner) for GPU sharing / OOM.",
+    )
     args = parser.parse_args()
 
     specialist_whitelist = None
-    if args.specialist_whitelist:
+    if args.low_memory:
+        specialist_whitelist = ["qwen3_4b", "llava4d", "spatial_reasoner"]
+        logger.info("Low-memory mode: specialist whitelist %s", specialist_whitelist)
+    elif args.specialist_whitelist:
         specialist_whitelist = [s.strip() for s in args.specialist_whitelist.split(",") if s.strip()]
         if specialist_whitelist:
             logger.info("Specialist whitelist: %s (excludes sa2va/spatial_rgpt when 3-agent)", specialist_whitelist)
