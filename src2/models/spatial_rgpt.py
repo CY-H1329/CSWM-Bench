@@ -65,10 +65,13 @@ def _load_via_spatialrgpt_repo(model_id: str, device: str, **kwargs):
 
         _mutils.no_init_weights = _no_init_weights
 
-    # Patch for transformers 5.x: is_tf_available was removed
+    # Patch for transformers 5.x: removed utils
     import transformers.utils as _tu
     if not hasattr(_tu, "is_tf_available"):
         _tu.is_tf_available = lambda: False
+    import transformers.utils.import_utils as _import_utils
+    if not hasattr(_import_utils, "is_torch_fx_available"):
+        _import_utils.is_torch_fx_available = lambda: False
 
     from llava.model.builder import load_pretrained_model
 
