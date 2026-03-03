@@ -114,6 +114,8 @@ def main():
         specialist_whitelist=specialist_whitelist,
         use_vlm_reasoning=True,
     )
+
+    if not args.inference_only:
         # --- 2. Train: dataset with SpatialTTO ---
         train_path = PROJECT_ROOT / "data" / "dataset" / train_subdir
         if train_path.exists():
@@ -129,7 +131,8 @@ def main():
             print(f"[Train] Loaded {len(train_ds)} samples from HuggingFace (use_frozen=False)")
 
         print("\n" + "=" * 70)
-        print(f"PHASE 1: Train ({len(train_ds)} samples, SpatialTTO updates, 4 agents incl. SpaceOm)")
+        n_agents = len(specialist_llms)
+        print(f"PHASE 1: Train ({len(train_ds)} samples, SpatialTTO updates, {n_agents} agents)")
         print("=" * 70)
 
         score_map = ScoreMap(categories=ALL_CATEGORIES, llms=specialist_llms, roles=ROLES, seed=args.seed)
