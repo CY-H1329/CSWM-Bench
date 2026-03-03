@@ -11,6 +11,7 @@ Usage:
     python run_confidence_mas_step4_train_then_eval_frozen.py --train_samples 50 --output_dir results/step4_train_eval
     # Inference only (load saved TTO table, no training):
     python run_confidence_mas_step4_train_then_eval_frozen.py --inference_only
+    # 기본: output_dir/score_map_after_50.json 없으면 data/score_maps/score_map_50step.json 사용
     python run_confidence_mas_step4_train_then_eval_frozen.py --inference_only --score_map_path results/step4_train_eval_frozen/score_map_after_50.json
 """
 import sys
@@ -50,27 +51,37 @@ def main():
                         help="Path to saved score_map JSON (default: output_dir/score_map_after_50.json)")
     args = parser.parse_args()
 
-    specialist_llms = ["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"]
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    score_map_path = Path(args.score_map_path) if args.score_map_path else out_dir / "score_map_after_50.json"
+    _bundled = PROJECT_ROOT / "data" / "score_maps" / "score_map_50step.json"
+
+    specialist_whitelist = None
+    if args.inference_only:
+        if not score_map_path.exists() and _bundled.exists():
+            score_map_path = _bundled
+            print(f"[Info] Using bundled score map: {score_map_path}")
+        if not score_map_path.exists():
+            raise FileNotFoundError(
+                f"Score map not found: {score_map_path}. "
+                f"Run without --inference_only first, or ensure data/score_maps/score_map_50step.json exists."
+            )
+        score_map = ScoreMap.load(str(score_map_path))
+        specialist_whitelist = score_map.llms
+        specialist_llms = score_map.llms
+        print(f"[Load] Score map from {score_map_path} (specialists: {specialist_llms})")
+        correct_train = None
+        train_samples = 0
 
     # --- 1. Build runners ---
     head_gen, spec_gen, reason_gen = build_runners_for_confidence(
         specialist_device="cuda",
+        specialist_whitelist=specialist_whitelist,
         use_vlm_reasoning=True,
     )
 
-    out_dir = Path(args.output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    score_map_path = Path(args.score_map_path) if args.score_map_path else out_dir / "score_map_after_50.json"
-
-    if args.inference_only:
-        # Load saved TTO score map, skip train
-        if not score_map_path.exists():
-            raise FileNotFoundError(f"Score map not found: {score_map_path}. Run without --inference_only first.")
-        score_map = ScoreMap.load(str(score_map_path))
-        print(f"[Load] Score map from {score_map_path}")
-        correct_train = None
-        train_samples = 0
-    else:
+    if not args.inference_only:
+        specialist_llms = ["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"]
         # --- 2. Train: 50 samples with TTO ---
         train_path = PROJECT_ROOT / "data" / "dataset" / args.train_subdir
         if train_path.exists():
