@@ -319,12 +319,15 @@ def run_test(
     random_agents: bool = False,
     use_vlm_reasoning: bool = False,
     verbose: bool = False,
+    updater: "ScoreMapUpdater" = None,
+    update_scores: bool = False,
 ) -> List[Dict]:
-    """Test phase: iterate over dataset, score map is frozen (no updates).
+    """Test phase: iterate over dataset.
 
     Categories are always the fixed ALL_CATEGORIES (16 types).
     random_agents: If True, use step=0 for each sample (random agent selection).
     verbose: If True, log step/acc/cat/assign and scores (every 5 steps).
+    updater + update_scores: If set, update score map after each sample (TTO).
     """
     from src2.benchmarks.loaders import (
         get_benchmark_image, get_benchmark_prompt, get_benchmark_answer,
@@ -346,18 +349,19 @@ def run_test(
             logger.warning("Test step %d: image is None, skipping.", step)
             continue
 
+        use_step = 0 if random_agents else step + 1
         result = run_step(
             image=image,
             query=query,
             gt=gt,
-            step=0 if random_agents else step + 999999,
+            step=use_step,
             total_steps=total,
             score_map=score_map,
             head_generate=head_generate,
             specialist_generate=specialist_generate,
             reasoning_generate=reasoning_generate,
-            updater=None,
-            update_scores=False,
+            updater=updater,
+            update_scores=update_scores and updater is not None,
             use_vlm_reasoning=use_vlm_reasoning,
         )
         results.append(result)

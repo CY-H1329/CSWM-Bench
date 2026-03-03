@@ -240,10 +240,13 @@ def run_test_only(
     specialist_llms: list = None,
     dataset_subdir: str = None,
     verbose: bool = True,
+    updater=None,
 ):
-    """Run MAS v2 pipeline on N samples — testing only, no ScoreMap training.
+    """Run MAS v2 pipeline on N samples.
 
-    Pipeline: Head → ScoreMap (random) → 3 Specialists → SharedMemory → Final Reasoning.
+    Pipeline: Head → ScoreMap → 3 Specialists → SharedMemory → Final Reasoning.
+    When updater is provided (--use_tto), scores are updated each step (TTO).
+    Otherwise random_agents=True uses random selection, no score updates.
     """
     if dataset_subdir:
         dataset = load_benchmark_from_dataset(
@@ -260,8 +263,9 @@ def run_test_only(
     specialist_llms = specialist_llms or SPECIALIST_LLMS
     score_map = ScoreMap(categories=ALL_CATEGORIES, llms=specialist_llms, seed=seed)
 
+    use_random = random_agents and updater is None
     logger.info("=" * 60)
-    logger.info("TESTING (%d samples, random_agents=%s)", len(dataset), random_agents)
+    logger.info("TESTING (%d samples, random_agents=%s, tto_updates=%s)", len(dataset), use_random, updater is not None)
     logger.info("=" * 60)
     results = run_test(
         dataset=dataset,
@@ -270,9 +274,11 @@ def run_test_only(
         head_generate=head_generate,
         specialist_generate=specialist_generate,
         reasoning_generate=reasoning_generate,
-        random_agents=random_agents,
+        random_agents=use_random,
         use_vlm_reasoning=use_vlm_reasoning,
         verbose=verbose,
+        updater=updater,
+        update_scores=updater is not None,
     )
     metrics = compute_accuracy(results)
     logger.info(
@@ -289,7 +295,7 @@ def run_test_only(
             "benchmark": benchmark,
             "samples": len(dataset),
             "seed": seed,
-            "random_agents": random_agents,
+            "random_agents": use_random,
             "accuracy": metrics["accuracy"],
             "correct": metrics["correct"],
             "total": metrics["total"],
@@ -573,6 +579,7 @@ def main():
             specialist_llms=specialist_llms,
             dataset_subdir=args.dataset_subdir,
             verbose=not args.no_verbose,
+            updater=updater if args.use_tto else None,
         )
     else:
         if args.max_samples:
