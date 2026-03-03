@@ -59,9 +59,9 @@ def build_runners(
     reasoning_api_key: str = "EMPTY",
     reasoning_model_name: str = "deepseek-r1",
     specialist_device: str = "cuda",
-    specialist_only_device: str | None = None,
+    specialist_only_device: Optional[str] = None,
     specialist_offload_after_use: bool = False,
-    specialist_whitelist: list | None = None,
+    specialist_whitelist: Optional[List[str]] = None,
     use_local_reasoning: bool = False,
     reasoning_local_model_id: str = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
     use_vlm_reasoning: bool = False,
@@ -109,7 +109,7 @@ def build_runners(
 
     # --- 5 Specialist VLMs (lazy-loaded, cached) ---
     _specialist_cache = {}
-    _last_specialist_on_gpu: str | None = None
+    _last_specialist_on_gpu: Optional[str] = None
 
     def _offload_specialist_to_cpu(name: str):
         if name not in _specialist_cache:
