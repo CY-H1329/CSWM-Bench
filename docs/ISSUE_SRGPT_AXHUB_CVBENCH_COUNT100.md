@@ -44,7 +44,7 @@
 
 ## Step-by-Step Accuracy 그래프
 
-![SpatialRGPT CV-Bench Count 100 Step Accuracy](fig_srgpt_cvbench_count100_accuracy.png)
+![SpatialRGPT CV-Bench Count 100 Step Accuracy](https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/fig_srgpt_cvbench_count100_accuracy.png)
 
 - **X축**: Step (1..100)
 - **Y축**: Cumulative Accuracy (%)
