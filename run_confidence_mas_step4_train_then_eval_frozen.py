@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """
-TTO Step4: 50 samples로 학습 → score map 고정 → frozen CV-Bench로 성능 평가.
+SpatialTTO: train 300 samples → score map 고정 → frozen benchmark으로 inference.
 
-1. Train: cvbench_train_300에서 50 samples, TTO로 score 업데이트
+지원: cvbench, 3dsrbench
+
+1. Train: data/dataset/<train_subdir> 300 samples, SpatialTTO로 score 업데이트 (4 agents)
 2. Score map 저장
-3. Eval: frozen cvbench_400으로 inference (TTO 업데이트 없음)
+3. Eval: frozen benchmark으로 inference (TTO 업데이트 없음)
 
 Usage:
-    python run_confidence_mas_step4_train_then_eval_frozen.py
-    python run_confidence_mas_step4_train_then_eval_frozen.py --train_samples 50 --output_dir results/step4_train_eval
-    # Inference only (load saved TTO table, no training):
-    python run_confidence_mas_step4_train_then_eval_frozen.py --inference_only
-    # 기본: output_dir/score_map_after_50.json 없으면 data/score_maps/score_map_50step.json 사용
-    python run_confidence_mas_step4_train_then_eval_frozen.py --inference_only --score_map_path results/step4_train_eval_frozen/score_map_after_50.json
+    # CV-Bench
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench
+    # 3DSRBench
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench
+    # Inference only
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench --inference_only
 """
 import sys
 from pathlib import Path
@@ -32,28 +34,51 @@ from src2.agents.mas_v2 import run_step
 from test_confidence_mas_v3_step4 import TrustScoreMapUpdaterStep4, build_runners_for_confidence
 
 
+BENCHMARK_CONFIG = {
+    "cvbench": {
+        "train_subdir": "cvbench_train_300",
+        "output_dir": "results/spatialtto_300_frozen_cvbench",
+        "score_map_name": "score_map_after_300.json",
+        "frozen_size": 400,
+    },
+    "3dsrbench": {
+        "train_subdir": "3dsrbench_train_300",
+        "output_dir": "results/spatialtto_300_frozen_3dsrbench",
+        "score_map_name": "score_map_after_300.json",
+        "frozen_size": 500,
+    },
+}
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train_samples", type=int, default=50)
-    parser.add_argument("--train_subdir", type=str, default="cvbench_train_300",
-                        help="data/dataset/<subdir> for training (disjoint from frozen)")
-    parser.add_argument("--output_dir", type=str, default="results/step4_train_eval_frozen")
+    parser.add_argument("--benchmark", type=str, default="cvbench", choices=["cvbench", "3dsrbench"],
+                        help="Benchmark: cvbench or 3dsrbench")
+    parser.add_argument("--train_samples", type=int, default=300,
+                        help="Train samples (default: 300)")
+    parser.add_argument("--train_subdir", type=str, default=None,
+                        help="Override data/dataset/<subdir> (default: from benchmark)")
+    parser.add_argument("--output_dir", type=str, default=None,
+                        help="Override output dir (default: from benchmark)")
     parser.add_argument("--T", type=float, default=5.0)
     parser.add_argument("--kappa", type=float, default=0.5)
     parser.add_argument("--gamma", type=float, default=0.3)
     parser.add_argument("--eval_max", type=int, default=None,
-                        help="Limit eval samples (None = full frozen 400)")
+                        help="Limit eval samples (None = full frozen)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--inference_only", action="store_true",
                         help="Skip train phase; load saved TTO score map and run eval only")
     parser.add_argument("--score_map_path", type=str, default=None,
-                        help="Path to saved score_map JSON (default: output_dir/score_map_after_50.json)")
+                        help="Path to saved score_map JSON")
     args = parser.parse_args()
 
-    out_dir = Path(args.output_dir)
+    bm_cfg = BENCHMARK_CONFIG[args.benchmark]
+    train_subdir = args.train_subdir or bm_cfg["train_subdir"]
+    out_dir = Path(args.output_dir or bm_cfg["output_dir"])
+    score_map_name = bm_cfg["score_map_name"]
     out_dir.mkdir(parents=True, exist_ok=True)
-    score_map_path = Path(args.score_map_path) if args.score_map_path else out_dir / "score_map_after_50.json"
+    score_map_path = Path(args.score_map_path) if args.score_map_path else out_dir / score_map_name
     _bundled = PROJECT_ROOT / "data" / "score_maps" / "score_map_50step.json"
 
     specialist_whitelist = None
@@ -64,7 +89,7 @@ def main():
         if not score_map_path.exists():
             raise FileNotFoundError(
                 f"Score map not found: {score_map_path}. "
-                f"Run without --inference_only first, or ensure data/score_maps/score_map_50step.json exists."
+                f"Run without --inference_only first to train on {train_subdir}."
             )
         score_map = ScoreMap.load(str(score_map_path))
         specialist_whitelist = score_map.llms
@@ -82,22 +107,22 @@ def main():
 
     if not args.inference_only:
         specialist_llms = ["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"]
-        # --- 2. Train: 50 samples with TTO ---
-        train_path = PROJECT_ROOT / "data" / "dataset" / args.train_subdir
+        # --- 2. Train: dataset with SpatialTTO ---
+        train_path = PROJECT_ROOT / "data" / "dataset" / train_subdir
         if train_path.exists():
             train_ds = load_benchmark_from_dataset(
-                "cvbench", args.train_subdir,
+                args.benchmark, train_subdir,
                 project_root=PROJECT_ROOT,
                 max_samples=args.train_samples,
                 seed=args.seed,
             )
-            print(f"[Train] Loaded {len(train_ds)} samples from data/dataset/{args.train_subdir}")
+            print(f"[Train] Loaded {len(train_ds)} samples from data/dataset/{train_subdir}")
         else:
-            train_ds = load_benchmark("cvbench", max_samples=args.train_samples, use_frozen=False, seed=args.seed)
+            train_ds = load_benchmark(args.benchmark, max_samples=args.train_samples, use_frozen=False, seed=args.seed)
             print(f"[Train] Loaded {len(train_ds)} samples from HuggingFace (use_frozen=False)")
 
         print("\n" + "=" * 70)
-        print("PHASE 1: Train (50 samples, TTO updates)")
+        print(f"PHASE 1: Train ({len(train_ds)} samples, SpatialTTO updates, 4 agents incl. SpaceOm)")
         print("=" * 70)
 
         score_map = ScoreMap(categories=ALL_CATEGORIES, llms=specialist_llms, roles=ROLES, seed=args.seed)
@@ -111,11 +136,11 @@ def main():
 
         correct_train = 0
         for step, ex in enumerate(samples):
-            image = get_benchmark_image(ex, "cvbench")
+            image = get_benchmark_image(ex, args.benchmark)
             if image is None:
                 continue
-            query = get_benchmark_prompt(ex, "cvbench")
-            gt_raw = get_benchmark_answer(ex, "cvbench")
+            query = get_benchmark_prompt(ex, args.benchmark)
+            gt_raw = get_benchmark_answer(ex, args.benchmark)
             gt = (gt_raw or "").strip().upper()
             if not any(c in gt for c in "ABCD"):
                 continue
@@ -137,7 +162,9 @@ def main():
             if result.get("correct"):
                 correct_train += 1
             acc = 100 * correct_train / (step + 1)
-            print(f"  Step {step + 1}/{len(samples)} | acc: {acc:.1f}% | cat: {result.get('category')} | assign: {result.get('assignments')}")
+            log_every = 10 if len(samples) > 100 else 1
+            if (step + 1) % log_every == 0 or step + 1 == len(samples):
+                print(f"  Step {step + 1}/{len(samples)} | acc: {acc:.1f}% | cat: {result.get('category')} | assign: {result.get('assignments')}")
 
         print(f"\n[Train] Accuracy: {correct_train}/{len(samples)} = {100*correct_train/len(samples):.1f}%")
         train_samples = len(samples)
@@ -146,17 +173,18 @@ def main():
         score_map.save(str(score_map_path))
         print(f"[Save] Score map → {score_map_path}")
 
-    # --- 4. Eval: frozen cvbench (no TTO updates) ---
+    # --- 4. Eval: frozen benchmark (no TTO updates) ---
+    frozen_name = {"cvbench": "cvbench_400", "3dsrbench": "3dsrbench_500"}[args.benchmark]
     print("\n" + "=" * 70)
-    print("PHASE 2: Eval (frozen cvbench_400, no TTO updates)")
+    print(f"PHASE 2: Eval (frozen {frozen_name}, no TTO updates)")
     print("=" * 70)
 
-    eval_ds = load_benchmark("cvbench", max_samples=args.eval_max, use_frozen=True, seed=args.seed)
-    print(f"[Eval] Loaded {len(eval_ds)} samples from frozen cvbench_400")
+    eval_ds = load_benchmark(args.benchmark, max_samples=args.eval_max, use_frozen=True, seed=args.seed)
+    print(f"[Eval] Loaded {len(eval_ds)} samples from frozen {frozen_name}")
 
     eval_results = run_test(
         dataset=eval_ds,
-        benchmark="cvbench",
+        benchmark=args.benchmark,
         score_map=score_map,
         head_generate=head_gen,
         specialist_generate=spec_gen,
@@ -173,7 +201,7 @@ def main():
     per_cat_counts = metrics.get("per_category_counts", {})
 
     print("\n" + "=" * 70)
-    print("FINAL EVAL (frozen cvbench)")
+    print(f"FINAL EVAL (frozen {args.benchmark})")
     print("=" * 70)
     print(f"Overall: {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%")
     print("-" * 70)
@@ -195,6 +223,7 @@ def main():
         for cat in per_cat
     }
     summary = {
+        "benchmark": args.benchmark,
         "inference_only": args.inference_only,
         "train_samples": train_samples,
         "train_accuracy": (correct_train / train_samples) if train_samples else None,
@@ -213,7 +242,7 @@ def main():
 
     # 발표용 Markdown 테이블 (카테고리별 성능)
     md_lines = [
-        "## CV-Bench (frozen) - Category별 성능",
+        f"## {args.benchmark.upper()} (frozen) - Category별 성능",
         "",
         f"**Overall:** {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%",
         "",
