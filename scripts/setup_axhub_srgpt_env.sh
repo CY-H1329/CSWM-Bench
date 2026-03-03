@@ -48,7 +48,7 @@ pip install flash-attn --no-build-isolation 2>/dev/null || echo "  flash_attn �
 # SpatialRGPT 의존성
 echo ""
 echo "[3] SpatialRGPT 의존성..."
-pip install deepspeed
+pip install deepspeed pycocotools
 pip install "s2wrapper@git+https://github.com/bfshi/scaling_on_scales.git"
 pip install einops==0.6.1 einops-exts==0.0.4 timm==0.9.12
 pip install sentencepiece shortuuid "pydantic<2" markdown2 requests httpx
