@@ -32,6 +32,23 @@ bash scripts/run_mas_tto.sh
 bash scripts/run_mas_tto.sh --test_only --max_samples 20
 ```
 
+**GPU 메모리 부족 시** (다른 프로세스와 GPU 공유):
+
+```bash
+# 3-agent 모드 (qwen3_4b, llava4d, spatial_reasoner)
+LOW_MEMORY=1 bash scripts/run_mas_tto.sh --test_only --max_samples 20
+
+# 또는
+bash scripts/run_mas_tto.sh --low_memory --test_only --max_samples 20
+```
+
+**4-agent avec SpaceOm** (test, script séparé):
+
+```bash
+LOW_MEMORY=1 bash scripts/run_mas_tto_lowmem4.sh --test_only --max_samples 20
+# Résultats: results/mas_tto_lowmem4_3dsrbench/
+```
+
 ## 요구사항
 
 - `data/dataset/3dsrbench_train_300` 존재 (git pull 또는 prepare_train_datasets.py)

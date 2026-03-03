@@ -37,14 +37,26 @@ class SpaceOmRunner(BaseVLM):
                 "Install: pip install transformers>=4.45"
             )
         device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        device_map = "auto" if device == "cuda" and torch.cuda.is_available() else device
+        use_cuda = device != "cpu" and torch.cuda.is_available()
+        try:
+            import accelerate  # noqa: F401
+            has_accelerate = True
+        except ImportError:
+            has_accelerate = False
 
-        load_kwargs = dict(
-            torch_dtype=torch.bfloat16 if device == "cuda" else torch.float32,
-            device_map=device_map,
-            trust_remote_code=True,
-            **kwargs,
-        )
+        if use_cuda and has_accelerate:
+            load_kwargs = dict(
+                torch_dtype=torch.bfloat16,
+                device_map="auto",
+                trust_remote_code=True,
+                **kwargs,
+            )
+        else:
+            load_kwargs = dict(
+                torch_dtype=torch.bfloat16 if use_cuda else torch.float32,
+                trust_remote_code=True,
+                **kwargs,
+            )
         if use_flash_attn and device == "cuda":
             try:
                 import flash_attn  # noqa: F401
@@ -58,6 +70,8 @@ class SpaceOmRunner(BaseVLM):
             model_id,
             **load_kwargs,
         )
+        if not (use_cuda and has_accelerate):
+            self.model = self.model.to(device)
         self.model.eval()
         self.device = device
 
