@@ -239,6 +239,7 @@ def run_test_only(
     use_vlm_reasoning: bool = False,
     specialist_llms: list = None,
     dataset_subdir: str = None,
+    verbose: bool = True,
 ):
     """Run MAS v2 pipeline on N samples — testing only, no ScoreMap training.
 
@@ -271,6 +272,7 @@ def run_test_only(
         reasoning_generate=reasoning_generate,
         random_agents=random_agents,
         use_vlm_reasoning=use_vlm_reasoning,
+        verbose=verbose,
     )
     metrics = compute_accuracy(results)
     logger.info(
@@ -504,6 +506,11 @@ def main():
         action="store_true",
         help="3-agent mode (qwen3_4b,llava4d,spatial_reasoner) for GPU sharing / OOM.",
     )
+    parser.add_argument(
+        "--no_verbose",
+        action="store_true",
+        help="Disable verbose step logging (step/acc/cat/assign, scores every 5 steps).",
+    )
     args = parser.parse_args()
 
     specialist_whitelist = None
@@ -565,6 +572,7 @@ def main():
             output_dir=out_dir,
             specialist_llms=specialist_llms,
             dataset_subdir=args.dataset_subdir,
+            verbose=not args.no_verbose,
         )
     else:
         if args.max_samples:

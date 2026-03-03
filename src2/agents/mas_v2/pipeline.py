@@ -318,11 +318,13 @@ def run_test(
     get_answer_fn: Callable = None,
     random_agents: bool = False,
     use_vlm_reasoning: bool = False,
+    verbose: bool = False,
 ) -> List[Dict]:
     """Test phase: iterate over dataset, score map is frozen (no updates).
 
     Categories are always the fixed ALL_CATEGORIES (16 types).
     random_agents: If True, use step=0 for each sample (random agent selection).
+    verbose: If True, log step/acc/cat/assign and scores (every 5 steps).
     """
     from src2.benchmarks.loaders import (
         get_benchmark_image, get_benchmark_prompt, get_benchmark_answer,
@@ -360,12 +362,23 @@ def run_test(
         )
         results.append(result)
 
-        if (step + 1) % 50 == 0 or step == total - 1:
-            correct_so_far = sum(1 for r in results if r.get("correct"))
+        correct_so_far = sum(1 for r in results if r.get("correct"))
+        acc_pct = 100.0 * correct_so_far / len(results) if results else 0
+
+        if verbose:
+            cat = result.get("category", "unknown")
+            assign = result.get("assignments", [])
+            logger.info(
+                "  Step %d/%d | acc: %.1f%% | cat: %s | assign: %s",
+                step + 1, total, acc_pct, cat, assign,
+            )
+            if (step + 1) % 5 == 0 or step == 0:
+                maps = score_map.get_all_maps()
+                logger.info("    scores (step %d): %s", step + 1, maps)
+        elif (step + 1) % 50 == 0 or step == total - 1:
             logger.info(
                 "Test step %d/%d | running acc: %.2f%%",
-                step + 1, total,
-                100.0 * correct_so_far / len(results),
+                step + 1, total, acc_pct,
             )
 
     return results
