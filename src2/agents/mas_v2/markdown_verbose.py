@@ -2,12 +2,16 @@
 Verbose markdown formatting for MAS v2 pipeline steps.
 
 Provides structured, readable output for --verbose_markdown.
-Also supports saving step data to text files (routing, per-agent CoT, final).
+Also supports saving step data to text files (routing, selection, CoT, table).
 """
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .score_map import ScoreMap
+
+# Section width for alignment
+_SEP = "=" * 72
+_SUB = "-" * 72
 
 # Role display names for markdown / file naming
 ROLE_DISPLAY = {
@@ -118,6 +122,131 @@ def format_step_markdown(
     return "\n".join(lines)
 
 
+def _build_routing_section(
+    n: int,
+    query: str,
+    category: str,
+    head_raw: Optional[str],
+    assignments: List[Tuple[str, str]],
+    score_map: ScoreMap,
+    step: int,
+) -> List[str]:
+    """Build routing + selection section (reusable)."""
+    cat_map = score_map.get_category_map(category) or {}
+    lines = [
+        "",
+        _SEP,
+        "  STEP {} — ROUTING & SELECTION".format(n),
+        _SEP,
+        "",
+        "┌─ Query ─────────────────────────────────────────────────────────────────",
+        "",
+        query,
+        "",
+        "└──────────────────────────────────────────────────────────────────────────",
+        "",
+        "",
+        "┌─ Head Agent: Analysis & Category Decision ───────────────────────────────",
+        "",
+        "Raw output:",
+        "",
+        (head_raw or "(force_category)").strip(),
+        "",
+        "Decided category (grouping):  {}".format(category),
+        "",
+        "└──────────────────────────────────────────────────────────────────────────",
+        "",
+        "",
+        "┌─ Score Map (category: {}) — Agent × Role ───────────────────────────────".format(category),
+        "",
+        score_map.to_markdown_list(category),
+        "",
+        "└──────────────────────────────────────────────────────────────────────────",
+        "",
+        "",
+        "┌─ Agent Selection — Per-Role Process (detailed) ──────────────────────────",
+        "",
+    ]
+    for role, chosen_llm in assignments:
+        role_disp = _role_display(role)
+        lines.append("  [Role] {} ({})".format(role_disp, role))
+        role_scores = cat_map.get(role, {})
+        sorted_llms = sorted(
+            score_map.llms,
+            key=lambda ll: role_scores.get(ll, score_map.initial_score),
+            reverse=True,
+        )
+        for llm in sorted_llms:
+            s = score_map.get_score(category, role, llm)
+            marker = "  ← SELECTED" if llm == chosen_llm else ""
+            lines.append("      {}  {:>10.4f}{}".format(llm, s, marker))
+        lines.append("      → selection: {} (step={})".format(
+            "random" if step == 0 else "argmax",
+            step,
+        ))
+        lines.append("")
+    lines.append("  Final assignment:")
+    for role, llm_name in assignments:
+        s = score_map.get_score(category, role, llm_name)
+        lines.append("    {}  →  {}  (score: {:.4f})".format(_role_display(role), llm_name, s))
+    lines.append("")
+    lines.append("└──────────────────────────────────────────────────────────────────────────")
+    return lines
+
+
+def _build_agent_cot_section(ad: Dict[str, Any], query: str, n: int) -> List[str]:
+    """Build per-agent CoT section."""
+    role = ad["role"]
+    llm = ad["llm_name"]
+    raw = (ad.get("raw_output") or "").strip()
+    ans = (ad.get("answer") or "").strip()
+    reason = (ad.get("reason") or "").strip()
+    obj_names = ad.get("object_names")
+    tool_out = (ad.get("tool_output") or "").strip()
+    role_prompt = (ad.get("role_prompt") or "").strip()
+    lines = [
+        "",
+        _SUB,
+        "  Agent: {}  |  Role: {}  ({})".format(llm, _role_display(role), role),
+        _SUB,
+        "",
+        "  Query:",
+        "",
+        "    " + query.replace("\n", "\n    "),
+        "",
+    ]
+    if obj_names is not None or tool_out:
+        lines.append("  Tool inputs:")
+        if obj_names is not None:
+            obj_str = ", ".join(obj_names) if isinstance(obj_names, (list, tuple)) else str(obj_names)
+            lines.append("    Object names: [{}]".format(obj_str or "(none)"))
+        if tool_out:
+            lines.append("    Tool output:")
+            for ln in tool_out.split("\n"):
+                lines.append("      " + ln)
+        lines.append("")
+    if role_prompt:
+        lines.append("  Role prompt (full):")
+        lines.append("")
+        for ln in role_prompt.split("\n"):
+            lines.append("    " + ln)
+        lines.append("")
+    lines.append("  CoT (Chain of Thought) — full raw output:")
+    lines.append("")
+    for ln in (raw or "(empty)").split("\n"):
+        lines.append("    " + ln)
+    lines.append("")
+    if reason:
+        lines.append("  Extracted reason:")
+        lines.append("")
+        for ln in reason.split("\n"):
+            lines.append("    " + ln)
+        lines.append("")
+    lines.append("  Answer:  {}".format(ans or "(empty)"))
+    lines.append("")
+    return lines
+
+
 def save_step_to_files(
     output_dir: Path,
     step: int,
@@ -135,10 +264,11 @@ def save_step_to_files(
     """Save step data to text files.
 
     Creates:
-      1. step_{N:03d}_routing.txt  - Query, analysis, routing, agent+role selection
-      2. step_{N:03d}_score_table.txt - Pretty ASCII score table (all categories)
-      3. step_{N:03d}_agent_{role}_{llm}.txt - Per-agent: tools, prompt, CoT, answer
-      4. step_{N:03d}_final.txt - Final reasoning CoT + answer + GT
+      1. step_{N:03d}_summary.txt  - Full: routing + selection + all CoTs + result + table
+      2. step_{N:03d}_routing.txt  - Routing & selection only
+      3. step_{N:03d}_score_table.txt - ASCII score table (all categories)
+      4. step_{N:03d}_agent_{role}_{llm}.txt - Per-agent: tools, prompt, CoT, answer
+      5. step_{N:03d}_final.txt - Final reasoning CoT + result
 
     Returns list of written file paths.
     """
@@ -147,156 +277,113 @@ def save_step_to_files(
     n = step + 1
     prefix = "step_{:03d}".format(n)
     written = []
+    correct_str = "Correct" if correct else "Wrong" if correct is False else "N/A"
 
-    # 1. Routing file: Query, Head Agent analysis, detailed score & selection, role assignment
-    routing_lines = [
-        "=" * 70,
-        "Step {} — Routing".format(n),
-        "=" * 70,
-        "",
-        "Query",
-        "-" * 50,
-        query,
-        "",
-        "",
-        "Head Agent — Analysis & Category Decision",
-        "-" * 50,
-        "Raw output (Head Agent 분석):",
-        "",
-        (head_raw or "(force_category)").strip(),
-        "",
-        "결정된 카테고리 (Grouping): {}".format(category),
-        "",
-        "",
-        "Score Map — 현재 카테고리({})별 Agent × Role 점수".format(category),
-        "-" * 50,
-        "",
-        score_map.to_markdown_list(category),
-        "",
-        "",
-        "Agent Selection — Role별 에이전트 선정 과정 (상세)",
-        "-" * 50,
+    # --- 1. Summary: routing + selection + all agent CoTs + final + table ---
+    summary_lines = [
+        _SEP,
+        "  STEP {} — COMPLETE LOG (routing + selection + CoT + result + table)".format(n),
+        _SEP,
     ]
+    summary_lines.extend(_build_routing_section(n, query, category, head_raw, assignments, score_map, step))
+    summary_lines.extend([
+        "",
+        "",
+        _SEP,
+        "  STEP {} — AGENT OUTPUTS (CoT & Results)".format(n),
+        _SEP,
+    ])
+    for ad in agent_details:
+        summary_lines.extend(_build_agent_cot_section(ad, query, n))
+    summary_lines.extend([
+        "",
+        "",
+        _SEP,
+        "  STEP {} — FINAL ANSWER".format(n),
+        _SEP,
+        "",
+        "  Final reasoning (CoT):",
+        "",
+    ])
+    for ln in (reasoning_raw or "").strip().split("\n") or ["(empty)"]:
+        summary_lines.append("    " + ln)
+    summary_lines.extend([
+        "",
+        "  Result:",
+        "    Pred:    {}".format((final_answer or "").strip() or "—"),
+        "    GT:      {}".format((gt or "").strip() or "—"),
+        "    Correct: {}".format(correct_str),
+        "",
+        "",
+        _SEP,
+        "  STEP {} — UPDATED SCORE TABLE (all categories)".format(n),
+        _SEP,
+        "",
+        score_map.to_pretty_table(),
+        "",
+        "",
+        _SEP,
+    ])
+    summary_path = output_dir / "{}_summary.txt".format(prefix)
+    summary_path.write_text("\n".join(summary_lines), encoding="utf-8")
+    written.append(summary_path)
 
-    # Per-role: show all scores, selection logic, chosen agent
-    cat_map = score_map.get_category_map(category) or {}
-    for role, chosen_llm in assignments:
-        role_disp = _role_display(role)
-        routing_lines.append("")
-        routing_lines.append("[Role] {} (역할: {})".format(role_disp, role))
-        role_scores = cat_map.get(role, {})
-        # All agents' scores for this role, sorted by score desc
-        sorted_llms = sorted(
-            score_map.llms,
-            key=lambda ll: role_scores.get(ll, score_map.initial_score),
-            reverse=True,
-        )
-        for llm in sorted_llms:
-            s = score_map.get_score(category, role, llm)
-            marker = "  ← selected" if llm == chosen_llm else ""
-            routing_lines.append("    - {}: {:.4f}{}".format(llm, s, marker))
-        if step == 0:
-            routing_lines.append("    (step=0: random selection)")
-        else:
-            routing_lines.append("    (step>0: argmax → {})".format(chosen_llm))
-        routing_lines.append("")
-
-    routing_lines.append("")
-    routing_lines.append("Role Assignment — 최종 할당")
-    routing_lines.append("-" * 50)
-    for role, llm_name in assignments:
-        s = score_map.get_score(category, role, llm_name)
-        routing_lines.append("  - {} → {} (score: {:.4f})".format(
-            _role_display(role), llm_name, s
-        ))
-
+    # --- 2. Routing only ---
+    routing_lines = _build_routing_section(n, query, category, head_raw, assignments, score_map, step)
     routing_path = output_dir / "{}_routing.txt".format(prefix)
     routing_path.write_text("\n".join(routing_lines), encoding="utf-8")
     written.append(routing_path)
 
-    # 2. Score table (pretty ASCII, all categories)
+    # --- 3. Score table ---
     score_table_path = output_dir / "{}_score_table.txt".format(prefix)
     score_table_path.write_text(
-        "Step {} — Score Map\n".format(n) + "=" * 70 + "\n\n" + score_map.to_pretty_table(),
+        _SEP + "\n  STEP {} — SCORE TABLE (all categories)\n".format(n) + _SEP + "\n\n" + score_map.to_pretty_table(),
         encoding="utf-8",
     )
     written.append(score_table_path)
 
-    # 3. Per-agent files: Query, tools (object_names, tool_output), prompt, CoT, answer
+    # --- 4. Per-agent files ---
     for ad in agent_details:
         role = ad["role"]
         llm = ad["llm_name"]
-        raw = (ad.get("raw_output") or "").strip()
-        ans = (ad.get("answer") or "").strip()
-        obj_names = ad.get("object_names")
-        tool_out = (ad.get("tool_output") or "").strip()
-        role_prompt = (ad.get("role_prompt") or "").strip()
         role_fn = _role_filename(role)
         agent_path = output_dir / "{}_agent_{}_{}.txt".format(prefix, role_fn, llm)
         agent_lines = [
-            "=" * 70,
-            "Step {} — Agent: {} ({}), Role: {}".format(n, llm, _role_display(role), role),
-            "=" * 70,
-            "",
-            "Query",
-            "-" * 50,
-            query,
-            "",
+            _SEP,
+            "  STEP {} — Agent: {}  |  Role: {}  ({})".format(n, llm, _role_display(role), role),
+            _SEP,
         ]
-        # Tool inputs (object extraction, 3D/scene_graph output)
-        if obj_names is not None or tool_out:
-            agent_lines.append("Tool Inputs (object extraction, 3D/scene_graph)")
-            agent_lines.append("-" * 50)
-            if obj_names is not None:
-                obj_str = ", ".join(obj_names) if isinstance(obj_names, (list, tuple)) else str(obj_names)
-                agent_lines.append("Object names (extracted): [{}]".format(obj_str or "(none)"))
-                agent_lines.append("")
-            if tool_out:
-                agent_lines.append("Tool output (passed to prompt):")
-                agent_lines.append(tool_out)
-                agent_lines.append("")
-            agent_lines.append("")
-        # Role prompt (full prompt sent to agent)
-        if role_prompt:
-            agent_lines.append("Role Prompt (full prompt sent to agent)")
-            agent_lines.append("-" * 50)
-            agent_lines.append(role_prompt)
-            agent_lines.append("")
-            agent_lines.append("")
-        agent_lines.extend([
-            "CoT (Chain of Thought)",
-            "-" * 50,
-            raw or "(empty)",
-            "",
-            "Answer",
-            "-" * 50,
-            ans or "(empty)",
-        ])
+        agent_lines.extend(_build_agent_cot_section(ad, query, n))
         agent_path.write_text("\n".join(agent_lines), encoding="utf-8")
         written.append(agent_path)
 
-    # 3. Final file: Query, reasoning CoT, final answer, GT
-    correct_str = "Correct" if correct else "Wrong" if correct is False else "N/A"
+    # --- 5. Final ---
     final_path = output_dir / "{}_final.txt".format(prefix)
     final_lines = [
-        "=" * 70,
-        "Step {} — Final Answer".format(n),
-        "=" * 70,
+        _SEP,
+        "  STEP {} — FINAL ANSWER".format(n),
+        _SEP,
         "",
-        "Query",
-        "-" * 50,
-        query,
+        "  Query:",
         "",
-        "Final Reasoning (CoT)",
-        "-" * 50,
-        (reasoning_raw or "").strip() or "(empty)",
+        "    " + query.replace("\n", "\n    "),
         "",
-        "Result",
-        "-" * 50,
-        "Pred:   {}".format((final_answer or "").strip() or "—"),
-        "GT:     {}".format((gt or "").strip() or "—"),
-        "Correct: {}".format(correct_str),
+        "",
+        "  Final reasoning (CoT):",
+        "",
     ]
+    for ln in (reasoning_raw or "").strip().split("\n") or ["(empty)"]:
+        final_lines.append("    " + ln)
+    final_lines.extend([
+        "",
+        "",
+        "  Result:",
+        "    Pred:    {}".format((final_answer or "").strip() or "—"),
+        "    GT:      {}".format((gt or "").strip() or "—"),
+        "    Correct: {}".format(correct_str),
+        "",
+        _SEP,
+    ])
     final_path.write_text("\n".join(final_lines), encoding="utf-8")
     written.append(final_path)
 

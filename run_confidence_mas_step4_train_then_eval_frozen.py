@@ -101,11 +101,11 @@ def main():
         save_step_dir = Path(args.save_step_text)
         save_step_dir.mkdir(parents=True, exist_ok=True)
         print(f"[Save] Step text files → {save_step_dir}/{{train,eval}}/")
-    elif args.eval:
-        # Inference: 기본으로 모든 로그 저장
+    elif not args.inference_only:
+        # Optimization (train): 기본으로 모든 로그 저장
         save_step_dir = out_dir / "step_logs"
         save_step_dir.mkdir(parents=True, exist_ok=True)
-        print(f"[Save] Step text files (eval) → {save_step_dir}/eval/")
+        print(f"[Save] Step text files (train) → {save_step_dir}/train/")
     score_map_path = Path(args.score_map_path) if args.score_map_path else out_dir / score_map_name
     _bundled = PROJECT_ROOT / "data" / "score_maps" / "score_map_50step.json"
 
@@ -184,6 +184,7 @@ def main():
                 continue
 
             _step_dir = (save_step_dir / "train") if save_step_dir else None
+            _train_verbose_md = args.verbose_markdown or bool(not args.inference_only)  # Optimization: 기본으로 모든 로그
             result = run_step(
                 image=image,
                 query=query,
@@ -197,10 +198,10 @@ def main():
                 updater=updater,
                 update_scores=True,
                 use_vlm_reasoning=True,
-                verbose_markdown=args.verbose_markdown,
+                verbose_markdown=_train_verbose_md,
                 save_step_dir=_step_dir,
             )
-            if args.verbose_markdown and result.get("verbose_markdown"):
+            if _train_verbose_md and result.get("verbose_markdown"):
                 print(result["verbose_markdown"])
             if result.get("correct"):
                 correct_train += 1
@@ -228,7 +229,6 @@ def main():
         print(f"[Eval] Loaded {len(eval_ds)} samples from frozen {frozen_name}")
 
         _eval_step_dir = (save_step_dir / "eval") if save_step_dir else None
-        _eval_verbose_md = args.verbose_markdown or bool(args.eval)  # Inference: 기본으로 모든 로그
         eval_results = run_test(
             dataset=eval_ds,
             benchmark=args.benchmark,
@@ -239,7 +239,7 @@ def main():
             random_agents=False,
             use_vlm_reasoning=True,
             verbose=True,
-            verbose_markdown=_eval_verbose_md,
+            verbose_markdown=args.verbose_markdown,
             updater=None,
             update_scores=False,
             save_step_dir=_eval_step_dir,
