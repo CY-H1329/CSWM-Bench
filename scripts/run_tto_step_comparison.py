@@ -205,9 +205,26 @@ def main():
         return
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load dataset (scale max_per_category for 500 steps)
-    train_subdir = {"cvbench": "cvbench_train_300", "3dsrbench": "3dsrbench_train_300", "stvqa": "stvqa_train_300"}[args.benchmark]
+    # Load dataset (prefer *_train_500 when steps=500)
+    base = {"cvbench": "cvbench", "3dsrbench": "3dsrbench", "stvqa": "stvqa"}[args.benchmark]
+    train_subdir = f"{base}_train_{args.steps}" if args.steps in (300, 500) else f"{base}_train_300"
     train_path = PROJECT_ROOT / "data" / "dataset" / train_subdir
+    if not train_path.exists() and args.steps == 500:
+        train_subdir = f"{base}_train_300"
+        train_path = PROJECT_ROOT / "data" / "dataset" / train_subdir
+
+    # Auto-create dataset if missing (cvbench/stvqa 500)
+    if not train_path.exists() and args.steps == 500 and args.benchmark in ("cvbench", "stvqa"):
+        print(f"[Prepare] Creating {base}_train_500 (500 samples, stratified)...")
+        import subprocess
+        subprocess.run(
+            [sys.executable, str(PROJECT_ROOT / "scripts" / "prepare_train_datasets.py"),
+             "--benchmarks", args.benchmark, "--n", "500"],
+            cwd=str(PROJECT_ROOT),
+            check=True,
+        )
+        train_subdir = f"{base}_train_500"
+        train_path = PROJECT_ROOT / "data" / "dataset" / train_subdir
     n_cats = {"cvbench": 4, "3dsrbench": 12, "stvqa": 9}[args.benchmark]
     max_per_cat = max((args.steps + n_cats - 1) // n_cats, {"cvbench": 50, "3dsrbench": 2, "stvqa": 25}[args.benchmark])
 

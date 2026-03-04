@@ -91,26 +91,29 @@ def stratified_sample_from_pool(by_cat: dict, n_total: int, rng: random.Random) 
     return indices
 
 
-def prepare_cvbench_train_300(output_dir: Path, seed: int) -> dict:
-    """CV-Bench: 300 from remainder (excluding frozen 400)."""
-    print("\n[CV-Bench train 300] Loading...")
+def prepare_cvbench_train(output_dir: Path, seed: int, n_samples: int = 300) -> dict:
+    """CV-Bench: n_samples stratified (excluding frozen 400 when possible)."""
+    print(f"\n[CV-Bench train {n_samples}] Loading...")
     ds = load_dataset("nyu-visionx/CV-Bench", split="test")
     frozen_indices = get_frozen_cvbench_indices(ds, seed)
     remaining = [i for i in range(len(ds)) if i not in frozen_indices]
     print(f"  Full: {len(ds)}, Frozen: {len(frozen_indices)}, Remaining: {len(remaining)}")
 
     by_cat = {}
-    for i in remaining:
+    pool = remaining if len(remaining) >= n_samples else list(range(len(ds)))
+    if len(remaining) < n_samples:
+        print(f"  [Warn] Remaining {len(remaining)} < {n_samples}, sampling from full (may overlap frozen)")
+    for i in pool:
         c = ds[i].get("task") or "unknown"
         if c not in by_cat:
             by_cat[c] = []
         by_cat[c].append(i)
 
-    rng = random.Random(seed + 1)  # Different seed for train sampling
-    indices = stratified_sample_from_pool(by_cat, 300, rng)
+    rng = random.Random(seed + 1)
+    indices = stratified_sample_from_pool(by_cat, n_samples, rng)
     sampled = ds.select(indices)
 
-    out_path = output_dir / "cvbench_train_300"
+    out_path = output_dir / f"cvbench_train_{n_samples}"
     out_path.mkdir(parents=True, exist_ok=True)
     sampled.save_to_disk(str(out_path))
 
@@ -122,7 +125,7 @@ def prepare_cvbench_train_300(output_dir: Path, seed: int) -> dict:
         "benchmark": "cvbench",
         "split": "train",
         "n_samples": len(sampled),
-        "excludes": "cvbench_400 (frozen)",
+        "excludes": "cvbench_400 (frozen)" if pool == remaining else "overlap (insufficient remaining)",
         "seed": seed,
         "source": "nyu-visionx/CV-Bench",
         "per_category": by_cat_out,
@@ -174,9 +177,9 @@ def prepare_3dsrbench_train_300(output_dir: Path, seed: int) -> dict:
     return manifest
 
 
-def prepare_stvqa_train_300(output_dir: Path, seed: int) -> dict:
-    """STVQA: 300 from train split (frozen uses val, so no exclusion)."""
-    print("\n[STVQA train 300] Loading...")
+def prepare_stvqa_train(output_dir: Path, seed: int, n_samples: int = 300) -> dict:
+    """STVQA: n_samples stratified from train split (frozen uses val, no exclusion)."""
+    print(f"\n[STVQA train {n_samples}] Loading...")
     ds = load_dataset("hunarbatra/STVQA-7K", split="train")
     print(f"  Train split: {len(ds)} samples")
 
@@ -188,10 +191,10 @@ def prepare_stvqa_train_300(output_dir: Path, seed: int) -> dict:
         by_cat[c].append(i)
 
     rng = random.Random(seed)
-    indices = stratified_sample_from_pool(by_cat, 300, rng)
+    indices = stratified_sample_from_pool(by_cat, n_samples, rng)
     sampled = ds.select(indices)
 
-    out_path = output_dir / "stvqa_train_300"
+    out_path = output_dir / f"stvqa_train_{n_samples}"
     out_path.mkdir(parents=True, exist_ok=True)
     sampled.save_to_disk(str(out_path))
 
@@ -227,28 +230,32 @@ def main():
         default=["cvbench", "3dsrbench", "stvqa"],
         choices=["cvbench", "3dsrbench", "stvqa"],
     )
+    parser.add_argument("--n", "--n-samples", dest="n_samples", type=int, default=300,
+                        help="Samples per dataset (stratified). Default 300. Use 500 for TTO comparison.")
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
+    n = args.n_samples
     readme = {
         "train_datasets": "Disjoint from frozen_benchmarks (used for training)",
         "seed": args.seed,
+        "n_samples": n,
         "paths": {
-            "cvbench": "cvbench_train_300",
+            "cvbench": f"cvbench_train_{n}",
             "3dsrbench": "3dsrbench_train_300",
-            "stvqa": "stvqa_train_300",
+            "stvqa": f"stvqa_train_{n}",
         },
     }
     (args.output_dir / "README.json").write_text(json.dumps(readme, indent=2))
 
     for key in args.benchmarks:
         if key == "cvbench":
-            prepare_cvbench_train_300(args.output_dir, args.seed)
+            prepare_cvbench_train(args.output_dir, args.seed, n_samples=n)
         elif key == "3dsrbench":
             prepare_3dsrbench_train_300(args.output_dir, args.seed)
         elif key == "stvqa":
-            prepare_stvqa_train_300(args.output_dir, args.seed)
+            prepare_stvqa_train(args.output_dir, args.seed, n_samples=n)
 
     print("\nDone. Train datasets at", args.output_dir)
 
