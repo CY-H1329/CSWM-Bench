@@ -10,7 +10,9 @@ Spatial MAS is designed for **diverse spatial reasoning problems** across benchm
 
 ### 1.1 Pipeline Diagram (Image)
 
-![MAS Pipeline](https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/figures/fig_mas_pipeline.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/figures/fig_mas_pipeline.png" alt="MAS Pipeline" />
+</p>
 
 ---
 
@@ -18,9 +20,13 @@ Spatial MAS is designed for **diverse spatial reasoning problems** across benchm
 
 Agent profiles are derived from 3DSRBench and CV-Bench performance. The Head Agent uses these profiles for model selection when `category_seen=false`. Each cell shows per-category performance (0–1).
 
-![Model Profiles Heatmap](https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/figures/fig_model_profiles_heatmap.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/figures/fig_model_profiles_heatmap.png" alt="Model Profiles Heatmap" />
+</p>
 
 ### 2.1 Model × Category Summary Table
+
+<div align="center">
 
 | Model | Best Category | depth | distance | relation | orientation | count |
 |-------|---------------|-------|----------|----------|-------------|-------|
@@ -30,6 +36,8 @@ Agent profiles are derived from 3DSRBench and CV-Bench performance. The Head Age
 | Gemini-ER | relation (0.59) | 0.46 | 0.32 | **0.59** | 0.47 | 0.46 |
 | LLaVA-4D | relation (0.53) | 0.30 | 0.10 | **0.53** | 0.32 | 0.30 |
 | Sa2VA | orientation (0.22) | 0.20 | 0.21 | 0.08 | **0.22** | 0.20 |
+
+</div>
 
 ---
 
@@ -54,7 +62,11 @@ flowchart LR
 
 ### 3.1 Role–Tool Matrix (Image)
 
-![Role-Tool Matrix](https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/figures/fig_role_tool_matrix.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/figures/fig_role_tool_matrix.png" alt="Role-Tool Matrix" />
+</p>
+
+<div align="center">
 
 | Role | Tool | Information Type |
 |------|------|-------------------|
@@ -62,11 +74,15 @@ flowchart LR
 | **explicit_3d_representation** | Depth, 3D Repr | Object z-values, depth ordering |
 | **scene_graph_construction** | Scene Graph | Nodes + edges (above, below, left_of, right_of) |
 
+</div>
+
 ---
 
 ## 4. Head Agent
 
 ### 4.1 Category Taxonomy (5 Unified Categories)
+
+<div align="center">
 
 | Category | Definition |
 |----------|------------|
@@ -75,6 +91,8 @@ flowchart LR
 | **size** | Size/height comparison. Asks HOW BIG. |
 | **orientation** | Facing direction, alignment. Asks WHICH WAY. |
 | **counting** | Number of instances. Asks HOW MANY. |
+
+</div>
 
 ### 4.2 Design Rationale
 
@@ -120,15 +138,21 @@ flowchart TD
 
 ### 6.2 Protocol Diagram (Image)
 
-![Final Reasoning Protocol](https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/figures/fig_final_reasoning_protocol.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/figures/fig_final_reasoning_protocol.png" alt="Final Reasoning Protocol" />
+</p>
 
 ### 6.3 Design Principles
+
+<div align="center">
 
 | Principle | Description |
 |-----------|-------------|
 | **Strategy–question matching** | Depth questions → explicit_3d; relation questions → scene_graph. |
 | **No blind majority** | Prefer the most grounded reasoning, not the majority vote. |
 | **5-step protocol** | Understand → Read → Compare → Conclusion → Output. |
+
+</div>
 
 ---
 
@@ -148,11 +172,15 @@ See **[APPENDIX_PROMPTS_AND_TOOLS_FULL.md](https://github.com/CY-H1329/Spatial_M
 
 ## 8. Tool Reference Summary
 
+<div align="center">
+
 | Tool | Function | Model / Source |
 |------|----------|----------------|
 | Depth (legacy) | `get_depth_summary()` | LiheYoung/depth-anything-small-hf |
 | 3D Representation | `get_3d_representation()` | DepthAnything + OWL-ViT / DETR |
 | Scene Graph | `get_scene_graph()` | DETR (facebook/detr-resnet-50) / OWL-ViT |
+
+</div>
 
 **C-Hybrid**: Tools are pre-computed by the pipeline and injected into the prompt. No dynamic tool-calling by agents.
 
