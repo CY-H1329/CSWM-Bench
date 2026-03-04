@@ -12,41 +12,36 @@ Spatial MAS is designed for **diverse spatial reasoning problems** across benchm
 
 ```mermaid
 flowchart TB
-    subgraph Input
+    subgraph Input["Input"]
         A[Image + Query]
     end
     
-    subgraph Head
+    subgraph Head["Head"]
         B["Head Agent / Category Inference"]
     end
     
-    subgraph Routing
+    subgraph Routing["Routing"]
         C["ScoreMap / role × llm selection"]
     end
     
-    subgraph Specialists
+    subgraph Specialists["Specialists"]
         D1["Direct Visual / pictorial cues"]
         D2["Explicit 3D / depth + z values"]
         D3["Scene Graph / nodes + edges"]
     end
     
-    subgraph Synthesis
+    subgraph Synthesis["Synthesis"]
         E["SharedMemory / 3 specialist outputs"]
         F[Final Reasoning Agent]
     end
     
     G[Final Answer]
     
-    A --> B
-    B --> C
-    C --> D1
-    C --> D2
-    C --> D3
-    D1 --> E
-    D2 --> E
-    D3 --> E
-    E --> F
-    F --> G
+    Input --> Head
+    Head --> Routing
+    Routing --> Specialists
+    Specialists --> Synthesis
+    Synthesis --> G
 ```
 
 ### 1.2 Pipeline Diagram (Image)
