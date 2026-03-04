@@ -175,7 +175,7 @@ flowchart TD
 
 ## 7. Full Prompt Templates & Tool Examples
 
-See **[docs/APPENDIX_PROMPTS_AND_TOOLS_FULL.md](docs/APPENDIX_PROMPTS_AND_TOOLS_FULL.md)** for:
+See **[APPENDIX_PROMPTS_AND_TOOLS_FULL.md](https://github.com/CY-H1329/Spatial_MAS/blob/main/docs/APPENDIX_PROMPTS_AND_TOOLS_FULL.md)** for:
 
 - Complete Head Agent prompt
 - Complete Specialist prompts (all 3 roles)
@@ -202,4 +202,4 @@ See **[docs/APPENDIX_PROMPTS_AND_TOOLS_FULL.md](docs/APPENDIX_PROMPTS_AND_TOOLS_
 ## References
 
 - **Code**: `src2/agents/mas_v2/prompts.py`, `src2/tools/`
-- **Docs**: [TOOL_ARCHITECTURE.md](docs/TOOL_ARCHITECTURE.md), [FINAL_REASONING_ANALYSIS.md](docs/FINAL_REASONING_ANALYSIS.md), [MAS_V2_FLOW.md](docs/MAS_V2_FLOW.md)
+- **Docs**: [TOOL_ARCHITECTURE.md](https://github.com/CY-H1329/Spatial_MAS/blob/main/docs/TOOL_ARCHITECTURE.md), [FINAL_REASONING_ANALYSIS.md](https://github.com/CY-H1329/Spatial_MAS/blob/main/docs/FINAL_REASONING_ANALYSIS.md), [MAS_V2_FLOW.md](https://github.com/CY-H1329/Spatial_MAS/blob/main/docs/MAS_V2_FLOW.md)
