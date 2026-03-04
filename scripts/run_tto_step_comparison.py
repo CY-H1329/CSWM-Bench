@@ -112,8 +112,21 @@ def run_tto_for_step(
     return accuracies
 
 
-def plot_comparison(data: dict, output_path: Path, max_steps: int = 70):
-    """Plot step1, step2, step3, step4 accuracy curves."""
+def _smooth_curve(y, window: int = 7):
+    """Smooth curve with moving average."""
+    import numpy as np
+    if len(y) < window:
+        return np.array(y)
+    try:
+        from scipy.ndimage import gaussian_filter1d
+        return gaussian_filter1d(np.array(y, dtype=float), sigma=window / 2.5, mode="nearest")
+    except ImportError:
+        kernel = np.ones(window) / window
+        return np.convolve(np.array(y, dtype=float), kernel, mode="same")
+
+
+def plot_comparison(data: dict, output_path: Path, max_steps: int = 70, smooth_window: int = 7, exclude_step1: bool = True):
+    """Plot step2, step3, step4 accuracy curves (step1 excluded by default)."""
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -131,18 +144,21 @@ def plot_comparison(data: dict, output_path: Path, max_steps: int = 70):
         "step3": "Step 3 (s += γ·R̃, γ=0.1)",
         "step4": "Step 4 (Beta + EMA)",
     }
-    colors = ["#2ecc71", "#3498db", "#9b59b6", "#e74c3c"]
+    colors = {"step1": "#2ecc71", "step2": "#3498db", "step3": "#9b59b6", "step4": "#e74c3c"}
+    keys = [k for k in ["step1", "step2", "step3", "step4"] if k not in (["step1"] if exclude_step1 else [])]
 
-    for i, key in enumerate(["step1", "step2", "step3", "step4"]):
+    for key in keys:
         if key not in data or not data[key]:
             continue
-        accs = data[key]
-        steps = np.arange(1, len(accs) + 1)
-        ax.plot(steps, accs, label=labels.get(key, key), color=colors[i], linewidth=2.5, alpha=0.9)
+        accs = np.array(data[key], dtype=float)
+        accs_smooth = _smooth_curve(accs, window=smooth_window)
+        steps = np.arange(1, len(accs_smooth) + 1)
+        ax.plot(steps, accs_smooth, label=labels.get(key, key), color=colors[key], linewidth=2.5, alpha=0.9)
 
     ax.set_xlabel("Step", fontsize=12)
     ax.set_ylabel("Cumulative Accuracy (%)", fontsize=12)
-    ax.set_title("TTO Step 1 vs 2 vs 3 vs 4 — Cumulative Accuracy", fontsize=14)
+    title = "TTO Step 2 vs 3 vs 4 — Cumulative Accuracy" if exclude_step1 else "TTO Step 1 vs 2 vs 3 vs 4 — Cumulative Accuracy"
+    ax.set_title(title, fontsize=14)
     ax.legend(loc="lower right", fontsize=10)
     ax.set_xlim(1, max_steps)
     ax.set_ylim(0, 105)
@@ -158,7 +174,7 @@ def plot_comparison(data: dict, output_path: Path, max_steps: int = 70):
 def main():
     parser = argparse.ArgumentParser(description="TTO Step 1,2,3,4 comparison (70 steps each)")
     parser.add_argument("--benchmark", type=str, default="cvbench", choices=["cvbench", "3dsrbench", "stvqa"])
-    parser.add_argument("--steps", type=int, default=70, help="Steps per TTO variant")
+    parser.add_argument("--steps", type=int, default=500, help="Steps per TTO variant")
     parser.add_argument("--output", type=str, default="results/tto_step_comparison", help="Output dir for JSON + plot")
     parser.add_argument("--T", type=float, default=5.0)
     parser.add_argument("--kappa", type=float, default=0.5)
@@ -168,6 +184,8 @@ def main():
     parser.add_argument("--specialist_offload", action="store_true")
     parser.add_argument("--plot-only", type=str, default=None,
                         help="Only plot from existing JSON (path to tto_step_accuracies.json)")
+    parser.add_argument("--include-step1", action="store_true", help="Include Step 1 in plot (default: exclude)")
+    parser.add_argument("--smooth", type=int, default=7, help="Smoothing window for curves (default: 7)")
     args = parser.parse_args()
 
     out_dir = Path(args.output)
@@ -182,15 +200,16 @@ def main():
         meta = raw.get("meta", {})
         steps = meta.get("steps", max(len(v) for v in data.values()) if data else 70)
         plot_path = json_path.parent / "tto_step_comparison.png"
-        plot_comparison(data, plot_path, max_steps=steps)
+        plot_comparison(data, plot_path, max_steps=steps, smooth_window=args.smooth, exclude_step1=not args.include_step1)
         print(f"[Done] Plot → {plot_path}")
         return
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load dataset
+    # Load dataset (scale max_per_category for 500 steps)
     train_subdir = {"cvbench": "cvbench_train_300", "3dsrbench": "3dsrbench_train_300", "stvqa": "stvqa_train_300"}[args.benchmark]
     train_path = PROJECT_ROOT / "data" / "dataset" / train_subdir
-    max_per_cat = {"cvbench": 50, "3dsrbench": 2, "stvqa": 25}[args.benchmark]
+    n_cats = {"cvbench": 4, "3dsrbench": 12, "stvqa": 9}[args.benchmark]
+    max_per_cat = max((args.steps + n_cats - 1) // n_cats, {"cvbench": 50, "3dsrbench": 2, "stvqa": 25}[args.benchmark])
 
     if train_path.exists():
         train_ds = load_benchmark_from_dataset(
@@ -224,7 +243,10 @@ def main():
         if len(samples) >= args.steps:
             break
 
-    print(f"[Data] Loaded {len(samples)} samples for {args.steps} steps (benchmark={args.benchmark})")
+    n_steps = min(args.steps, len(samples))
+    if len(samples) < args.steps:
+        print(f"[Warn] Only {len(samples)} valid samples (need {args.steps}). Will run {n_steps} steps.")
+    print(f"[Data] Loaded {len(samples)} samples for {n_steps} steps (benchmark={args.benchmark})")
 
     # Build runners
     from test_confidence_mas_v3_step4 import build_runners_for_confidence
@@ -240,7 +262,7 @@ def main():
     data = {}
     for step_num in [1, 2, 3, 4]:
         print(f"\n{'='*60}")
-        print(f"TTO Step {step_num} ({args.steps} steps)")
+        print(f"TTO Step {step_num} ({n_steps} steps)")
         print("=" * 60)
         accs = run_tto_for_step(
             step_num=step_num,
@@ -249,7 +271,7 @@ def main():
             head_gen=head_gen,
             spec_gen=spec_gen,
             reason_gen=reason_gen,
-            max_steps=args.steps,
+            max_steps=n_steps,
             T=args.T,
             kappa=args.kappa,
             gamma=args.gamma,
@@ -263,7 +285,7 @@ def main():
     json_path = out_dir / "tto_step_accuracies.json"
     meta = {
         "benchmark": args.benchmark,
-        "steps": args.steps,
+        "steps": n_steps,
         "T": args.T,
         "kappa": args.kappa,
         "gamma": args.gamma,
@@ -275,7 +297,7 @@ def main():
 
     # Plot
     plot_path = out_dir / "tto_step_comparison.png"
-    plot_comparison(data, plot_path, max_steps=args.steps)
+    plot_comparison(data, plot_path, max_steps=n_steps, smooth_window=args.smooth, exclude_step1=not args.include_step1)
     print(f"[Done] Results in {out_dir}")
 
 
