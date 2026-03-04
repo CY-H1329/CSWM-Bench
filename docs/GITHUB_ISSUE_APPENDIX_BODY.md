@@ -8,44 +8,7 @@
 
 Spatial MAS is designed for **diverse spatial reasoning problems** across benchmarks and real-world scenarios. The architecture is grounded in **spatial cognition research** (Kosslyn 1987, Walsh 2003, Levinson 2003).
 
-### 1.1 MAS Pipeline Flow (Mermaid)
-
-```mermaid
-flowchart TB
-    subgraph Input
-        A[Image + Query]
-    end
-    
-    subgraph Head
-        B["Head Agent / Category Inference"]
-    end
-    
-    subgraph Routing
-        C["ScoreMap / role × llm selection"]
-    end
-    
-    subgraph Specialists["Specialists"]
-        D1["Direct Visual / pictorial cues"]
-        D2["Explicit 3D / depth + z values"]
-        D3["Scene Graph / nodes + edges"]
-    end
-    
-    subgraph Synthesis["Synthesis"]
-        E["SharedMemory / 3 specialist outputs"]
-        F[Final Reasoning Agent]
-    end
-    
-    G[Final Answer]
-    
-    A --> B
-    B --> C
-    C --> Specialists
-    Specialists --> Synthesis
-    E --> F
-    F --> G
-```
-
-### 1.2 Pipeline Diagram (Image)
+### 1.1 Pipeline Diagram (Image)
 
 ![MAS Pipeline](https://raw.githubusercontent.com/CY-H1329/Spatial_MAS/main/docs/figures/fig_mas_pipeline.png)
 
