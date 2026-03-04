@@ -57,7 +57,7 @@ def load_agent_profiles():
 
 
 def gen_model_profiles_heatmap():
-    """Generate model x category performance heatmap (Toss colors)."""
+    """Generate model x category performance heatmap (original RdYlGn)."""
     try:
         import numpy as np
         import matplotlib
@@ -84,11 +84,8 @@ def gen_model_profiles_heatmap():
     fig.patch.set_facecolor(TOSS["white"])
     ax.set_facecolor(TOSS["white"])
 
-    # Toss-style colormap: gray (low) -> blue (mid) -> mint (high)
-    from matplotlib.colors import LinearSegmentedColormap
-    colors_toss = [TOSS["gray_light"], TOSS["blue_bg"], TOSS["blue"], TOSS["mint"]]
-    cmap = LinearSegmentedColormap.from_list("toss", colors_toss, N=256)
-    im = ax.imshow(arr, aspect="auto", cmap=cmap, vmin=0, vmax=1)
+    # Original RdYlGn colormap (red=low, yellow=mid, green=high)
+    im = ax.imshow(arr, aspect="auto", cmap="RdYlGn", vmin=0, vmax=1)
 
     ax.set_xticks(range(len(cats)))
     ax.set_xticklabels(cats, rotation=45, ha="right", color=TOSS["gray"])
@@ -99,7 +96,7 @@ def gen_model_profiles_heatmap():
     for i in range(len(models)):
         for j in range(len(cats)):
             val = arr[i, j]
-            color = TOSS["white"] if val < 0.5 else TOSS["gray"]
+            color = "white" if val < 0.5 else "black"
             ax.text(j, i, f"{val:.2f}", ha="center", va="center", fontsize=8, color=color)
 
     cbar = plt.colorbar(im, ax=ax)
@@ -274,15 +271,22 @@ def gen_mas_pipeline_diagram():
                                 facecolor=TOSS["mint_bg"], edgecolor=TOSS["mint"]))
     ax.text(5, y_final, "Final Reasoning", ha="center", va="center", fontsize=9, color=TOSS["gray"])
 
-    # Arrows (top to bottom, correct direction)
+    # Arrows (top to bottom)
     ax.annotate("", xy=(5, y_head + 0.35), xytext=(5, y_input - 0.35),
                 arrowprops=dict(arrowstyle="->", color=TOSS["blue"], lw=2))
     ax.annotate("", xy=(5, y_scoremap + 0.35), xytext=(5, y_head - 0.35),
                 arrowprops=dict(arrowstyle="->", color=TOSS["blue"], lw=2))
-    ax.annotate("", xy=(5, y_specialists + 0.4), xytext=(5, y_scoremap - 0.35),
-                arrowprops=dict(arrowstyle="->", color=TOSS["blue"], lw=2))
-    ax.annotate("", xy=(5, y_shared + 0.35), xytext=(5, y_specialists - 0.4),
-                arrowprops=dict(arrowstyle="->", color=TOSS["mint"], lw=2))
+
+    # ScoreMap → all 3 specialists (branching)
+    for _, x in specialists:
+        ax.annotate("", xy=(x, y_specialists + 0.4), xytext=(5, y_scoremap - 0.35),
+                    arrowprops=dict(arrowstyle="->", color=TOSS["blue"], lw=2))
+
+    # All 3 specialists → SharedMemory (converging)
+    for _, x in specialists:
+        ax.annotate("", xy=(5, y_shared + 0.35), xytext=(x, y_specialists - 0.4),
+                    arrowprops=dict(arrowstyle="->", color=TOSS["mint"], lw=2))
+
     ax.annotate("", xy=(5, y_final + 0.35), xytext=(5, y_shared - 0.35),
                 arrowprops=dict(arrowstyle="->", color=TOSS["mint"], lw=2))
     ax.annotate("", xy=(5, y_output), xytext=(5, y_final - 0.35),
