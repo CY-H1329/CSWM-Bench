@@ -17,21 +17,21 @@ flowchart TB
     end
     
     subgraph Head
-        B[Head Agent\nCategory Inference]
+        B["Head Agent / Category Inference"]
     end
     
     subgraph Routing
-        C[ScoreMap\nrole × llm selection]
+        C["ScoreMap / role × llm selection"]
     end
     
     subgraph Specialists
-        D1[Direct Visual\npictorial cues]
-        D2[Explicit 3D\ndepth + z values]
-        D3[Scene Graph\nnodes + edges]
+        D1["Direct Visual / pictorial cues"]
+        D2["Explicit 3D / depth + z values"]
+        D3["Scene Graph / nodes + edges"]
     end
     
     subgraph Synthesis
-        E[SharedMemory\n3 specialist outputs]
+        E["SharedMemory / 3 specialist outputs"]
         F[Final Reasoning Agent]
     end
     
