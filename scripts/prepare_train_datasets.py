@@ -135,26 +135,29 @@ def prepare_cvbench_train(output_dir: Path, seed: int, n_samples: int = 300) -> 
     return manifest
 
 
-def prepare_3dsrbench_train_300(output_dir: Path, seed: int) -> dict:
-    """3DSRBench: 300 from remainder (excluding frozen 500)."""
-    print("\n[3DSRBench train 300] Loading...")
+def prepare_3dsrbench_train(output_dir: Path, seed: int, n_samples: int = 300) -> dict:
+    """3DSRBench: n_samples stratified from remainder (excluding frozen 500)."""
+    print(f"\n[3DSRBench train {n_samples}] Loading...")
     ds = load_dataset("ccvl/3DSRBench", "benchmark", split="test")
     frozen_indices = get_frozen_3dsrbench_indices(ds, seed)
     remaining = [i for i in range(len(ds)) if i not in frozen_indices]
     print(f"  Full: {len(ds)}, Frozen: {len(frozen_indices)}, Remaining: {len(remaining)}")
 
     by_cat = {}
-    for i in remaining:
+    pool = remaining if len(remaining) >= n_samples else list(range(len(ds)))
+    if len(remaining) < n_samples:
+        print(f"  [Warn] Remaining {len(remaining)} < {n_samples}, sampling from full (may overlap frozen)")
+    for i in pool:
         c = ds[i].get("category") or "unknown"
         if c not in by_cat:
             by_cat[c] = []
         by_cat[c].append(i)
 
     rng = random.Random(seed + 1)
-    indices = stratified_sample_from_pool(by_cat, 300, rng)
+    indices = stratified_sample_from_pool(by_cat, n_samples, rng)
     sampled = ds.select(indices)
 
-    out_path = output_dir / "3dsrbench_train_300"
+    out_path = output_dir / f"3dsrbench_train_{n_samples}"
     out_path.mkdir(parents=True, exist_ok=True)
     sampled.save_to_disk(str(out_path))
 
@@ -166,7 +169,7 @@ def prepare_3dsrbench_train_300(output_dir: Path, seed: int) -> dict:
         "benchmark": "3dsrbench",
         "split": "train",
         "n_samples": len(sampled),
-        "excludes": "3dsrbench_500 (frozen)",
+        "excludes": "3dsrbench_500 (frozen)" if pool == remaining else "overlap (insufficient remaining)",
         "seed": seed,
         "source": "ccvl/3DSRBench",
         "subset": "benchmark",
@@ -243,7 +246,7 @@ def main():
         "n_samples": n,
         "paths": {
             "cvbench": f"cvbench_train_{n}",
-            "3dsrbench": "3dsrbench_train_300",
+            "3dsrbench": f"3dsrbench_train_{n}",
             "stvqa": f"stvqa_train_{n}",
         },
     }
@@ -253,7 +256,7 @@ def main():
         if key == "cvbench":
             prepare_cvbench_train(args.output_dir, args.seed, n_samples=n)
         elif key == "3dsrbench":
-            prepare_3dsrbench_train_300(args.output_dir, args.seed)
+            prepare_3dsrbench_train(args.output_dir, args.seed, n_samples=n)
         elif key == "stvqa":
             prepare_stvqa_train(args.output_dir, args.seed, n_samples=n)
 

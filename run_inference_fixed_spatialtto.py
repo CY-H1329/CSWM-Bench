@@ -74,9 +74,37 @@ def load_assignments_from_json(path: str) -> Dict[str, List[Tuple[str, str]]]:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     a = data.get("assignments", data)
     return {
-        cat: [(r, a) for r, a in lst]
+        cat: [(r, ag) for r, ag in lst]
         for cat, lst in a.items()
     }
+
+
+def load_assignments_from_score_map(path: str) -> Dict[str, List[Tuple[str, str]]]:
+    """Dérive assignments depuis score_map JSON (argmax par rôle, sans réutilisation)."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    maps = data.get("maps", {})
+    llms = data.get("llms", ["qwen3_4b", "llava4d", "spatial_reasoner"])
+    roles = data.get("roles", ["direct_visual_heuristic", "explicit_3d_representation", "scene_graph_construction"])
+    assignments = {}
+    for cat, cat_map in maps.items():
+        used = set()
+        lst = []
+        for role in roles:
+            role_scores = cat_map.get(role, {})
+            best_agent, best_s = None, -1e9
+            for agent in llms:
+                if agent in used:
+                    continue
+                s = role_scores.get(agent, 0.5)
+                if s > best_s:
+                    best_s, best_agent = s, agent
+            if best_agent:
+                lst.append((role, best_agent))
+                used.add(best_agent)
+            elif llms:
+                lst.append((role, llms[0]))
+        assignments[cat] = lst
+    return assignments
 
 
 def main():
@@ -85,8 +113,11 @@ def main():
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--summary", type=str, help="Path to step_XXX_summary.txt")
     g.add_argument("--assignment_json", type=str, help="Path to assignments JSON")
+    g.add_argument("--score_map_path", type=str, help="Path to score_map JSON (derive assignments)")
     p.add_argument("--benchmark", type=str, default="cvbench")
     p.add_argument("--max_samples", type=int, default=500)
+    p.add_argument("--max_per_category", type=int, default=None,
+                   help="Stratified: max samples per category (e.g. 250 for 1000 total on 4 CV-Bench cats)")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--specialist_offload", action="store_true")
     p.add_argument("--output_dir", type=str, default=None)
@@ -95,9 +126,12 @@ def main():
     if args.summary:
         assignments = load_assignments_from_summary(args.summary)
         print(f"[Load] Assignments from step summary: {args.summary}")
-    else:
+    elif args.assignment_json:
         assignments = load_assignments_from_json(args.assignment_json)
         print(f"[Load] Assignments from JSON: {args.assignment_json}")
+    else:
+        assignments = load_assignments_from_score_map(args.score_map_path)
+        print(f"[Load] Assignments from score map: {args.score_map_path}")
 
     llms = []
     for lst in assignments.values():
@@ -114,38 +148,47 @@ def main():
         llms=llms,
     )
 
-    # Charger CV-Bench 500
-    train_500 = PROJECT_ROOT / "data" / "dataset" / "cvbench_train_500"
-    if train_500.exists():
+    # Charger CV-Bench (stratifié si max_per_category)
+    train_n = PROJECT_ROOT / "data" / "dataset" / f"cvbench_train_{args.max_samples}"
+    if args.max_per_category is not None:
+        # Stratifié: max_per_category par catégorie (ex: 250 × 4 = 1000)
+        dataset = load_benchmark(
+            "cvbench",
+            max_per_category=args.max_per_category,
+            use_frozen=False,
+            seed=args.seed,
+        )
+        print(f"[Eval] Loaded {len(dataset)} from CV-Bench (stratified, {args.max_per_category}/cat)")
+    elif train_n.exists():
         dataset = load_benchmark_from_dataset(
-            "cvbench", "cvbench_train_500",
+            "cvbench", f"cvbench_train_{args.max_samples}",
             project_root=PROJECT_ROOT,
             max_samples=args.max_samples,
             seed=args.seed,
         )
-        print(f"[Eval] Loaded {len(dataset)} from data/dataset/cvbench_train_500")
+        print(f"[Eval] Loaded {len(dataset)} from data/dataset/cvbench_train_{args.max_samples}")
     else:
-        # Créer cvbench_train_500 si absent
-        print("[Info] cvbench_train_500 absent. Création via prepare_train_datasets...")
         import subprocess
         prep = PROJECT_ROOT / "scripts" / "prepare_train_datasets.py"
-        if prep.exists():
+        if prep.exists() and args.max_samples in (300, 500):
+            print(f"[Info] cvbench_train_{args.max_samples} absent. Création...")
             subprocess.run(
-                [sys.executable, str(prep), "--benchmarks", "cvbench", "--n", "500"],
+                [sys.executable, str(prep), "--benchmarks", "cvbench", "--n", str(args.max_samples)],
                 cwd=str(PROJECT_ROOT),
                 check=True,
             )
             dataset = load_benchmark_from_dataset(
-                "cvbench", "cvbench_train_500",
+                "cvbench", f"cvbench_train_{args.max_samples}",
                 project_root=PROJECT_ROOT,
                 max_samples=args.max_samples,
                 seed=args.seed,
             )
-            print(f"[Eval] Loaded {len(dataset)} from data/dataset/cvbench_train_500")
+            print(f"[Eval] Loaded {len(dataset)} from data/dataset/cvbench_train_{args.max_samples}")
         else:
             dataset = load_benchmark(
                 "cvbench",
                 max_samples=args.max_samples,
+                max_per_category=args.max_per_category,
                 use_frozen=False,
                 seed=args.seed,
             )

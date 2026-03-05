@@ -59,6 +59,14 @@ BENCHMARK_CONFIG = {
         "score_map_name": "score_map_after_20.json",
         "frozen_size": 500,
     },
+    "3dsrbench_50": {
+        "train_subdir": "3dsrbench_train_50",
+        "train_samples": 50,
+        "max_per_category": 5,  # 12 cats × 5 = 60, cap at 50
+        "output_dir": "results/spatialtto_50_3dsrbench",
+        "score_map_name": "score_map_after_50.json",
+        "frozen_size": 500,
+    },
     "stvqa": {
         "train_subdir": "stvqa_train_300",
         "train_samples": 200,
@@ -73,8 +81,9 @@ BENCHMARK_CONFIG = {
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--benchmark", type=str, default="cvbench", choices=["cvbench", "3dsrbench", "stvqa"],
-                        help="Benchmark: cvbench, 3dsrbench, or stvqa")
+    parser.add_argument("--benchmark", type=str, default="cvbench",
+                        choices=["cvbench", "3dsrbench", "3dsrbench_50", "stvqa"],
+                        help="Benchmark: cvbench, 3dsrbench, 3dsrbench_50 (50 samples), stvqa")
     parser.add_argument("--train_samples", type=int, default=None,
                         help="Train samples (default: from benchmark config)")
     parser.add_argument("--train_subdir", type=str, default=None,
@@ -103,6 +112,8 @@ def main():
                         help="Save step data to text files in this dir: routing, per-agent CoT, final")
     args = parser.parse_args()
 
+    # 3dsrbench_50 uses same loader as 3dsrbench
+    benchmark_load = "3dsrbench" if args.benchmark == "3dsrbench_50" else args.benchmark
     bm_cfg = BENCHMARK_CONFIG[args.benchmark]
     train_subdir = args.train_subdir or bm_cfg["train_subdir"]
     train_samples = args.train_samples if args.train_samples is not None else bm_cfg["train_samples"]
@@ -158,7 +169,7 @@ def main():
         train_path = PROJECT_ROOT / "data" / "dataset" / train_subdir
         if train_path.exists():
             train_ds = load_benchmark_from_dataset(
-                args.benchmark, train_subdir,
+                benchmark_load, train_subdir,
                 project_root=PROJECT_ROOT,
                 max_samples=train_samples,
                 max_per_category=max_per_category,
@@ -167,7 +178,7 @@ def main():
             print(f"[Train] Loaded {len(train_ds)} samples from data/dataset/{train_subdir} (max_per_cat={max_per_category})")
         else:
             train_ds = load_benchmark(
-                args.benchmark, max_samples=train_samples,
+                benchmark_load, max_samples=train_samples,
                 max_per_category=max_per_category,
                 use_frozen=False, seed=args.seed,
             )
@@ -191,11 +202,11 @@ def main():
         correct_train = 0
         per_cat_train = defaultdict(lambda: {"correct": 0, "total": 0})
         for step, ex in enumerate(samples):
-            image = get_benchmark_image(ex, args.benchmark)
+            image = get_benchmark_image(ex, benchmark_load)
             if image is None:
                 continue
-            query = get_benchmark_prompt(ex, args.benchmark)
-            gt_raw = get_benchmark_answer(ex, args.benchmark)
+            query = get_benchmark_prompt(ex, benchmark_load)
+            gt_raw = get_benchmark_answer(ex, benchmark_load)
             gt = (gt_raw or "").strip().upper()
             # Skip only for multiple-choice benchmarks when answer has no A/B/C/D
             if args.benchmark != "stvqa" and not any(c in gt for c in "ABCD"):
@@ -223,7 +234,7 @@ def main():
                 print(result["verbose_markdown"])
             if result.get("correct"):
                 correct_train += 1
-            cat = get_benchmark_category(ex, args.benchmark) or result.get("category") or "unknown"
+            cat = get_benchmark_category(ex, benchmark_load) or result.get("category") or "unknown"
             per_cat_train[cat]["total"] += 1
             if result.get("correct"):
                 per_cat_train[cat]["correct"] += 1
@@ -258,18 +269,18 @@ def main():
 
     # --- 4. Eval: frozen benchmark (no TTO updates) ---
     if args.eval:
-        frozen_name = FROZEN_PATHS.get(args.benchmark, "cvbench_400")
+        frozen_name = FROZEN_PATHS.get(benchmark_load, "cvbench_400")
         print("\n" + "=" * 70)
         print(f"PHASE 2: Eval (frozen {frozen_name}, no TTO updates)")
         print("=" * 70)
 
-        eval_ds = load_benchmark(args.benchmark, max_samples=args.eval_max, use_frozen=True, seed=args.seed)
+        eval_ds = load_benchmark(benchmark_load, max_samples=args.eval_max, use_frozen=True, seed=args.seed)
         print(f"[Eval] Loaded {len(eval_ds)} samples from frozen {frozen_name}")
 
         _eval_step_dir = (save_step_dir / "eval") if save_step_dir else None
         eval_results = run_test(
             dataset=eval_ds,
-            benchmark=args.benchmark,
+            benchmark=benchmark_load,
             score_map=score_map,
             head_generate=head_gen,
             specialist_generate=spec_gen,
