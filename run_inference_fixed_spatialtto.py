@@ -121,6 +121,7 @@ def main():
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--specialist_offload", action="store_true")
     p.add_argument("--output_dir", type=str, default=None)
+    p.add_argument("--verbose", action="store_true", help="Full verbose (cat, assign, scores). Default: minimal (step + O/X)")
     args = p.parse_args()
 
     if args.summary:
@@ -214,7 +215,8 @@ def main():
         reasoning_generate=reason_gen,
         random_agents=False,
         use_vlm_reasoning=True,
-        verbose=True,
+        verbose=args.verbose,
+        verbose_minimal=not args.verbose,
         verbose_markdown=False,
         updater=None,
         update_scores=False,

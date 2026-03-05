@@ -362,6 +362,7 @@ def run_test(
     use_vlm_reasoning: bool = False,
     verbose: bool = False,
     verbose_markdown: bool = False,
+    verbose_minimal: bool = False,
     updater: "ScoreMapUpdater" = None,
     update_scores: bool = False,
     save_step_dir: Optional[Union[str, Path]] = None,
@@ -422,7 +423,10 @@ def run_test(
         correct_so_far = sum(1 for r in results if r.get("correct"))
         acc_pct = 100.0 * correct_so_far / len(results) if results else 0
 
-        if verbose:
+        if verbose_minimal:
+            ok = "O" if result.get("correct") else "X"
+            print(f"  Step {step + 1}/{total} | {ok}")
+        elif verbose:
             cat = result.get("category", "unknown")
             assign = result.get("assignments", [])
             logger.info(
