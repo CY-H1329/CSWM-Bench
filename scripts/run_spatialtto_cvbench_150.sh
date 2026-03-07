@@ -5,7 +5,7 @@
 # 2. Eval on frozen cvbench_400 with fixed combination
 #
 # Usage (H100):
-#   bash scripts/run_spatialtto_cvbench_150.sh              # Train 150 + Eval
+#   bash scripts/run_spatialtto_cvbench_150.sh              # Train 150 + Eval (no SpatialRGPT)
 #   bash scripts/run_spatialtto_cvbench_150.sh --inference_only  # Eval only (needs score map)
 #
 # Inference with 150-step combination (other scripts):
@@ -28,5 +28,6 @@ export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:T
 python run_confidence_mas_step4_train_then_eval_frozen.py \
   --benchmark cvbench_150 \
   --eval \
+  --no_spatial_rgpt \
   --checkpoint_every 50 \
   "$@"

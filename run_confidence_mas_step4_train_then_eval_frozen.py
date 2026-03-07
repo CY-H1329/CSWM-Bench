@@ -136,6 +136,8 @@ def main():
                         help="Include SpaceOm (6 agents). Default: 5 agents (qwen3_4b, sa2va, llava4d, spatial_rgpt, spatial_reasoner)")
     parser.add_argument("--low_memory", action="store_true",
                         help="Use 3 agents only (qwen3_4b, llava4d, spatial_reasoner) for OOM / quick test")
+    parser.add_argument("--no_spatial_rgpt", action="store_true",
+                        help="Exclude SpatialRGPT (4 agents: qwen3_4b, sa2va, llava4d, spatial_reasoner)")
     parser.add_argument("--specialist_offload", action="store_true",
                         help="Offload specialists to CPU after use (saves GPU memory, slower)")
     parser.add_argument("--verbose_markdown", action="store_true",
@@ -187,8 +189,12 @@ def main():
                 f"Run without --inference_only first to train on {train_subdir}."
             )
         score_map = ScoreMap.load(str(score_map_path))
-        specialist_whitelist = score_map.llms
         specialist_llms = score_map.llms
+        if args.no_spatial_rgpt:
+            specialist_whitelist = [a for a in specialist_llms if a != "spatial_rgpt"]
+            score_map.llms = specialist_whitelist  # exclude from selection
+        else:
+            specialist_whitelist = specialist_llms
         print(f"[Load] Score map from {score_map_path} (specialists: {specialist_llms})")
         correct_train = None
         train_samples = 0
@@ -200,6 +206,8 @@ def main():
             specialist_llms = ["qwen3_4b", "sa2va", "llava4d", "spatial_rgpt", "spaceom", "spatial_reasoner"]
         else:
             specialist_llms = SPECIALIST_LLMS_5
+        if args.no_spatial_rgpt:
+            specialist_llms = [a for a in specialist_llms if a != "spatial_rgpt"]
         specialist_whitelist = specialist_llms
 
     # --- 1. Build runners ---
