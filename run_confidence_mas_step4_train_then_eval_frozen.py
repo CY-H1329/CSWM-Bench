@@ -32,7 +32,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, SPECIALIST_LLMS_5, SPECIALIST_LLMS_3, run_test, compute_accuracy
+from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, run_test, compute_accuracy
+try:
+    from src2.agents.mas_v2 import SPECIALIST_LLMS_5, SPECIALIST_LLMS_3
+except ImportError:
+    from src2.agents.mas_v2.config import SPECIALIST_LLMS_5, SPECIALIST_LLMS_3
 from src2.benchmarks.loaders import (
     FROZEN_PATHS,
     load_benchmark,
