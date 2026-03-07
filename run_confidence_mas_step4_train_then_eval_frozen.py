@@ -125,6 +125,8 @@ def main():
     parser.add_argument("--gamma", type=float, default=0.3)
     parser.add_argument("--eval_max", type=int, default=None,
                         help="Limit eval samples (None = full frozen)")
+    parser.add_argument("--eval_full", action="store_true",
+                        help="Eval on full CV-Bench (~2638) from HuggingFace instead of cvbench_400")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--inference_only", action="store_true",
                         help="Skip train phase; load saved TTO score map and run eval only")
@@ -358,14 +360,15 @@ def main():
 
     # --- 4. Eval: frozen benchmark (no TTO updates) ---
     if args.eval:
-        use_frozen_eval = bm_cfg.get("use_frozen_for_eval", True)
-        frozen_name = FROZEN_PATHS.get(benchmark_load, "cvbench_400") if use_frozen_eval else "HuggingFace (full)"
+        use_frozen_eval = False if args.eval_full else bm_cfg.get("use_frozen_for_eval", True)
+        eval_max = None if args.eval_full else args.eval_max
+        frozen_name = FROZEN_PATHS.get(benchmark_load, "cvbench_400") if use_frozen_eval else "HuggingFace (full ~2638)"
         print("\n" + "=" * 70)
         print(f"PHASE 2: Eval ({frozen_name}, no TTO updates)")
         print("=" * 70)
 
         eval_ds = load_benchmark(
-            benchmark_load, max_samples=args.eval_max,
+            benchmark_load, max_samples=eval_max,
             use_frozen=use_frozen_eval, seed=args.seed,
         )
         print(f"[Eval] Loaded {len(eval_ds)} samples from {frozen_name}")
