@@ -36,7 +36,12 @@ from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, run_test, comput
 try:
     from src2.agents.mas_v2 import SPECIALIST_LLMS_5, SPECIALIST_LLMS_3
 except ImportError:
-    from src2.agents.mas_v2.config import SPECIALIST_LLMS_5, SPECIALIST_LLMS_3
+    try:
+        from src2.agents.mas_v2.config import SPECIALIST_LLMS_5, SPECIALIST_LLMS_3
+    except ImportError:
+        # Fallback when config.py is outdated (e.g. H100)
+        SPECIALIST_LLMS_5 = ["qwen3_4b", "sa2va", "llava4d", "spatial_rgpt", "spatial_reasoner"]
+        SPECIALIST_LLMS_3 = ["qwen3_4b", "llava4d", "spatial_reasoner"]
 from src2.benchmarks.loaders import (
     FROZEN_PATHS,
     load_benchmark,
