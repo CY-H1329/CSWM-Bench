@@ -203,14 +203,25 @@ def main():
         specialist_whitelist = specialist_llms
 
     # --- 1. Build runners ---
-    head_gen, spec_gen, reason_gen = build_runners_for_confidence(
-        specialist_device="cuda",
-        specialist_whitelist=specialist_whitelist,
-        use_vlm_reasoning=True,
-        specialist_offload_after_use=args.specialist_offload,
-        temperature=args.temperature,
-        top_p=args.top_p,
-    )
+    def _build():
+        kw = dict(
+            specialist_device="cuda",
+            specialist_whitelist=specialist_whitelist,
+            use_vlm_reasoning=True,
+        )
+        try:
+            return build_runners_for_confidence(
+                **kw, specialist_offload_after_use=args.specialist_offload,
+                temperature=args.temperature, top_p=args.top_p,
+            )
+        except TypeError:
+            pass
+        try:
+            return build_runners_for_confidence(**kw, specialist_offload_after_use=args.specialist_offload)
+        except TypeError:
+            return build_runners_for_confidence(**kw)
+
+    head_gen, spec_gen, reason_gen = _build()
 
     if not args.inference_only:
         # --- 2. Train: dataset with SpatialTTO ---
