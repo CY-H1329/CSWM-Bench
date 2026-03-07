@@ -11,6 +11,8 @@ SpatialTTO: train → score map 고정 → frozen benchmark으로 inference.
 Usage:
     # CV-Bench: 200 samples
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench
+    # CV-Bench full: ~2638 samples (HuggingFace test split)
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench_full --eval
     # 3DSRBench: 20 samples
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench
     # STVQA-7K: 200 samples (data/dataset/stvqa_train_300, run: python scripts/prepare_train_datasets.py --datasets stvqa)
@@ -28,7 +30,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, run_test, compute_accuracy
+from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, SPECIALIST_LLMS_5, SPECIALIST_LLMS_3, run_test, compute_accuracy
 from src2.benchmarks.loaders import (
     FROZEN_PATHS,
     load_benchmark,
@@ -50,6 +52,15 @@ BENCHMARK_CONFIG = {
         "output_dir": "results/spatialtto_200_frozen_cvbench",
         "score_map_name": "score_map_after_200.json",
         "frozen_size": 400,
+    },
+    "cvbench_full": {
+        "train_subdir": None,  # Load full from HuggingFace (no local dataset)
+        "train_samples": None,  # Full = all ~2638
+        "max_per_category": None,
+        "output_dir": "results/spatialtto_full_cvbench",
+        "score_map_name": "score_map_after_full.json",
+        "frozen_size": 2638,
+        "use_frozen_for_eval": False,  # Eval on full HF, not cvbench_400
     },
     "3dsrbench": {
         "train_subdir": "3dsrbench_train_300",
@@ -82,8 +93,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", type=str, default="cvbench",
-                        choices=["cvbench", "3dsrbench", "3dsrbench_50", "stvqa"],
-                        help="Benchmark: cvbench, 3dsrbench, 3dsrbench_50 (50 samples), stvqa")
+                        choices=["cvbench", "cvbench_full", "3dsrbench", "3dsrbench_50", "stvqa"],
+                        help="Benchmark: cvbench, cvbench_full (full 2638), 3dsrbench, 3dsrbench_50, stvqa")
     parser.add_argument("--train_samples", type=int, default=None,
                         help="Train samples (default: from benchmark config)")
     parser.add_argument("--train_subdir", type=str, default=None,
@@ -103,20 +114,32 @@ def main():
     parser.add_argument("--score_map_path", type=str, default=None,
                         help="Path to saved score_map JSON")
     parser.add_argument("--with_spaceom", action="store_true",
-                        help="Include SpaceOm (4 agents). Default: 3 agents (qwen3_4b, llava4d, spatial_reasoner)")
+                        help="Include SpaceOm (6 agents). Default: 5 agents (qwen3_4b, sa2va, llava4d, spatial_rgpt, spatial_reasoner)")
+    parser.add_argument("--low_memory", action="store_true",
+                        help="Use 3 agents only (qwen3_4b, llava4d, spatial_reasoner) for OOM / quick test")
     parser.add_argument("--specialist_offload", action="store_true",
                         help="Offload specialists to CPU after use (saves GPU memory, slower)")
     parser.add_argument("--verbose_markdown", action="store_true",
                         help="Print markdown summary per step (question, category, scores, agents, updated table)")
     parser.add_argument("--save_step_text", type=str, default=None,
                         help="Save step data to text files in this dir: routing, per-agent CoT, final")
+    parser.add_argument("--max_steps", type=int, default=None,
+                        help="Stop after N steps (partial run, e.g. 200). Saves score_map + summary.")
+    parser.add_argument("--checkpoint_every", type=int, default=50,
+                        help="Save score_map every N steps (default 50). Use 0 to disable.")
+    parser.add_argument("--temperature", type=float, default=0.0,
+                        help="Decoding temperature. 0=greedy, >0=sampling (e.g. 0.7).")
+    parser.add_argument("--top_p", type=float, default=0.9,
+                        help="Nucleus sampling top_p when temperature>0.")
     args = parser.parse_args()
 
-    # 3dsrbench_50 uses same loader as 3dsrbench
-    benchmark_load = "3dsrbench" if args.benchmark == "3dsrbench_50" else args.benchmark
+    # 3dsrbench_50, cvbench_full use same loader as base benchmark
+    benchmark_load = "3dsrbench" if args.benchmark == "3dsrbench_50" else (
+        "cvbench" if args.benchmark == "cvbench_full" else args.benchmark
+    )
     bm_cfg = BENCHMARK_CONFIG[args.benchmark]
-    train_subdir = args.train_subdir or bm_cfg["train_subdir"]
-    train_samples = args.train_samples if args.train_samples is not None else bm_cfg["train_samples"]
+    train_subdir = args.train_subdir if args.train_subdir is not None else bm_cfg.get("train_subdir")
+    train_samples = args.train_samples if args.train_samples is not None else bm_cfg.get("train_samples")
     max_per_category = bm_cfg.get("max_per_category")
     out_dir = Path(args.output_dir or bm_cfg["output_dir"])
     score_map_name = bm_cfg["score_map_name"]
@@ -152,9 +175,13 @@ def main():
         train_samples = 0
 
     if not args.inference_only:
-        specialist_llms = ["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"] if args.with_spaceom else ["qwen3_4b", "llava4d", "spatial_reasoner"]
-        if not args.with_spaceom:
-            specialist_whitelist = specialist_llms
+        if args.low_memory:
+            specialist_llms = SPECIALIST_LLMS_3
+        elif args.with_spaceom:
+            specialist_llms = ["qwen3_4b", "sa2va", "llava4d", "spatial_rgpt", "spaceom", "spatial_reasoner"]
+        else:
+            specialist_llms = SPECIALIST_LLMS_5
+        specialist_whitelist = specialist_llms
 
     # --- 1. Build runners ---
     head_gen, spec_gen, reason_gen = build_runners_for_confidence(
@@ -162,12 +189,14 @@ def main():
         specialist_whitelist=specialist_whitelist,
         use_vlm_reasoning=True,
         specialist_offload_after_use=args.specialist_offload,
+        temperature=args.temperature,
+        top_p=args.top_p,
     )
 
     if not args.inference_only:
         # --- 2. Train: dataset with SpatialTTO ---
-        train_path = PROJECT_ROOT / "data" / "dataset" / train_subdir
-        if train_path.exists():
+        train_path = (PROJECT_ROOT / "data" / "dataset" / train_subdir) if train_subdir else None
+        if train_path and train_path.exists():
             train_ds = load_benchmark_from_dataset(
                 benchmark_load, train_subdir,
                 project_root=PROJECT_ROOT,
@@ -177,12 +206,14 @@ def main():
             )
             print(f"[Train] Loaded {len(train_ds)} samples from data/dataset/{train_subdir} (max_per_cat={max_per_category})")
         else:
+            # cvbench_full or no local dataset: load from HuggingFace (full when max_samples=max_per_category=None)
             train_ds = load_benchmark(
                 benchmark_load, max_samples=train_samples,
                 max_per_category=max_per_category,
                 use_frozen=False, seed=args.seed,
             )
-            print(f"[Train] Loaded {len(train_ds)} samples from HuggingFace (use_frozen=False)")
+            src = "full HuggingFace" if (train_samples is None and max_per_category is None) else "HuggingFace"
+            print(f"[Train] Loaded {len(train_ds)} samples from {src} (use_frozen=False)")
 
         print("\n" + "=" * 70)
         n_agents = len(specialist_llms)
@@ -201,58 +232,78 @@ def main():
 
         correct_train = 0
         per_cat_train = defaultdict(lambda: {"correct": 0, "total": 0})
-        for step, ex in enumerate(samples):
-            image = get_benchmark_image(ex, benchmark_load)
-            if image is None:
-                continue
-            query = get_benchmark_prompt(ex, benchmark_load)
-            gt_raw = get_benchmark_answer(ex, benchmark_load)
-            gt = (gt_raw or "").strip().upper()
-            # Skip only for multiple-choice benchmarks when answer has no A/B/C/D
-            if args.benchmark != "stvqa" and not any(c in gt for c in "ABCD"):
-                continue
+        n_samples = len(samples)
+        if args.max_steps is not None:
+            n_samples = min(n_samples, args.max_steps)
+            print(f"[Info] Limiting to {n_samples} steps (--max_steps {args.max_steps})")
+        try:
+            for step, ex in enumerate(samples):
+                if args.max_steps is not None and step >= args.max_steps:
+                    break
+                image = get_benchmark_image(ex, benchmark_load)
+                if image is None:
+                    continue
+                query = get_benchmark_prompt(ex, benchmark_load)
+                gt_raw = get_benchmark_answer(ex, benchmark_load)
+                gt = (gt_raw or "").strip().upper()
+                # Skip only for multiple-choice benchmarks when answer has no A/B/C/D
+                if args.benchmark != "stvqa" and not any(c in gt for c in "ABCD"):
+                    continue
 
-            _step_dir = (save_step_dir / "train") if save_step_dir else None
-            _train_verbose_md = args.verbose_markdown or bool(not args.inference_only)  # Optimization: 기본으로 모든 로그
-            result = run_step(
-                image=image,
-                query=query,
-                gt=gt,
-                step=step,
-                total_steps=len(samples),
-                score_map=score_map,
-                head_generate=head_gen,
-                specialist_generate=spec_gen,
-                reasoning_generate=reason_gen,
-                updater=updater,
-                update_scores=True,
-                use_vlm_reasoning=True,
-                verbose_markdown=_train_verbose_md,
-                save_step_dir=_step_dir,
-            )
-            if _train_verbose_md and result.get("verbose_markdown"):
-                print(result["verbose_markdown"])
-            if result.get("correct"):
-                correct_train += 1
-            cat = get_benchmark_category(ex, benchmark_load) or result.get("category") or "unknown"
-            per_cat_train[cat]["total"] += 1
-            if result.get("correct"):
-                per_cat_train[cat]["correct"] += 1
-            acc = 100 * correct_train / (step + 1)
-            pred = (result.get("final_answer") or "").strip()[:20]
-            gt_s = (result.get("gt") or "").strip()[:20]
-            ok = "✓" if result.get("correct") else "✗"
-            print(f"  Step {step + 1}/{len(samples)} | {ok} | acc: {acc:.1f}% | cat: {result.get('category')} | assign: {result.get('assignments')} | pred: {pred} | gt: {gt_s}")
-            # 카테고리별 성능 실시간 출력
-            cat_lines = []
-            for c in sorted(per_cat_train.keys()):
-                t = per_cat_train[c]["total"]
-                cr = per_cat_train[c]["correct"]
-                pct = 100 * cr / t if t else 0
-                cat_lines.append(f"{c}:{cr}/{t}({pct:.0f}%)")
-            print("    " + " | ".join(cat_lines))
+                _step_dir = (save_step_dir / "train") if save_step_dir else None
+                _train_verbose_md = args.verbose_markdown or bool(not args.inference_only)  # Optimization: 기본으로 모든 로그
+                result = run_step(
+                    image=image,
+                    query=query,
+                    gt=gt,
+                    step=step,
+                    total_steps=len(samples),
+                    score_map=score_map,
+                    head_generate=head_gen,
+                    specialist_generate=spec_gen,
+                    reasoning_generate=reason_gen,
+                    updater=updater,
+                    update_scores=True,
+                    use_vlm_reasoning=True,
+                    verbose_markdown=_train_verbose_md,
+                    save_step_dir=_step_dir,
+                )
+                if _train_verbose_md and result.get("verbose_markdown"):
+                    print(result["verbose_markdown"])
+                if result.get("correct"):
+                    correct_train += 1
+                cat = get_benchmark_category(ex, benchmark_load) or result.get("category") or "unknown"
+                per_cat_train[cat]["total"] += 1
+                if result.get("correct"):
+                    per_cat_train[cat]["correct"] += 1
+                acc = 100 * correct_train / (step + 1)
+                pred = (result.get("final_answer") or "").strip()[:20]
+                gt_s = (result.get("gt") or "").strip()[:20]
+                ok = "✓" if result.get("correct") else "✗"
+                print(f"  Step {step + 1}/{len(samples)} | {ok} | acc: {acc:.1f}% | cat: {result.get('category')} | assign: {result.get('assignments')} | pred: {pred} | gt: {gt_s}")
+                # 카테고리별 성능 실시간 출력
+                cat_lines = []
+                for c in sorted(per_cat_train.keys()):
+                    t = per_cat_train[c]["total"]
+                    cr = per_cat_train[c]["correct"]
+                    pct = 100 * cr / t if t else 0
+                    cat_lines.append(f"{c}:{cr}/{t}({pct:.0f}%)")
+                print("    " + " | ".join(cat_lines))
 
-        print(f"\n[Train] Accuracy: {correct_train}/{len(samples)} = {100*correct_train/len(samples):.1f}%")
+                # Checkpoint: save score_map every N steps
+                if args.checkpoint_every and (step + 1) % args.checkpoint_every == 0:
+                    score_map.save(str(score_map_path))
+                    print(f"  [Checkpoint] Step {step + 1} → {score_map_path}")
+
+        except KeyboardInterrupt:
+            print("\n[Interrupted] Saving partial results...")
+            score_map.save(str(score_map_path))
+            train_samples = sum(per_cat_train[c]["total"] for c in per_cat_train)
+            correct_train = sum(per_cat_train[c]["correct"] for c in per_cat_train)
+            n_samples = train_samples if train_samples else step + 1
+            print(f"  Saved partial: {correct_train}/{n_samples} steps → {score_map_path}")
+
+        print(f"\n[Train] Accuracy: {correct_train}/{n_samples} = {100*correct_train/n_samples:.1f}%")
         print("-" * 50)
         print(f"{'Category':<14} | {'Correct':>7} | {'Total':>5} | {'Accuracy':>8}")
         print("-" * 50)
@@ -261,7 +312,7 @@ def main():
             acc = 100 * c / t if t else 0
             print(f"{cat:<14} | {c:>7} | {t:>5} | {acc:>6.1f}%")
         print("-" * 50)
-        train_samples = len(samples)
+        train_samples = n_samples
 
         # Save score map
         score_map.save(str(score_map_path))
@@ -269,13 +320,17 @@ def main():
 
     # --- 4. Eval: frozen benchmark (no TTO updates) ---
     if args.eval:
-        frozen_name = FROZEN_PATHS.get(benchmark_load, "cvbench_400")
+        use_frozen_eval = bm_cfg.get("use_frozen_for_eval", True)
+        frozen_name = FROZEN_PATHS.get(benchmark_load, "cvbench_400") if use_frozen_eval else "HuggingFace (full)"
         print("\n" + "=" * 70)
-        print(f"PHASE 2: Eval (frozen {frozen_name}, no TTO updates)")
+        print(f"PHASE 2: Eval ({frozen_name}, no TTO updates)")
         print("=" * 70)
 
-        eval_ds = load_benchmark(benchmark_load, max_samples=args.eval_max, use_frozen=True, seed=args.seed)
-        print(f"[Eval] Loaded {len(eval_ds)} samples from frozen {frozen_name}")
+        eval_ds = load_benchmark(
+            benchmark_load, max_samples=args.eval_max,
+            use_frozen=use_frozen_eval, seed=args.seed,
+        )
+        print(f"[Eval] Loaded {len(eval_ds)} samples from {frozen_name}")
 
         _eval_step_dir = (save_step_dir / "eval") if save_step_dir else None
         eval_results = run_test(
