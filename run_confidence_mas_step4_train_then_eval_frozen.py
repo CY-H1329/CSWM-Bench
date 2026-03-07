@@ -11,6 +11,8 @@ SpatialTTO: train → score map 고정 → frozen benchmark으로 inference.
 Usage:
     # CV-Bench: 200 samples
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench
+    # CV-Bench 150-step optimization (combination + score from 150 steps)
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench_150 --eval
     # CV-Bench full: ~2638 samples (HuggingFace test split)
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench_full --eval
     # 3DSRBench: 20 samples
@@ -53,6 +55,14 @@ BENCHMARK_CONFIG = {
         "score_map_name": "score_map_after_200.json",
         "frozen_size": 400,
     },
+    "cvbench_150": {
+        "train_subdir": "cvbench_train_300",
+        "train_samples": 150,
+        "max_per_category": 38,  # 4 cats × 38 ≈ 150
+        "output_dir": "results/spatialtto_150_frozen_cvbench",
+        "score_map_name": "score_map_after_150.json",
+        "frozen_size": 400,
+    },
     "cvbench_full": {
         "train_subdir": None,  # Load full from HuggingFace (no local dataset)
         "train_samples": None,  # Full = all ~2638
@@ -93,8 +103,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", type=str, default="cvbench",
-                        choices=["cvbench", "cvbench_full", "3dsrbench", "3dsrbench_50", "stvqa"],
-                        help="Benchmark: cvbench, cvbench_full (full 2638), 3dsrbench, 3dsrbench_50, stvqa")
+                        choices=["cvbench", "cvbench_150", "cvbench_full", "3dsrbench", "3dsrbench_50", "stvqa"],
+                        help="Benchmark: cvbench, cvbench_150 (150-step opt), cvbench_full, 3dsrbench, 3dsrbench_50, stvqa")
     parser.add_argument("--train_samples", type=int, default=None,
                         help="Train samples (default: from benchmark config)")
     parser.add_argument("--train_subdir", type=str, default=None,
@@ -133,9 +143,9 @@ def main():
                         help="Nucleus sampling top_p when temperature>0.")
     args = parser.parse_args()
 
-    # 3dsrbench_50, cvbench_full use same loader as base benchmark
+    # 3dsrbench_50, cvbench_full, cvbench_150 use same loader as base benchmark
     benchmark_load = "3dsrbench" if args.benchmark == "3dsrbench_50" else (
-        "cvbench" if args.benchmark == "cvbench_full" else args.benchmark
+        "cvbench" if args.benchmark in ("cvbench_full", "cvbench_150") else args.benchmark
     )
     bm_cfg = BENCHMARK_CONFIG[args.benchmark]
     train_subdir = args.train_subdir if args.train_subdir is not None else bm_cfg.get("train_subdir")
