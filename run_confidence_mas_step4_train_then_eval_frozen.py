@@ -17,6 +17,8 @@ Usage:
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark cvbench_full --eval
     # 3DSRBench: 20 samples
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench
+    # 3DSRBench 150-step optimization
+    python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark 3dsrbench_150 --eval
     # STVQA-7K: 200 samples (data/dataset/stvqa_train_300, run: python scripts/prepare_train_datasets.py --datasets stvqa)
     python run_confidence_mas_step4_train_then_eval_frozen.py --benchmark stvqa
     # Inference only
@@ -89,6 +91,14 @@ BENCHMARK_CONFIG = {
         "score_map_name": "score_map_after_20.json",
         "frozen_size": 500,
     },
+    "3dsrbench_150": {
+        "train_subdir": "3dsrbench_train_300",
+        "train_samples": 150,
+        "max_per_category": 13,  # 12 cats × 13 ≈ 156, cap at 150
+        "output_dir": "results/spatialtto_150_frozen_3dsrbench",
+        "score_map_name": "score_map_after_150.json",
+        "frozen_size": 500,
+    },
     "3dsrbench_50": {
         "train_subdir": "3dsrbench_train_50",
         "train_samples": 50,
@@ -112,8 +122,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", type=str, default="cvbench",
-                        choices=["cvbench", "cvbench_150", "cvbench_full", "3dsrbench", "3dsrbench_50", "stvqa"],
-                        help="Benchmark: cvbench, cvbench_150 (150-step opt), cvbench_full, 3dsrbench, 3dsrbench_50, stvqa")
+                        choices=["cvbench", "cvbench_150", "cvbench_full", "3dsrbench", "3dsrbench_150", "3dsrbench_50", "stvqa"],
+                        help="Benchmark: cvbench, cvbench_150, cvbench_full, 3dsrbench, 3dsrbench_150 (150-step), 3dsrbench_50, stvqa")
     parser.add_argument("--train_samples", type=int, default=None,
                         help="Train samples (default: from benchmark config)")
     parser.add_argument("--train_subdir", type=str, default=None,
@@ -156,8 +166,8 @@ def main():
                         help="Nucleus sampling top_p when temperature>0.")
     args = parser.parse_args()
 
-    # 3dsrbench_50, cvbench_full, cvbench_150 use same loader as base benchmark
-    benchmark_load = "3dsrbench" if args.benchmark == "3dsrbench_50" else (
+    # 3dsrbench_50, 3dsrbench_150, cvbench_full, cvbench_150 use same loader as base benchmark
+    benchmark_load = "3dsrbench" if args.benchmark in ("3dsrbench_50", "3dsrbench_150") else (
         "cvbench" if args.benchmark in ("cvbench_full", "cvbench_150") else args.benchmark
     )
     bm_cfg = BENCHMARK_CONFIG[args.benchmark]
@@ -362,7 +372,7 @@ def main():
     if args.eval:
         use_frozen_eval = False if args.eval_full else bm_cfg.get("use_frozen_for_eval", True)
         eval_max = None if args.eval_full else args.eval_max
-        frozen_name = FROZEN_PATHS.get(benchmark_load, "cvbench_400") if use_frozen_eval else "HuggingFace (full ~2638)"
+        frozen_name = FROZEN_PATHS.get(benchmark_load, "cvbench_400") if use_frozen_eval else "HuggingFace (full)"
         print("\n" + "=" * 70)
         print(f"PHASE 2: Eval ({frozen_name}, no TTO updates)")
         print("=" * 70)
