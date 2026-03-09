@@ -23,10 +23,7 @@ from typing import Dict, List, Optional, Tuple
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src2.agents.mas_v2 import (
-    ALL_CATEGORIES, ROLES, run_step, run_test, compute_accuracy,
-    compute_per_module_accuracy, save_per_module_report,
-)
+from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, run_step, run_test, compute_accuracy
 from src2.agents.mas_v2.config import FINE_TO_UNIFIED
 from src2.agents.mas_v2.score_map import ScoreMap
 from src2.benchmarks.loaders import (
@@ -269,15 +266,8 @@ def main():
     per_cat = metrics.get("per_category", {})
     per_cat_counts = metrics.get("per_category_counts", {})
 
-    # Per-module report: always save (default output_dir if not set)
-    out_base = Path(args.output_dir) if args.output_dir else Path(f"results/inference_fixed_{args.benchmark}")
-    out_base.mkdir(parents=True, exist_ok=True)
-    per_module = compute_per_module_accuracy(results, use_gt_category=True)
-    save_per_module_report(per_module, out_base / "per_module_report")
-    print(f"\n[Save] Per-module report → {out_base / 'per_module_report'}.json / .md")
-
     print("\n" + "=" * 70)
-    print(f"FINAL — {args.benchmark.upper()} (fixed assignment)")
+    print("FINAL — CV-Bench (fixed assignment)")
     print("=" * 70)
     print(f"Overall: {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%")
     print("-" * 70)
@@ -289,17 +279,19 @@ def main():
         print(f"{cat:<18} | {c:>7} | {t:>5} | {acc*100:>6.1f}%")
     print("=" * 70)
 
-    out = out_base
-    out_file = out / "inference_fixed_results.json"
-    with open(out_file, "w", encoding="utf-8") as f:
-        json.dump({
-            "correct": metrics["correct"],
-            "total": metrics["total"],
-            "accuracy": metrics["accuracy"],
-            "per_category": per_cat,
-            "per_category_counts": per_cat_counts,
-        }, f, indent=2)
-    print(f"[Save] Results → {out_file}")
+    if args.output_dir:
+        out = Path(args.output_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        out_file = out / "inference_fixed_results.json"
+        with open(out_file, "w", encoding="utf-8") as f:
+            json.dump({
+                "correct": metrics["correct"],
+                "total": metrics["total"],
+                "accuracy": metrics["accuracy"],
+                "per_category": per_cat,
+                "per_category_counts": per_cat_counts,
+            }, f, indent=2)
+        print(f"\n[Save] Results → {out_file}")
 
 
 if __name__ == "__main__":

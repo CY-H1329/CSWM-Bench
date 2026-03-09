@@ -186,6 +186,8 @@ def build_runners_for_confidence(
     specialist_whitelist: list = None,
     use_vlm_reasoning: bool = True,
     specialist_offload_after_use: bool = False,
+    temperature: float = 0.0,
+    top_p: float = 0.9,
 ):
     """Build runners for Confidence MAS."""
     from run_eval_mas_v2 import build_runners
@@ -193,6 +195,8 @@ def build_runners_for_confidence(
     kwargs = dict(
         specialist_device=specialist_device,
         use_vlm_reasoning=use_vlm_reasoning,
+        temperature=temperature,
+        top_p=top_p,
     )
     if specialist_whitelist is not None:
         kwargs["specialist_whitelist"] = specialist_whitelist
@@ -229,7 +233,8 @@ def run_confidence_mas_test_step4(
 
     Returns: {correct, total, accuracy, per_category, score_map, ...}
     """
-    specialist_llms = specialist_llms or ["qwen3_4b", "llava4d", "spatial_reasoner"]
+    from src2.agents.mas_v2 import SPECIALIST_LLMS_5
+    specialist_llms = specialist_llms or SPECIALIST_LLMS_5
     dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
 
     score_map = ScoreMap(categories=ALL_CATEGORIES, llms=specialist_llms, roles=ROLES, seed=seed)

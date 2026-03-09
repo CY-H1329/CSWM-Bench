@@ -122,13 +122,17 @@ class SpatialReasonerRunner(BaseVLM):
             or self.processor.tokenizer.eos_token_id
         )
 
+        gen_kwargs = dict(
+            max_new_tokens=max_new_tokens,
+            do_sample=temperature > 0,
+            pad_token_id=pad_id,
+        )
+        if temperature > 0:
+            gen_kwargs["temperature"] = temperature
+            if top_p and top_p > 0:
+                gen_kwargs["top_p"] = top_p
         with torch.inference_mode():
-            out = self.model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                do_sample=temperature > 0,
-                pad_token_id=pad_id,
-            )
+            out = self.model.generate(**inputs, **gen_kwargs)
 
         in_len = inputs["input_ids"].shape[1]
         response = self.processor.decode(out[0][in_len:], skip_special_tokens=True)

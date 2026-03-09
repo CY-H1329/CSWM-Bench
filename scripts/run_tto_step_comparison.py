@@ -19,7 +19,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, run_step
+from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, run_step, SPECIALIST_LLMS_5, SPECIALIST_LLMS_3
 from src2.benchmarks.loaders import (
     load_benchmark,
     load_benchmark_from_dataset,
@@ -180,12 +180,19 @@ def main():
     parser.add_argument("--kappa", type=float, default=0.5)
     parser.add_argument("--gamma", type=float, default=0.3)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--with_spaceom", action="store_true")
+    parser.add_argument("--with_spaceom", action="store_true",
+                        help="Include SpaceOm (6 agents). Default: 5 agents")
+    parser.add_argument("--low_memory", action="store_true",
+                        help="Use 3 agents only (qwen3_4b, llava4d, spatial_reasoner)")
     parser.add_argument("--specialist_offload", action="store_true")
     parser.add_argument("--plot-only", type=str, default=None,
                         help="Only plot from existing JSON (path to tto_step_accuracies.json)")
     parser.add_argument("--include-step1", action="store_true", help="Include Step 1 in plot (default: exclude)")
     parser.add_argument("--smooth", type=int, default=7, help="Smoothing window for curves (default: 7)")
+    parser.add_argument("--temperature", type=float, default=0.0,
+                        help="Decoding temperature. 0=greedy, >0=sampling (e.g. 0.7).")
+    parser.add_argument("--top_p", type=float, default=0.9,
+                        help="Nucleus sampling top_p when temperature>0.")
     args = parser.parse_args()
 
     out_dir = Path(args.output)
@@ -268,11 +275,19 @@ def main():
     # Build runners
     from test_confidence_mas_v3_step4 import build_runners_for_confidence
 
-    specialist_llms = ["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"] if args.with_spaceom else ["qwen3_4b", "llava4d", "spatial_reasoner"]
+    if args.low_memory:
+        specialist_llms = SPECIALIST_LLMS_3
+    elif args.with_spaceom:
+        specialist_llms = ["qwen3_4b", "sa2va", "llava4d", "spatial_rgpt", "spaceom", "spatial_reasoner"]
+    else:
+        specialist_llms = SPECIALIST_LLMS_5
     head_gen, spec_gen, reason_gen = build_runners_for_confidence(
         specialist_device="cuda",
+        specialist_whitelist=specialist_llms,
         use_vlm_reasoning=True,
         specialist_offload_after_use=args.specialist_offload,
+        temperature=args.temperature,
+        top_p=args.top_p,
     )
 
     # Run each TTO step

@@ -66,6 +66,8 @@ def build_runners(
     reasoning_local_model_id: str = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
     use_vlm_reasoning: bool = False,
     reasoning_vlm_model_id: str = "Qwen/Qwen3-VL-8B-Instruct",
+    temperature: float = 0.0,
+    top_p: float = 0.9,
     **kwargs,
 ):
     """Instantiate all model runners.
@@ -105,7 +107,12 @@ def build_runners(
         return _head_runner
 
     def head_generate(image, prompt: str) -> str:
-        return _get_head().generate(image, prompt, temperature=0.0, max_new_tokens=64)
+        return _get_head().generate(
+            image, prompt,
+            temperature=temperature,
+            max_new_tokens=64,
+            top_p=top_p if temperature > 0 else 0.0,
+        )
 
     # --- 5 Specialist VLMs (lazy-loaded, cached) ---
     _specialist_cache = {}
@@ -167,7 +174,12 @@ def build_runners(
             # Move current specialist to GPU
             _ensure_specialist_on_gpu(llm_name)
             _last_specialist_on_gpu = llm_name
-        out = runner.generate(image, prompt, temperature=0.0, max_new_tokens=1024)
+        out = runner.generate(
+            image, prompt,
+            temperature=temperature,
+            max_new_tokens=1024,
+            top_p=top_p if temperature > 0 else 0.0,
+        )
         if specialist_offload_after_use and llm_name != "qwen3_4b":
             _offload_specialist_to_cpu(llm_name)
             _last_specialist_on_gpu = None
@@ -187,7 +199,10 @@ def build_runners(
             if image is None:
                 raise ValueError("use_vlm_reasoning=True requires image for Final Reasoning")
             return _reasoning_vlm.generate(
-                image, prompt, temperature=0.0, max_new_tokens=1024
+                image, prompt,
+                temperature=temperature,
+                max_new_tokens=1024,
+                top_p=top_p if temperature > 0 else 0.0,
             )
     elif use_local_reasoning:
         reasoning = DeepSeekR1LocalRunner(
@@ -196,7 +211,12 @@ def build_runners(
         )
 
         def reasoning_generate(prompt: str, image=None):
-            return reasoning.generate(prompt, temperature=0.0, max_tokens=1024)
+            return reasoning.generate(
+                prompt,
+                temperature=temperature,
+                max_tokens=1024,
+                top_p=top_p if temperature > 0 else 0.0,
+            )
     else:
         reasoning = DeepSeekR1Runner(
             api_base=reasoning_api_base,
@@ -205,7 +225,12 @@ def build_runners(
         )
 
         def reasoning_generate(prompt: str, image=None):
-            return reasoning.generate(prompt, temperature=0.0, max_tokens=1024)
+            return reasoning.generate(
+                prompt,
+                temperature=temperature,
+                max_tokens=1024,
+                top_p=top_p if temperature > 0 else 0.0,
+            )
 
     return head_generate, specialist_generate, reasoning_generate
 
@@ -517,6 +542,18 @@ def main():
         action="store_true",
         help="Disable verbose step logging (step/acc/cat/assign, scores every 5 steps).",
     )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="Decoding temperature. 0=greedy, >0=sampling (e.g. 0.7).",
+    )
+    parser.add_argument(
+        "--top_p",
+        type=float,
+        default=0.9,
+        help="Nucleus sampling top_p when temperature>0 (default 0.9).",
+    )
     args = parser.parse_args()
 
     specialist_whitelist = None
@@ -543,6 +580,8 @@ def main():
         use_local_reasoning=args.use_local_reasoning,
         reasoning_local_model_id=args.reasoning_local_model,
         use_vlm_reasoning=args.use_vlm_reasoning,
+        temperature=args.temperature,
+        top_p=args.top_p,
     )
 
     specialist_llms = specialist_whitelist or SPECIALIST_LLMS

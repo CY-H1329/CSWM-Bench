@@ -4,14 +4,32 @@ Models, roles, categories, score defaults.
 """
 
 # ---------------------------------------------------------------------------
-# 5 Specialist LLMs (open-source VLMs)
+# Specialist LLMs (open-source VLMs)
 # ---------------------------------------------------------------------------
+# Full set (6 agents, includes SpaceOm)
 SPECIALIST_LLMS = [
     "qwen3_4b",
     "sa2va",
     "llava4d",
     "spatial_rgpt",
     "spaceom",
+    "spatial_reasoner",
+]
+
+# Default 5 agents for TTO (qwen3_4b, sa2va, llava4d, spatial_rgpt, spatial_reasoner)
+# Excludes spaceom (optional, use --with_spaceom to add)
+SPECIALIST_LLMS_5 = [
+    "qwen3_4b",
+    "sa2va",
+    "llava4d",
+    "spatial_rgpt",
+    "spatial_reasoner",
+]
+
+# Low-memory 3 agents (OOM / quick test)
+SPECIALIST_LLMS_3 = [
+    "qwen3_4b",
+    "llava4d",
     "spatial_reasoner",
 ]
 

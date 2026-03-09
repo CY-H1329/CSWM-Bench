@@ -89,6 +89,8 @@ class Qwen3Runner:
             )
             if temperature > 0:
                 gen_config.temperature = temperature
+                if top_p and top_p > 0:
+                    gen_config.top_p = top_p
             gen_kwargs = {"generation_config": gen_config}
         except ImportError:
             gen_kwargs = dict(max_new_tokens=max_new_tokens, do_sample=temperature > 0)

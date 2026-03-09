@@ -39,16 +39,20 @@ class DeepSeekR1Runner:
         prompt: str,
         temperature: float = 0.0,
         max_tokens: int = 1024,
+        top_p: float = 0.0,
         **kwargs,
     ) -> str:
         """Generate text from a text-only prompt (no image)."""
-        response = self.client.chat.completions.create(
+        create_kwargs = dict(
             model=self.model_name,
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=self.timeout,
         )
+        if temperature > 0 and top_p and top_p > 0:
+            create_kwargs["top_p"] = top_p
+        response = self.client.chat.completions.create(**create_kwargs)
         return (response.choices[0].message.content or "").strip()
 
 
@@ -86,6 +90,7 @@ class DeepSeekR1LocalRunner:
         prompt: str,
         temperature: float = 0.0,
         max_tokens: int = 1024,
+        top_p: float = 0.0,
         **kwargs,
     ) -> str:
         import torch
@@ -95,12 +100,14 @@ class DeepSeekR1LocalRunner:
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+        gen_kwargs = dict(
+            max_new_tokens=max_tokens,
+            do_sample=temperature > 0,
+            temperature=temperature if temperature > 0 else None,
+        )
+        if temperature > 0 and top_p and top_p > 0:
+            gen_kwargs["top_p"] = top_p
         with torch.inference_mode():
-            out = self.model.generate(
-                **inputs,
-                max_new_tokens=max_tokens,
-                do_sample=temperature > 0,
-                temperature=temperature if temperature > 0 else None,
-            )
+            out = self.model.generate(**inputs, **gen_kwargs)
         new_tokens = out[0][inputs["input_ids"].shape[1]:]
         return self.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()

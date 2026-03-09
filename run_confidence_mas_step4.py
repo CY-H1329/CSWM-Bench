@@ -12,9 +12,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent  # H100: Path("/home/jovyan/CY/Sp
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from test_confidence_mas_v3_step4 import run_confidence_mas_test_step4, build_runners_for_confidence
+from src2.agents.mas_v2.config import SPECIALIST_LLMS_5
 
 head_gen, spec_gen, reason_gen = build_runners_for_confidence(
     specialist_device="cuda",
+    specialist_whitelist=SPECIALIST_LLMS_5,
     use_vlm_reasoning=True,
 )
 
@@ -25,7 +27,7 @@ results = run_confidence_mas_test_step4(
     T=5.0,
     kappa=0.5,
     gamma=0.3,
-    specialist_llms=["qwen3_4b", "llava4d", "spaceom", "spatial_reasoner"],
+    specialist_llms=SPECIALIST_LLMS_5,
 )
 
 print(f"\nAccuracy: {results['correct']}/{results['total']} = {100*results['accuracy']:.1f}%")
