@@ -34,10 +34,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src2.agents.mas_v2 import (
-    ALL_CATEGORIES, ROLES, ScoreMap, run_test, compute_accuracy,
-    compute_per_module_accuracy, save_per_module_report,
-)
+from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, run_test, compute_accuracy
 try:
     from src2.agents.mas_v2 import SPECIALIST_LLMS_5, SPECIALIST_LLMS_3
 except ImportError:
@@ -190,6 +187,11 @@ def main():
         save_step_dir = out_dir / "step_logs"
         save_step_dir.mkdir(parents=True, exist_ok=True)
         print(f"[Save] Step text files (train) → {save_step_dir}/train/")
+    elif args.eval:
+        # Inference-only + eval: step logs + timing for eval phase
+        save_step_dir = out_dir / "step_logs"
+        save_step_dir.mkdir(parents=True, exist_ok=True)
+        print(f"[Save] Step text files (eval) → {save_step_dir}/eval/")
     score_map_path = Path(args.score_map_path) if args.score_map_path else out_dir / score_map_name
     _bundled = PROJECT_ROOT / "data" / "score_maps" / "score_map_50step.json"
 
@@ -406,12 +408,6 @@ def main():
         metrics = compute_accuracy(eval_results)
         per_cat = metrics.get("per_category", {})
         per_cat_counts = metrics.get("per_category_counts", {})
-
-        # Per-module (head / specialists / reasoning) breakdown
-        per_module = compute_per_module_accuracy(eval_results, use_gt_category=True)
-        per_module_path = out_dir / "per_module_report"
-        save_per_module_report(per_module, per_module_path)
-        print(f"[Save] Per-module report → {per_module_path}.json / {per_module_path}.md")
 
         print("\n" + "=" * 70)
         print(f"FINAL EVAL (frozen {args.benchmark})")

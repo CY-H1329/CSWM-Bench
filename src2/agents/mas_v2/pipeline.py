@@ -43,6 +43,67 @@ _ROLES_WITH_TOOLS = {"explicit_3d_representation", "scene_graph_construction"}
 logger = logging.getLogger(__name__)
 
 
+def _save_timing_to_file(
+    output_dir: Path,
+    step: int,
+    category: str,
+    timing: Dict,
+    assignments: List[Tuple[str, str]],
+) -> None:
+    """Save per-step timing and append to cumulative timing_summary.csv."""
+    n = step + 1
+    prefix = "step_{:03d}".format(n)
+
+    # 1. Per-step timing file (step_XXX_timing.txt)
+    lines = [
+        "=" * 60,
+        f"  STEP {n} — RUNTIME (seconds) by module",
+        "=" * 60,
+        "",
+        f"  head_agent:        {timing.get('head_agent_sec', 0):.3f} s",
+        f"  object_extraction: {timing.get('object_extraction_sec', 0):.3f} s",
+        "",
+        "  specialists:",
+    ]
+    for s in timing.get("specialists_sec", []):
+        role_short = s.get("role", "").replace("direct_visual_heuristic", "heuristic").replace("explicit_3d_representation", "3d_repr").replace("scene_graph_construction", "scene_graph")
+        lines.append(f"    - {role_short} ({s.get('llm', '')}): {s.get('sec', 0):.3f} s")
+    lines.extend([
+        "",
+        f"  reasoning_agent:    {timing.get('reasoning_agent_sec', 0):.3f} s",
+        "",
+        f"  total:             {timing.get('total_sec', 0):.3f} s",
+        "",
+        "=" * 60,
+    ])
+    (output_dir / f"{prefix}_timing.txt").write_text("\n".join(lines), encoding="utf-8")
+
+    # 2. Append to timing_summary.csv
+    spec_times = timing.get("specialists_sec", [])
+    spec1 = f"{spec_times[0].get('sec', 0):.3f}" if len(spec_times) > 0 else ""
+    spec2 = f"{spec_times[1].get('sec', 0):.3f}" if len(spec_times) > 1 else ""
+    spec3 = f"{spec_times[2].get('sec', 0):.3f}" if len(spec_times) > 2 else ""
+    row = [
+        str(n),
+        category,
+        f"{timing.get('head_agent_sec', 0):.3f}",
+        f"{timing.get('object_extraction_sec', 0):.3f}",
+        spec1,
+        spec2,
+        spec3,
+        f"{timing.get('reasoning_agent_sec', 0):.3f}",
+        f"{timing.get('total_sec', 0):.3f}",
+    ]
+    csv_path = output_dir / "timing_summary.csv"
+    if not csv_path.exists():
+        csv_path.write_text(
+            "step,category,head_agent_sec,object_extraction_sec,specialist1_sec,specialist2_sec,specialist3_sec,reasoning_agent_sec,total_sec\n",
+            encoding="utf-8",
+        )
+    with open(csv_path, "a", encoding="utf-8") as f:
+        f.write(",".join(row) + "\n")
+
+
 # ======================================================================
 # Output parsers
 # ======================================================================
@@ -146,6 +207,7 @@ def run_step(
     force_category: If set (e.g. "counting" for Count-only benchmark), skip Head Agent and use this category.
     """
     t0 = time.time()
+    timing = {"head_agent_sec": 0.0, "object_extraction_sec": 0.0, "specialists_sec": [], "reasoning_agent_sec": 0.0}
     if answer_type is None:
         answer_type = _infer_answer_type(query)
 
@@ -154,9 +216,11 @@ def run_step(
     if force_category and force_category in ALL_CATEGORIES:
         category = force_category
     else:
+        _t = time.time()
         head_prompt = build_head_agent_prompt(query, ALL_CATEGORIES, CATEGORY_DESCRIPTIONS)
         head_raw = head_generate(image, head_prompt)
         category = parse_category(head_raw, ALL_CATEGORIES)
+        timing["head_agent_sec"] = round(time.time() - _t, 3)
 
     # 2. Agent selection from score map
     assignments = score_map.select_agents(category, step)
@@ -166,8 +230,10 @@ def run_step(
     if shared_object_extraction:
         for role, llm_name in assignments:
             if role in _ROLES_WITH_TOOLS:
+                _t = time.time()
                 from src2.tools.object_extraction import extract_objects_from_image
                 object_names_cache = extract_objects_from_image(image, specialist_generate, llm_name)
+                timing["object_extraction_sec"] = round(time.time() - _t, 3)
                 break
 
     # 3. Run 3 specialist agents -> SharedMemory (C: tools for explicit_3d, scene_graph)
@@ -175,6 +241,7 @@ def run_step(
     agent_details = []
     tool_output_cache = {}  # role -> tool output (computed once per role type)
     for role, llm_name in assignments:
+        _t_spec = time.time()
         if role in _ROLES_WITH_TOOLS and role not in tool_output_cache:
             try:
                 if shared_object_extraction:
@@ -198,6 +265,10 @@ def run_step(
         tool_output = tool_output_cache.get(role, None)
         role_prompt = build_role_prompt(role, query, tool_output=tool_output, answer_type=answer_type)
         raw_output = specialist_generate(llm_name, image, role_prompt)
+        timing["specialists_sec"].append({
+            "role": role, "llm": llm_name,
+            "sec": round(time.time() - _t_spec, 3),
+        })
         answer, reason = parse_specialist_output(raw_output, answer_type=answer_type)
         shared_memory.add(role, llm_name, answer, reason)
         raw_store = raw_output if save_step_dir else raw_output[:3000]
@@ -216,10 +287,12 @@ def run_step(
         agent_details.append(entry)
 
     # 4. Final Reasoning Agent (DeepSeek-R1 text-only, or Qwen3-VL-8B image+text)
+    _t = time.time()
     reasoning_prompt = build_final_reasoning_prompt(
         query, shared_memory.to_prompt_text(), with_image=use_vlm_reasoning, answer_type=answer_type
     )
     reasoning_raw = reasoning_generate(reasoning_prompt, image=image)
+    timing["reasoning_agent_sec"] = round(time.time() - _t, 3)
     final_answer = parse_final_answer(reasoning_raw, answer_type=answer_type)
 
     # 5. Score map update (train phase only)
@@ -237,6 +310,7 @@ def run_step(
 
     elapsed = time.time() - t0
     correct = _is_correct(final_answer, gt, answer_type) if gt else None
+    timing["total_sec"] = round(elapsed, 3)
     result = {
         "step": step,
         "category": category,
@@ -247,6 +321,7 @@ def run_step(
         "correct": correct,
         "reasoning_raw": reasoning_raw[:3000],
         "elapsed_sec": round(elapsed, 2),
+        "timing": timing,
     }
     if verbose_markdown:
         result["verbose_markdown"] = format_step_markdown(
@@ -276,6 +351,7 @@ def run_step(
             score_map=score_map,
             reasoning_raw=reasoning_raw,
         )
+        _save_timing_to_file(Path(save_step_dir), step, category, timing, assignments)
     return result
 
 
@@ -519,197 +595,3 @@ def compute_accuracy(results: List[Dict], use_gt_category: bool = True) -> Dict:
         "per_category": per_category,
         "per_category_counts": by_cat,
     }
-
-
-def _infer_answer_type_from_gt(gt: str) -> str:
-    """Infer multiple_choice vs free_form from ground truth."""
-    if not gt or not str(gt).strip():
-        return "free_form"
-    g = str(gt).strip().upper()
-    if any(c in g for c in "ABCDEF"):
-        return "multiple_choice"
-    return "free_form"
-
-
-def _normalize_cat_for_match(gt_cat: str, pred_cat: str) -> Tuple[str, str]:
-    """Normalize categories for head-agent match (FINE_TO_UNIFIED mapping)."""
-    from .config import FINE_TO_UNIFIED
-    gt_n = (FINE_TO_UNIFIED.get(gt_cat, gt_cat) if gt_cat else "") or gt_cat
-    pred_n = (FINE_TO_UNIFIED.get(pred_cat, pred_cat) if pred_cat else "") or pred_cat
-    return (gt_n or "unknown", pred_n or "unknown")
-
-
-def compute_per_module_accuracy(
-    results: List[Dict],
-    use_gt_category: bool = True,
-) -> Dict:
-    """Compute per-module (head-agent, specialists, reasoning-agent) accuracy.
-
-    Returns:
-        - head_agent: {overall_acc, correct, total, per_category}
-        - specialists: {agent_name: {overall_acc, correct, total, per_category}}
-        - reasoning_agent: {overall_acc, correct, total, per_category}
-        - per_task_per_module: {category: {head_agent, specialist_X, reasoning_agent}}
-    """
-    from collections import defaultdict
-
-    total = 0
-    head_correct = 0
-    head_by_cat: Dict[str, Dict[str, int]] = defaultdict(lambda: {"correct": 0, "total": 0})
-    spec_by_agent: Dict[str, Dict[str, Dict[str, int]]] = defaultdict(
-        lambda: defaultdict(lambda: {"correct": 0, "total": 0})
-    )
-    reason_correct = 0
-    reason_by_cat: Dict[str, Dict[str, int]] = defaultdict(lambda: {"correct": 0, "total": 0})
-
-    for r in results:
-        if r.get("correct") is None:
-            continue
-        total += 1
-        gt = r.get("gt") or ""
-        gt_cat = r.get("gt_category") if use_gt_category else None
-        pred_cat = r.get("category", "unknown")
-        cat = gt_cat or pred_cat
-
-        answer_type = _infer_answer_type_from_gt(gt)
-
-        # Head agent: category match
-        if gt_cat:
-            gt_n, pred_n = _normalize_cat_for_match(gt_cat, pred_cat)
-            h_ok = gt_n == pred_n
-            if h_ok:
-                head_correct += 1
-            head_by_cat[cat]["total"] += 1
-            if h_ok:
-                head_by_cat[cat]["correct"] += 1
-
-        # Specialists: each agent's answer vs gt
-        for ad in r.get("agent_details", []):
-            agent = ad.get("llm_name", "unknown")
-            ans = ad.get("answer", "")
-            s_ok = _is_correct(ans, gt, answer_type)
-            spec_by_agent[agent][cat]["total"] += 1
-            if s_ok:
-                spec_by_agent[agent][cat]["correct"] += 1
-
-        # Reasoning agent: final answer vs gt
-        final = r.get("final_answer", "")
-        r_ok = r.get("correct", False)
-        if r_ok:
-            reason_correct += 1
-        reason_by_cat[cat]["total"] += 1
-        if r_ok:
-            reason_by_cat[cat]["correct"] += 1
-
-    def _acc(d: Dict[str, Dict[str, int]]) -> Dict[str, float]:
-        return {c: (v["correct"] / v["total"] if v["total"] > 0 else 0.0) for c, v in sorted(d.items())}
-
-    head_per_cat = _acc(head_by_cat) if head_by_cat else {}
-    head_overall = head_correct / total if total > 0 and head_correct is not None else 0.0
-    head_total = sum(v["total"] for v in head_by_cat.values()) if head_by_cat else total
-
-    specialists = {}
-    for agent, by_cat in spec_by_agent.items():
-        c_total = sum(v["total"] for v in by_cat.values())
-        c_correct = sum(v["correct"] for v in by_cat.values())
-        specialists[agent] = {
-            "overall_acc": c_correct / c_total if c_total > 0 else 0.0,
-            "correct": c_correct,
-            "total": c_total,
-            "per_category": _acc(dict(by_cat)),
-        }
-
-    reason_per_cat = _acc(reason_by_cat)
-    reason_overall = reason_correct / total if total > 0 else 0.0
-
-    # per_task_per_module: category -> {head_agent, specialist_X, reasoning_agent}
-    all_cats = sorted(set(list(head_by_cat.keys()) + list(reason_by_cat.keys())))
-    per_task_per_module = {}
-    for c in all_cats:
-        per_task_per_module[c] = {
-            "head_agent": head_by_cat.get(c, {}).get("correct", 0) / max(1, head_by_cat.get(c, {}).get("total", 0)),
-            "reasoning_agent": reason_by_cat.get(c, {}).get("correct", 0) / max(1, reason_by_cat.get(c, {}).get("total", 0)),
-        }
-        for agent in specialists:
-            sc = spec_by_agent.get(agent, {}).get(c, {})
-            per_task_per_module[c][f"specialist_{agent}"] = sc.get("correct", 0) / max(1, sc.get("total", 0))
-
-    return {
-        "total": total,
-        "head_agent": {
-            "overall_acc": head_overall,
-            "correct": head_correct,
-            "total": head_total,
-            "per_category": head_per_cat,
-        },
-        "specialists": specialists,
-        "reasoning_agent": {
-            "overall_acc": reason_overall,
-            "correct": reason_correct,
-            "total": total,
-            "per_category": reason_per_cat,
-        },
-        "per_task_per_module": per_task_per_module,
-    }
-
-
-def save_per_module_report(metrics: Dict, output_path: Union[str, Path]) -> None:
-    """Save per-module (head/specialists/reasoning) metrics to JSON and Markdown."""
-    import json
-    from datetime import datetime
-
-    out = Path(output_path)
-    out.parent.mkdir(parents=True, exist_ok=True)
-
-    # JSON (full)
-    json_path = out if str(out).endswith(".json") else out.with_suffix(".json")
-    to_save = {k: v for k, v in metrics.items() if k != "per_task_per_module"}
-    to_save["per_task_per_module"] = metrics.get("per_task_per_module", {})
-    to_save["timestamp"] = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_path.write_text(json.dumps(to_save, indent=2, ensure_ascii=False))
-
-    # Markdown (readable)
-    md_path = json_path.with_suffix(".md")
-    lines = [
-        "# Per-Module Accuracy Report",
-        "",
-        f"**Total samples:** {metrics.get('total', 0)}",
-        "",
-        "## Head Agent (category inference)",
-        "",
-    ]
-    ha = metrics.get("head_agent", {})
-    lines.append(f"- Overall: {ha.get('correct', 0)}/{ha.get('total', 0)} = {100*ha.get('overall_acc', 0):.1f}%")
-    for cat, acc in sorted(ha.get("per_category", {}).items(), key=lambda x: -x[1]):
-        lines.append(f"  - {cat}: {100*acc:.1f}%")
-    lines.append("")
-    lines.append("## Specialists (per agent)")
-    lines.append("")
-    for agent, data in sorted(metrics.get("specialists", {}).items()):
-        lines.append(f"### {agent}")
-        lines.append(f"- Overall: {data.get('correct', 0)}/{data.get('total', 0)} = {100*data.get('overall_acc', 0):.1f}%")
-        for cat, acc in sorted(data.get("per_category", {}).items(), key=lambda x: -x[1]):
-            lines.append(f"  - {cat}: {100*acc:.1f}%")
-        lines.append("")
-    lines.append("## Reasoning Agent (final synthesis)")
-    lines.append("")
-    ra = metrics.get("reasoning_agent", {})
-    lines.append(f"- Overall: {ra.get('correct', 0)}/{ra.get('total', 0)} = {100*ra.get('overall_acc', 0):.1f}%")
-    for cat, acc in sorted(ra.get("per_category", {}).items(), key=lambda x: -x[1]):
-        lines.append(f"  - {cat}: {100*acc:.1f}%")
-    lines.append("")
-    lines.append("## Per-Task × Per-Module")
-    lines.append("")
-    ptm = metrics.get("per_task_per_module", {})
-    if ptm:
-        cats = sorted(ptm.keys())
-        first_val = next(iter(ptm.values()), {})
-        modules = ["head_agent", "reasoning_agent"] + sorted(
-            k for k in first_val.keys() if k.startswith("specialist_")
-        )
-        lines.append("| Category | " + " | ".join(m.replace("specialist_", "") for m in modules) + " |")
-        lines.append("|" + "----------|" * len(modules) + "|")
-        for cat in cats:
-            row = [f"{100*ptm[cat].get(m, 0):.1f}%" for m in modules]
-            lines.append(f"| {cat} | " + " | ".join(row) + " |")
-    md_path.write_text("\n".join(lines))
