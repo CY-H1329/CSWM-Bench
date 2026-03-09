@@ -136,7 +136,7 @@ def main():
     parser.add_argument("--eval_max", type=int, default=None,
                         help="Limit eval samples (None = full frozen)")
     parser.add_argument("--eval_full", action="store_true",
-                        help="Eval on full CV-Bench (~2638) from HuggingFace instead of cvbench_400")
+                        help="Eval on full dataset from HuggingFace (CV-Bench ~2638, 3DSRBench full) instead of frozen")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--inference_only", action="store_true",
                         help="Skip train phase; load saved TTO score map and run eval only")
