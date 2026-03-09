@@ -23,7 +23,10 @@ from typing import Dict, List, Optional, Tuple
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, run_step, run_test, compute_accuracy
+from src2.agents.mas_v2 import (
+    ALL_CATEGORIES, ROLES, run_step, run_test, compute_accuracy,
+    compute_per_module_accuracy, save_per_module_report,
+)
 from src2.agents.mas_v2.config import FINE_TO_UNIFIED
 from src2.agents.mas_v2.score_map import ScoreMap
 from src2.benchmarks.loaders import (
@@ -83,7 +86,8 @@ def load_assignments_from_score_map(path: str) -> Dict[str, List[Tuple[str, str]
     """Dérive assignments depuis score_map JSON (argmax par rôle, sans réutilisation)."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     maps = data.get("maps", {})
-    llms = data.get("llms", ["qwen3_4b", "llava4d", "spatial_reasoner"])
+    from src2.agents.mas_v2.config import SPECIALIST_LLMS_5
+    llms = data.get("llms", SPECIALIST_LLMS_5)
     roles = data.get("roles", ["direct_visual_heuristic", "explicit_3d_representation", "scene_graph_construction"])
     assignments = {}
     for cat, cat_map in maps.items():
@@ -121,6 +125,10 @@ def main():
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--specialist_offload", action="store_true")
     p.add_argument("--output_dir", type=str, default=None)
+    p.add_argument("--max_steps", type=int, default=None,
+                   help="Stop after N steps (partial run, e.g. 200)")
+    p.add_argument("--checkpoint_every", type=int, default=100,
+                   help="Save partial results every N steps (default 100). 0=only at end.")
     p.add_argument("--verbose", action="store_true", help="Full verbose (cat, assign, scores). Default: minimal (step + O/X)")
     args = p.parse_args()
 
@@ -140,7 +148,8 @@ def main():
             if a not in llms:
                 llms.append(a)
     if not llms:
-        llms = ["qwen3_4b", "llava4d", "spatial_reasoner"]
+        from src2.agents.mas_v2.config import SPECIALIST_LLMS_5
+        llms = SPECIALIST_LLMS_5
     print(f"[Info] Specialists: {llms}")
 
     score_map = FixedAssignmentScoreMap(
@@ -202,32 +211,73 @@ def main():
         specialist_offload_after_use=args.specialist_offload,
     )
 
+    total_samples = len(dataset)
+    if args.max_steps:
+        total_samples = min(total_samples, args.max_steps)
+        print(f"[Info] Limiting to {total_samples} steps (--max_steps {args.max_steps})")
     print("\n" + "=" * 70)
-    print(f"SPATIALTTO INFERENCE — CV-Bench {len(dataset)} samples (fixed assignment)")
+    print(f"SPATIALTTO INFERENCE — CV-Bench {total_samples} samples (fixed assignment)")
     print("=" * 70)
 
-    results = run_test(
-        dataset=dataset,
-        benchmark=args.benchmark,
-        score_map=score_map,
-        head_generate=head_gen,
-        specialist_generate=spec_gen,
-        reasoning_generate=reason_gen,
-        random_agents=False,
-        use_vlm_reasoning=True,
-        verbose=args.verbose,
-        verbose_minimal=not args.verbose,
-        verbose_markdown=False,
-        updater=None,
-        update_scores=False,
-    )
+    def _checkpoint_cb(results_so_far, step_count):
+        if args.output_dir:
+            out = Path(args.output_dir)
+            out.mkdir(parents=True, exist_ok=True)
+            m = compute_accuracy(results_so_far)
+            pc = m.get("per_category", {})
+            pcc = m.get("per_category_counts", {})
+            out_file = out / f"inference_partial_{step_count}.json"
+            with open(out_file, "w", encoding="utf-8") as f:
+                json.dump({
+                    "correct": m["correct"],
+                    "total": m["total"],
+                    "accuracy": m["accuracy"],
+                    "steps": step_count,
+                    "per_category": pc,
+                    "per_category_counts": pcc,
+                }, f, indent=2)
+            print(f"  [Checkpoint] Step {step_count} → {out_file}")
+
+    try:
+        results = run_test(
+            dataset=dataset,
+            benchmark=args.benchmark,
+            score_map=score_map,
+            head_generate=head_gen,
+            specialist_generate=spec_gen,
+            reasoning_generate=reason_gen,
+            random_agents=False,
+            use_vlm_reasoning=True,
+            verbose=args.verbose,
+            verbose_minimal=not args.verbose,
+            verbose_markdown=False,
+            updater=None,
+            update_scores=False,
+            max_steps=args.max_steps,
+            checkpoint_every=args.checkpoint_every if args.output_dir else None,
+            checkpoint_callback=_checkpoint_cb if (args.output_dir and args.checkpoint_every) else None,
+        )
+    except KeyboardInterrupt:
+        print("\n[Interrupted] Partial results from last checkpoint (if --checkpoint_every).")
+        if args.output_dir:
+            partial_files = sorted(Path(args.output_dir).glob("inference_partial_*.json"))
+            if partial_files:
+                print(f"  Latest: {partial_files[-1]}")
+        raise
 
     metrics = compute_accuracy(results)
     per_cat = metrics.get("per_category", {})
     per_cat_counts = metrics.get("per_category_counts", {})
 
+    # Per-module report: always save (default output_dir if not set)
+    out_base = Path(args.output_dir) if args.output_dir else Path(f"results/inference_fixed_{args.benchmark}")
+    out_base.mkdir(parents=True, exist_ok=True)
+    per_module = compute_per_module_accuracy(results, use_gt_category=True)
+    save_per_module_report(per_module, out_base / "per_module_report")
+    print(f"\n[Save] Per-module report → {out_base / 'per_module_report'}.json / .md")
+
     print("\n" + "=" * 70)
-    print("FINAL — CV-Bench (fixed assignment)")
+    print(f"FINAL — {args.benchmark.upper()} (fixed assignment)")
     print("=" * 70)
     print(f"Overall: {metrics['correct']}/{metrics['total']} = {100*metrics['accuracy']:.1f}%")
     print("-" * 70)
@@ -239,19 +289,17 @@ def main():
         print(f"{cat:<18} | {c:>7} | {t:>5} | {acc*100:>6.1f}%")
     print("=" * 70)
 
-    if args.output_dir:
-        out = Path(args.output_dir)
-        out.mkdir(parents=True, exist_ok=True)
-        out_file = out / "inference_fixed_results.json"
-        with open(out_file, "w", encoding="utf-8") as f:
-            json.dump({
-                "correct": metrics["correct"],
-                "total": metrics["total"],
-                "accuracy": metrics["accuracy"],
-                "per_category": per_cat,
-                "per_category_counts": per_cat_counts,
-            }, f, indent=2)
-        print(f"\n[Save] Results → {out_file}")
+    out = out_base
+    out_file = out / "inference_fixed_results.json"
+    with open(out_file, "w", encoding="utf-8") as f:
+        json.dump({
+            "correct": metrics["correct"],
+            "total": metrics["total"],
+            "accuracy": metrics["accuracy"],
+            "per_category": per_cat,
+            "per_category_counts": per_cat_counts,
+        }, f, indent=2)
+    print(f"[Save] Results → {out_file}")
 
 
 if __name__ == "__main__":

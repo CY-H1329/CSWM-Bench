@@ -34,7 +34,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src2.agents.mas_v2 import ALL_CATEGORIES, ROLES, ScoreMap, run_test, compute_accuracy
+from src2.agents.mas_v2 import (
+    ALL_CATEGORIES, ROLES, ScoreMap, run_test, compute_accuracy,
+    compute_per_module_accuracy, save_per_module_report,
+)
 try:
     from src2.agents.mas_v2 import SPECIALIST_LLMS_5, SPECIALIST_LLMS_3
 except ImportError:
@@ -403,6 +406,12 @@ def main():
         metrics = compute_accuracy(eval_results)
         per_cat = metrics.get("per_category", {})
         per_cat_counts = metrics.get("per_category_counts", {})
+
+        # Per-module (head / specialists / reasoning) breakdown
+        per_module = compute_per_module_accuracy(eval_results, use_gt_category=True)
+        per_module_path = out_dir / "per_module_report"
+        save_per_module_report(per_module, per_module_path)
+        print(f"[Save] Per-module report → {per_module_path}.json / {per_module_path}.md")
 
         print("\n" + "=" * 70)
         print(f"FINAL EVAL (frozen {args.benchmark})")

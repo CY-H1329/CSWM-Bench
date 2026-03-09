@@ -366,6 +366,9 @@ def run_test(
     updater: "ScoreMapUpdater" = None,
     update_scores: bool = False,
     save_step_dir: Optional[Union[str, Path]] = None,
+    max_steps: Optional[int] = None,
+    checkpoint_every: Optional[int] = None,
+    checkpoint_callback: Optional[Callable] = None,
 ) -> List[Dict]:
     """Test phase: iterate over dataset.
 
@@ -383,6 +386,8 @@ def run_test(
     _answer = get_answer_fn or (lambda ex: get_benchmark_answer(ex, benchmark))
 
     total = len(dataset)
+    if max_steps is not None:
+        total = min(total, max_steps)
     results = []
 
     for step in range(total):
@@ -443,6 +448,9 @@ def run_test(
                 "Test step %d/%d | running acc: %.2f%%",
                 step + 1, total, acc_pct,
             )
+
+        if checkpoint_every and checkpoint_callback and (step + 1) % checkpoint_every == 0:
+            checkpoint_callback(results, step + 1)
 
     return results
 
@@ -511,3 +519,197 @@ def compute_accuracy(results: List[Dict], use_gt_category: bool = True) -> Dict:
         "per_category": per_category,
         "per_category_counts": by_cat,
     }
+
+
+def _infer_answer_type_from_gt(gt: str) -> str:
+    """Infer multiple_choice vs free_form from ground truth."""
+    if not gt or not str(gt).strip():
+        return "free_form"
+    g = str(gt).strip().upper()
+    if any(c in g for c in "ABCDEF"):
+        return "multiple_choice"
+    return "free_form"
+
+
+def _normalize_cat_for_match(gt_cat: str, pred_cat: str) -> Tuple[str, str]:
+    """Normalize categories for head-agent match (FINE_TO_UNIFIED mapping)."""
+    from .config import FINE_TO_UNIFIED
+    gt_n = (FINE_TO_UNIFIED.get(gt_cat, gt_cat) if gt_cat else "") or gt_cat
+    pred_n = (FINE_TO_UNIFIED.get(pred_cat, pred_cat) if pred_cat else "") or pred_cat
+    return (gt_n or "unknown", pred_n or "unknown")
+
+
+def compute_per_module_accuracy(
+    results: List[Dict],
+    use_gt_category: bool = True,
+) -> Dict:
+    """Compute per-module (head-agent, specialists, reasoning-agent) accuracy.
+
+    Returns:
+        - head_agent: {overall_acc, correct, total, per_category}
+        - specialists: {agent_name: {overall_acc, correct, total, per_category}}
+        - reasoning_agent: {overall_acc, correct, total, per_category}
+        - per_task_per_module: {category: {head_agent, specialist_X, reasoning_agent}}
+    """
+    from collections import defaultdict
+
+    total = 0
+    head_correct = 0
+    head_by_cat: Dict[str, Dict[str, int]] = defaultdict(lambda: {"correct": 0, "total": 0})
+    spec_by_agent: Dict[str, Dict[str, Dict[str, int]]] = defaultdict(
+        lambda: defaultdict(lambda: {"correct": 0, "total": 0})
+    )
+    reason_correct = 0
+    reason_by_cat: Dict[str, Dict[str, int]] = defaultdict(lambda: {"correct": 0, "total": 0})
+
+    for r in results:
+        if r.get("correct") is None:
+            continue
+        total += 1
+        gt = r.get("gt") or ""
+        gt_cat = r.get("gt_category") if use_gt_category else None
+        pred_cat = r.get("category", "unknown")
+        cat = gt_cat or pred_cat
+
+        answer_type = _infer_answer_type_from_gt(gt)
+
+        # Head agent: category match
+        if gt_cat:
+            gt_n, pred_n = _normalize_cat_for_match(gt_cat, pred_cat)
+            h_ok = gt_n == pred_n
+            if h_ok:
+                head_correct += 1
+            head_by_cat[cat]["total"] += 1
+            if h_ok:
+                head_by_cat[cat]["correct"] += 1
+
+        # Specialists: each agent's answer vs gt
+        for ad in r.get("agent_details", []):
+            agent = ad.get("llm_name", "unknown")
+            ans = ad.get("answer", "")
+            s_ok = _is_correct(ans, gt, answer_type)
+            spec_by_agent[agent][cat]["total"] += 1
+            if s_ok:
+                spec_by_agent[agent][cat]["correct"] += 1
+
+        # Reasoning agent: final answer vs gt
+        final = r.get("final_answer", "")
+        r_ok = r.get("correct", False)
+        if r_ok:
+            reason_correct += 1
+        reason_by_cat[cat]["total"] += 1
+        if r_ok:
+            reason_by_cat[cat]["correct"] += 1
+
+    def _acc(d: Dict[str, Dict[str, int]]) -> Dict[str, float]:
+        return {c: (v["correct"] / v["total"] if v["total"] > 0 else 0.0) for c, v in sorted(d.items())}
+
+    head_per_cat = _acc(head_by_cat) if head_by_cat else {}
+    head_overall = head_correct / total if total > 0 and head_correct is not None else 0.0
+    head_total = sum(v["total"] for v in head_by_cat.values()) if head_by_cat else total
+
+    specialists = {}
+    for agent, by_cat in spec_by_agent.items():
+        c_total = sum(v["total"] for v in by_cat.values())
+        c_correct = sum(v["correct"] for v in by_cat.values())
+        specialists[agent] = {
+            "overall_acc": c_correct / c_total if c_total > 0 else 0.0,
+            "correct": c_correct,
+            "total": c_total,
+            "per_category": _acc(dict(by_cat)),
+        }
+
+    reason_per_cat = _acc(reason_by_cat)
+    reason_overall = reason_correct / total if total > 0 else 0.0
+
+    # per_task_per_module: category -> {head_agent, specialist_X, reasoning_agent}
+    all_cats = sorted(set(list(head_by_cat.keys()) + list(reason_by_cat.keys())))
+    per_task_per_module = {}
+    for c in all_cats:
+        per_task_per_module[c] = {
+            "head_agent": head_by_cat.get(c, {}).get("correct", 0) / max(1, head_by_cat.get(c, {}).get("total", 0)),
+            "reasoning_agent": reason_by_cat.get(c, {}).get("correct", 0) / max(1, reason_by_cat.get(c, {}).get("total", 0)),
+        }
+        for agent in specialists:
+            sc = spec_by_agent.get(agent, {}).get(c, {})
+            per_task_per_module[c][f"specialist_{agent}"] = sc.get("correct", 0) / max(1, sc.get("total", 0))
+
+    return {
+        "total": total,
+        "head_agent": {
+            "overall_acc": head_overall,
+            "correct": head_correct,
+            "total": head_total,
+            "per_category": head_per_cat,
+        },
+        "specialists": specialists,
+        "reasoning_agent": {
+            "overall_acc": reason_overall,
+            "correct": reason_correct,
+            "total": total,
+            "per_category": reason_per_cat,
+        },
+        "per_task_per_module": per_task_per_module,
+    }
+
+
+def save_per_module_report(metrics: Dict, output_path: Union[str, Path]) -> None:
+    """Save per-module (head/specialists/reasoning) metrics to JSON and Markdown."""
+    import json
+    from datetime import datetime
+
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    # JSON (full)
+    json_path = out if str(out).endswith(".json") else out.with_suffix(".json")
+    to_save = {k: v for k, v in metrics.items() if k != "per_task_per_module"}
+    to_save["per_task_per_module"] = metrics.get("per_task_per_module", {})
+    to_save["timestamp"] = datetime.now().strftime("%Y%m%d_%H%M%S")
+    json_path.write_text(json.dumps(to_save, indent=2, ensure_ascii=False))
+
+    # Markdown (readable)
+    md_path = json_path.with_suffix(".md")
+    lines = [
+        "# Per-Module Accuracy Report",
+        "",
+        f"**Total samples:** {metrics.get('total', 0)}",
+        "",
+        "## Head Agent (category inference)",
+        "",
+    ]
+    ha = metrics.get("head_agent", {})
+    lines.append(f"- Overall: {ha.get('correct', 0)}/{ha.get('total', 0)} = {100*ha.get('overall_acc', 0):.1f}%")
+    for cat, acc in sorted(ha.get("per_category", {}).items(), key=lambda x: -x[1]):
+        lines.append(f"  - {cat}: {100*acc:.1f}%")
+    lines.append("")
+    lines.append("## Specialists (per agent)")
+    lines.append("")
+    for agent, data in sorted(metrics.get("specialists", {}).items()):
+        lines.append(f"### {agent}")
+        lines.append(f"- Overall: {data.get('correct', 0)}/{data.get('total', 0)} = {100*data.get('overall_acc', 0):.1f}%")
+        for cat, acc in sorted(data.get("per_category", {}).items(), key=lambda x: -x[1]):
+            lines.append(f"  - {cat}: {100*acc:.1f}%")
+        lines.append("")
+    lines.append("## Reasoning Agent (final synthesis)")
+    lines.append("")
+    ra = metrics.get("reasoning_agent", {})
+    lines.append(f"- Overall: {ra.get('correct', 0)}/{ra.get('total', 0)} = {100*ra.get('overall_acc', 0):.1f}%")
+    for cat, acc in sorted(ra.get("per_category", {}).items(), key=lambda x: -x[1]):
+        lines.append(f"  - {cat}: {100*acc:.1f}%")
+    lines.append("")
+    lines.append("## Per-Task × Per-Module")
+    lines.append("")
+    ptm = metrics.get("per_task_per_module", {})
+    if ptm:
+        cats = sorted(ptm.keys())
+        first_val = next(iter(ptm.values()), {})
+        modules = ["head_agent", "reasoning_agent"] + sorted(
+            k for k in first_val.keys() if k.startswith("specialist_")
+        )
+        lines.append("| Category | " + " | ".join(m.replace("specialist_", "") for m in modules) + " |")
+        lines.append("|" + "----------|" * len(modules) + "|")
+        for cat in cats:
+            row = [f"{100*ptm[cat].get(m, 0):.1f}%" for m in modules]
+            lines.append(f"| {cat} | " + " | ".join(row) + " |")
+    md_path.write_text("\n".join(lines))
