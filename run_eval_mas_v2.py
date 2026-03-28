@@ -13,6 +13,10 @@ Usage:
         --train_ratio 0.5 \
         --seed 42
 
+Full HF: TTO on 500 samples, inference on the rest:
+    python run_eval_mas_v2.py --benchmark 3dsrbench --hf_full_dataset \
+        --train_samples 500 --use_tto --trust_step 4 --use_vlm_reasoning ...
+
 Or import from Jupyter:
     from run_eval_mas_v2 import build_runners, run_experiment, run_test_only
 
@@ -249,6 +253,23 @@ def split_dataset(dataset, train_ratio: float = 0.5, seed: int = 42):
     return dataset.select(train_idx), dataset.select(test_idx)
 
 
+def split_dataset_fixed_train_size(dataset, train_size: int, seed: int = 42):
+    """Shuffle then take exactly train_size samples for TTO; remaining for inference (no overlap)."""
+    n = len(dataset)
+    if train_size <= 0:
+        raise ValueError(f"train_size must be positive, got {train_size}")
+    if train_size >= n:
+        raise ValueError(
+            f"train_size ({train_size}) must be < dataset length ({n}) to leave a test set."
+        )
+    rng = random.Random(seed)
+    indices = list(range(n))
+    rng.shuffle(indices)
+    train_idx = sorted(indices[:train_size])
+    test_idx = sorted(indices[train_size:])
+    return dataset.select(train_idx), dataset.select(test_idx)
+
+
 # ======================================================================
 # Test-only runner (no train/test split, no ScoreMap update)
 # ======================================================================
@@ -352,6 +373,7 @@ def run_experiment(
     specialist_generate,
     reasoning_generate,
     train_ratio: float = 0.5,
+    train_samples: Optional[int] = None,
     seed: int = 42,
     output_dir: str = None,
     updater: ScoreMapUpdater = None,
@@ -361,7 +383,11 @@ def run_experiment(
     dataset_subdir: str = None,
     use_frozen: bool = True,
 ):
-    """Run full MAS v2 experiment: load data -> split -> train -> test -> report."""
+    """Run full MAS v2 experiment: load data -> split -> train -> test -> report.
+
+    If train_samples is set, use exactly that many shuffled examples for TTO (train)
+    and the rest for inference (test). Overrides train_ratio.
+    """
 
     specialist_llms = specialist_llms or SPECIALIST_LLMS_5
     logger.info("Benchmark: %s | Categories: %d (fixed) | Specialists: %s | Seed: %d",
@@ -381,8 +407,15 @@ def run_experiment(
         )
     logger.info("Loaded %d samples", len(dataset))
 
-    train_ds, test_ds = split_dataset(dataset, train_ratio=train_ratio, seed=seed)
-    logger.info("Train: %d | Test: %d", len(train_ds), len(test_ds))
+    if train_samples is not None:
+        train_ds, test_ds = split_dataset_fixed_train_size(dataset, train_samples, seed=seed)
+        logger.info(
+            "Split: TTO optimization on %d samples | inference on %d (train_samples=%d, overrides train_ratio)",
+            len(train_ds), len(test_ds), train_samples,
+        )
+    else:
+        train_ds, test_ds = split_dataset(dataset, train_ratio=train_ratio, seed=seed)
+        logger.info("Train: %d | Test: %d (train_ratio=%s)", len(train_ds), len(test_ds), train_ratio)
 
     score_map = ScoreMap(categories=ALL_CATEGORIES, llms=specialist_llms, seed=seed)
     updater = updater or ScoreMapUpdater()
@@ -479,7 +512,15 @@ def run_experiment(
 def main():
     parser = argparse.ArgumentParser(description="MAS v2 evaluation")
     parser.add_argument("--benchmark", choices=["3dsrbench", "cvbench"], required=True)
-    parser.add_argument("--train_ratio", type=float, default=0.5)
+    parser.add_argument("--train_ratio", type=float, default=0.5,
+                        help="Random fraction for train split (ignored if --train_samples is set)")
+    parser.add_argument(
+        "--train_samples",
+        type=int,
+        default=None,
+        help="Exact train size for TTO (e.g. 500 on full HF); remaining rows = inference test. "
+             "Requires full dataset (e.g. --hf_full_dataset). Overrides --train_ratio.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--test_only",
@@ -587,6 +628,10 @@ def main():
         )
     if args.hf_full_dataset and args.dataset_subdir:
         parser.error("--hf_full_dataset cannot be combined with --dataset_subdir")
+    if args.train_samples is not None and args.test_only:
+        parser.error("--train_samples applies to train+test experiment only (do not use with --test_only)")
+    if args.train_samples is not None and args.train_samples < 1:
+        parser.error("--train_samples must be >= 1")
 
     head_gen, spec_gen, reason_gen = build_runners(
         reasoning_api_base=args.reasoning_api_base,
@@ -655,6 +700,7 @@ def main():
             specialist_generate=spec_gen,
             reasoning_generate=reason_gen,
             train_ratio=args.train_ratio,
+            train_samples=args.train_samples,
             seed=args.seed,
             output_dir=out_dir,
             max_samples=args.max_samples,
