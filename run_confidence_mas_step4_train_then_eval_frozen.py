@@ -42,8 +42,21 @@ except ImportError:
         from src2.agents.mas_v2.config import SPECIALIST_LLMS_5, SPECIALIST_LLMS_3
     except ImportError:
         # Fallback when config.py is outdated (e.g. H100)
-        SPECIALIST_LLMS_5 = ["qwen3_4b", "sa2va", "llava4d", "spatial_rgpt", "spatial_reasoner"]
+        SPECIALIST_LLMS_5 = ["qwen3_4b", "sa2va", "llava4d", "spatial_reasoner"]
         SPECIALIST_LLMS_3 = ["qwen3_4b", "llava4d", "spatial_reasoner"]
+
+
+def _with_spatial_rgpt_inserted(llms: list) -> list:
+    """Insert spatial_rgpt before spatial_reasoner if missing."""
+    if "spatial_rgpt" in llms:
+        return list(llms)
+    out = list(llms)
+    if "spatial_reasoner" in out:
+        i = out.index("spatial_reasoner")
+        out.insert(i, "spatial_rgpt")
+    else:
+        out.append("spatial_rgpt")
+    return out
 from src2.benchmarks.loaders import (
     FROZEN_PATHS,
     load_benchmark,
@@ -145,11 +158,13 @@ def main():
     parser.add_argument("--score_map_path", type=str, default=None,
                         help="Path to saved score_map JSON")
     parser.add_argument("--with_spaceom", action="store_true",
-                        help="Include SpaceOm (6 agents). Default: 5 agents (qwen3_4b, sa2va, llava4d, spatial_rgpt, spatial_reasoner)")
+                        help="Include SpaceOm. Default: qwen3_4b, sa2va, llava4d, spatial_reasoner (+ optional SpatialRGPT)")
     parser.add_argument("--low_memory", action="store_true",
                         help="Use 3 agents only (qwen3_4b, llava4d, spatial_reasoner) for OOM / quick test")
+    parser.add_argument("--with_spatial_rgpt", action="store_true",
+                        help="Include SpatialRGPT (requires SPATIALRGPT_PATH). Off by default.")
     parser.add_argument("--no_spatial_rgpt", action="store_true",
-                        help="Exclude SpatialRGPT (4 agents: qwen3_4b, sa2va, llava4d, spatial_reasoner)")
+                        help=argparse.SUPPRESS)  # deprecated, no-op (RGPT off by default)
     parser.add_argument("--specialist_offload", action="store_true",
                         help="Offload specialists to CPU after use (saves GPU memory, slower)")
     parser.add_argument("--verbose_markdown", action="store_true",
@@ -206,25 +221,24 @@ def main():
                 f"Run without --inference_only first to train on {train_subdir}."
             )
         score_map = ScoreMap.load(str(score_map_path))
-        specialist_llms = score_map.llms
-        if args.no_spatial_rgpt:
-            specialist_whitelist = [a for a in specialist_llms if a != "spatial_rgpt"]
-            score_map.llms = specialist_whitelist  # exclude from selection
-        else:
-            specialist_whitelist = specialist_llms
+        specialist_llms = list(score_map.llms)
+        if not args.with_spatial_rgpt:
+            specialist_llms = [a for a in specialist_llms if a != "spatial_rgpt"]
+            score_map.llms = specialist_llms
+        specialist_whitelist = specialist_llms
         print(f"[Load] Score map from {score_map_path} (specialists: {specialist_llms})")
         correct_train = None
         train_samples = 0
 
     if not args.inference_only:
         if args.low_memory:
-            specialist_llms = SPECIALIST_LLMS_3
+            specialist_llms = list(SPECIALIST_LLMS_3)
         elif args.with_spaceom:
-            specialist_llms = ["qwen3_4b", "sa2va", "llava4d", "spatial_rgpt", "spaceom", "spatial_reasoner"]
+            specialist_llms = list(SPECIALIST_LLMS_5) + ["spaceom"]
         else:
-            specialist_llms = SPECIALIST_LLMS_5
-        if args.no_spatial_rgpt:
-            specialist_llms = [a for a in specialist_llms if a != "spatial_rgpt"]
+            specialist_llms = list(SPECIALIST_LLMS_5)
+        if args.with_spatial_rgpt:
+            specialist_llms = _with_spatial_rgpt_inserted(specialist_llms)
         specialist_whitelist = specialist_llms
 
     # --- 1. Build runners ---

@@ -278,9 +278,9 @@ def main():
     if args.low_memory:
         specialist_llms = SPECIALIST_LLMS_3
     elif args.with_spaceom:
-        specialist_llms = ["qwen3_4b", "sa2va", "llava4d", "spatial_rgpt", "spaceom", "spatial_reasoner"]
+        specialist_llms = list(SPECIALIST_LLMS_5) + ["spaceom"]
     else:
-        specialist_llms = SPECIALIST_LLMS_5
+        specialist_llms = list(SPECIALIST_LLMS_5)
     head_gen, spec_gen, reason_gen = build_runners_for_confidence(
         specialist_device="cuda",
         specialist_whitelist=specialist_llms,

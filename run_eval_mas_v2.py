@@ -4,7 +4,7 @@ MAS v2 Evaluation -- Train / Test split.
 
 Models:
   HEAD            = Qwen3-VL-4B       (VLM, image+text -> category)
-  5 SPECIALISTS   = Qwen3/Sa2VA/LLaVA4D/SpatialRGPT/SpatialReasoner
+  4 SPECIALISTS (default) = Qwen3/Sa2VA/LLaVA4D/SpatialReasoner (SpatialRGPT: --specialist_whitelist …, spatial_rgpt)
   FINAL REASONING = DeepSeek-R1       (text-only, SharedMemory + query -> answer)
 
 Usage:
@@ -37,7 +37,7 @@ warnings.filterwarnings("ignore", message=".*offload.*buffer.*")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from src2.agents.mas_v2 import (
-    ALL_CATEGORIES, SPECIALIST_LLMS, ROLES,
+    ALL_CATEGORIES, SPECIALIST_LLMS_5, ROLES,
     ScoreMap, ScoreMapUpdater,
     run_train, run_test, compute_accuracy,
 )
@@ -257,7 +257,7 @@ def run_test_only(
     head_generate,
     specialist_generate,
     reasoning_generate,
-    max_samples: int,
+    max_samples: Optional[int],
     seed: int = 42,
     output_dir: str = None,
     random_agents: bool = True,
@@ -266,6 +266,7 @@ def run_test_only(
     dataset_subdir: str = None,
     verbose: bool = True,
     updater=None,
+    use_frozen: bool = True,
 ):
     """Run MAS v2 pipeline on N samples.
 
@@ -282,10 +283,12 @@ def run_test_only(
         )
         logger.info("Loaded from data/dataset/%s (%d samples)", dataset_subdir, len(dataset))
     else:
-        dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
+        dataset = load_benchmark(
+            benchmark, max_samples=max_samples, seed=seed, use_frozen=use_frozen
+        )
     logger.info("Loaded %d samples (test only, no train)", len(dataset))
 
-    specialist_llms = specialist_llms or SPECIALIST_LLMS
+    specialist_llms = specialist_llms or SPECIALIST_LLMS_5
     score_map = ScoreMap(categories=ALL_CATEGORIES, llms=specialist_llms, seed=seed)
 
     use_random = random_agents and updater is None
@@ -356,10 +359,11 @@ def run_experiment(
     use_vlm_reasoning: bool = False,
     specialist_llms: list = None,
     dataset_subdir: str = None,
+    use_frozen: bool = True,
 ):
     """Run full MAS v2 experiment: load data -> split -> train -> test -> report."""
 
-    specialist_llms = specialist_llms or SPECIALIST_LLMS
+    specialist_llms = specialist_llms or SPECIALIST_LLMS_5
     logger.info("Benchmark: %s | Categories: %d (fixed) | Specialists: %s | Seed: %d",
                 benchmark, len(ALL_CATEGORIES), specialist_llms, seed)
 
@@ -372,7 +376,9 @@ def run_experiment(
         )
         logger.info("Loaded from data/dataset/%s (%d samples)", dataset_subdir, len(dataset))
     else:
-        dataset = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
+        dataset = load_benchmark(
+            benchmark, max_samples=max_samples, seed=seed, use_frozen=use_frozen
+        )
     logger.info("Loaded %d samples", len(dataset))
 
     train_ds, test_ds = split_dataset(dataset, train_ratio=train_ratio, seed=seed)
@@ -521,6 +527,12 @@ def main():
         help="Load from data/dataset/<subdir> instead of HuggingFace. e.g. 3dsrbench_train_300",
     )
     parser.add_argument(
+        "--hf_full_dataset",
+        action="store_true",
+        help="Load full benchmark from HuggingFace (ccvl/3DSRBench …) instead of frozen subset "
+        "(data/frozen_benchmarks/3dsrbench_500). Ignored if --dataset_subdir is set.",
+    )
+    parser.add_argument(
         "--use_tto",
         action="store_true",
         help="Use TTO (Trust Score) updater: trust_score.run_step4 (Beta+EMA).",
@@ -567,8 +579,14 @@ def main():
         else:
             specialist_whitelist = None
 
-    if args.test_only and not args.max_samples:
-        parser.error("--max_samples required when --test_only")
+    use_frozen = not args.hf_full_dataset
+
+    if args.test_only and not args.max_samples and not args.hf_full_dataset:
+        parser.error(
+            "--max_samples required when --test_only (unless --hf_full_dataset for all HF samples)"
+        )
+    if args.hf_full_dataset and args.dataset_subdir:
+        parser.error("--hf_full_dataset cannot be combined with --dataset_subdir")
 
     head_gen, spec_gen, reason_gen = build_runners(
         reasoning_api_base=args.reasoning_api_base,
@@ -584,7 +602,7 @@ def main():
         top_p=args.top_p,
     )
 
-    specialist_llms = specialist_whitelist or SPECIALIST_LLMS
+    specialist_llms = specialist_whitelist or SPECIALIST_LLMS_5
 
     updater = None
     if args.use_tto:
@@ -606,7 +624,10 @@ def main():
             logger.warning("TTO updater not available: %s. Using default ScoreMapUpdater.", e)
 
     if args.test_only:
-        out_dir = f"{args.output_dir}/{args.benchmark}/{args.max_samples}samples"
+        if args.max_samples:
+            out_dir = f"{args.output_dir}/{args.benchmark}/{args.max_samples}samples"
+        else:
+            out_dir = f"{args.output_dir}/{args.benchmark}/full_hf"
         run_test_only(
             benchmark=args.benchmark,
             head_generate=head_gen,
@@ -619,10 +640,13 @@ def main():
             dataset_subdir=args.dataset_subdir,
             verbose=not args.no_verbose,
             updater=updater if args.use_tto else None,
+            use_frozen=use_frozen,
         )
     else:
         if args.max_samples:
             out_dir = f"{args.output_dir}/{args.benchmark}/{args.max_samples}samples"
+        elif args.hf_full_dataset:
+            out_dir = f"{args.output_dir}/{args.benchmark}/full_hf"
         else:
             out_dir = f"{args.output_dir}/{args.benchmark}"
         run_experiment(
@@ -638,6 +662,7 @@ def main():
             updater=updater,
             use_vlm_reasoning=args.use_vlm_reasoning,
             dataset_subdir=args.dataset_subdir,
+            use_frozen=use_frozen,
         )
 
 

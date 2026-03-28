@@ -16,9 +16,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-# 4 agents: llava4d, qwen3_4b, sa2va, spaceom (SpaceOm 사용, SpatialRGPT 제외)
-# SpatialRGPT 대신 SpaceOm: scripts/run_spatialtto_spaceom.sh 참고
-WHITELIST_4="llava4d,qwen3_4b,sa2va,spatial_rgpt"
+# 4 specialists: no SpatialRGPT (requires SPATIALRGPT_PATH); use spatial_reasoner instead
+WHITELIST_4="llava4d,qwen3_4b,sa2va,spatial_reasoner"
 
 echo "=============================================="
 echo "MAS v2 + TTO — H100 — 3DSRBench"

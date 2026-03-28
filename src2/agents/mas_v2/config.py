@@ -16,9 +16,18 @@ SPECIALIST_LLMS = [
     "spatial_reasoner",
 ]
 
-# Default 5 agents for TTO (qwen3_4b, sa2va, llava4d, spatial_rgpt, spatial_reasoner)
+# Default TTO specialists (4 VLMs). SpatialRGPT is optional — requires cloning
+# https://github.com/AnjieCheng/SpatialRGPT and SPATIALRGPT_PATH; use
+# SPECIALIST_LLMS_5_WITH_RGPT or CLI --with_spatial_rgpt when the repo is installed.
 # Excludes spaceom (optional, use --with_spaceom to add)
 SPECIALIST_LLMS_5 = [
+    "qwen3_4b",
+    "sa2va",
+    "llava4d",
+    "spatial_reasoner",
+]
+
+SPECIALIST_LLMS_5_WITH_RGPT = [
     "qwen3_4b",
     "sa2va",
     "llava4d",

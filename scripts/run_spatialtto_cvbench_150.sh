@@ -28,6 +28,5 @@ export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:T
 python run_confidence_mas_step4_train_then_eval_frozen.py \
   --benchmark cvbench_150 \
   --eval \
-  --no_spatial_rgpt \
   --checkpoint_every 50 \
   "$@"

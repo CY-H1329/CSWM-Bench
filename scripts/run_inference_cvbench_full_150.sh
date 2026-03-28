@@ -24,4 +24,4 @@ python run_confidence_mas_step4_train_then_eval_frozen.py \
   --eval \
   --eval_full \
   --score_map_path "$SCORE_MAP" \
-  --no_spatial_rgpt
+  "$@"
