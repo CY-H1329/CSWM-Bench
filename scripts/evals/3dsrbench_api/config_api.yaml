@@ -17,6 +17,11 @@ models:
     enabled: true
     model_id: "gpt-4o"
     api_key_env: "OPENAI_API_KEY"
+  # GPT-5.2 (vision) — full 3DSRBench: use run_eval_api.py --full_dataset --model gpt_5_2
+  gpt_5_2:
+    enabled: true
+    model_id: "gpt-5.2"  # or snapshot e.g. gpt-5.2-2025-12-11
+    api_key_env: "OPENAI_API_KEY"
   deepseek_vl:
     enabled: false  # API officielle sans vision ; retiré
     model_id: "deepseek-vl"

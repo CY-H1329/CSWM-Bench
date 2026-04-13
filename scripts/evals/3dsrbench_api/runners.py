@@ -5,6 +5,7 @@ Separate from src/models to avoid modifying existing code.
 import os
 import io
 import base64
+import time
 from typing import Optional
 from PIL import Image
 
@@ -83,8 +84,14 @@ class ClaudeRunner:
 
 
 class GPT4oRunner:
-    """GPT-4o via OpenAI API (reuses GPTRunner pattern)."""
-    def __init__(self, model_id: str = "gpt-4o", api_key: Optional[str] = None):
+    """GPT-4o / GPT-5.x via OpenAI API. Retries on rate limits (상용 실행용)."""
+
+    def __init__(
+        self,
+        model_id: str = "gpt-4o",
+        api_key: Optional[str] = None,
+        max_retries: Optional[int] = None,
+    ):
         if not OPENAI_AVAILABLE:
             raise ImportError("Install: pip install openai")
         key = (api_key or os.environ.get("OPENAI_API_KEY", "")).strip()
@@ -92,6 +99,26 @@ class GPT4oRunner:
             raise ValueError("Set OPENAI_API_KEY")
         self.client = OpenAI(api_key=key)
         self.model_id = model_id
+        self.max_retries = max_retries if max_retries is not None else int(
+            os.environ.get("OPENAI_MAX_RETRIES", "8")
+        )
+
+    def _is_retryable(self, err: BaseException) -> bool:
+        msg = str(err).lower()
+        if "429" in msg or "rate" in msg or "timeout" in msg or "connection" in msg:
+            return True
+        try:
+            import openai
+
+            types = tuple(
+                t
+                for name in ("RateLimitError", "APIConnectionError", "APITimeoutError")
+                for t in (getattr(openai, name, None),)
+                if t is not None
+            )
+            return isinstance(err, types) if types else False
+        except Exception:
+            return False
 
     def generate(
         self,
@@ -103,9 +130,9 @@ class GPT4oRunner:
     ) -> str:
         prompt = _sanitize(prompt)
         b64 = _img_to_base64(image)
-        # GPT-5.x uses max_completion_tokens instead of max_tokens
-        tok_param = {"max_completion_tokens": max_tokens} if "gpt-5" in (self.model_id or "").lower() else {"max_tokens": max_tokens}
-        resp = self.client.chat.completions.create(
+        mid = (self.model_id or "").lower()
+        tok_param = {"max_completion_tokens": max_tokens} if "gpt-5" in mid else {"max_tokens": max_tokens}
+        req = dict(
             model=self.model_id,
             messages=[
                 {
@@ -116,10 +143,23 @@ class GPT4oRunner:
                     ],
                 }
             ],
-            temperature=max(0.0, temperature),
             **tok_param,
         )
-        return (resp.choices[0].message.content or "").strip()
+        if not mid.startswith("gpt-5") and not mid.startswith("o1") and not mid.startswith("o3"):
+            req["temperature"] = max(0.0, temperature)
+
+        last_err: Optional[BaseException] = None
+        for attempt in range(self.max_retries):
+            try:
+                resp = self.client.chat.completions.create(**req)
+                return (resp.choices[0].message.content or "").strip()
+            except BaseException as e:
+                last_err = e
+                if attempt + 1 >= self.max_retries or not self._is_retryable(e):
+                    raise
+                wait = min(8.0 * (2**attempt), 120.0)
+                time.sleep(wait)
+        raise last_err  # pragma: no cover
 
 
 class DeepSeekVLRunner:

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-3DSRBench — API models (Claude Sonnet 4.5, GPT-4o, DeepSeek-VL, Gemini Robotics-ER).
-100 samples, separate from GPU eval. Does not modify existing code.
+3DSRBench — API models (Claude Sonnet 4.5, GPT-4o, GPT-5.2, DeepSeek-VL, Gemini Robotics-ER).
 
 Usage:
   python scripts/evals/3dsrbench_api/run_eval_api.py
   python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 50
-  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset   # dataset complet, tous modèles
-  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5  # un modèle, 2 variants
-  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt4o --without_prompt  # un run (terminal séparé)
+  # Full HF test split (not frozen 500): --full_dataset sets use_frozen=False
+  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt_5_2
+  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset   # all enabled models
+  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model claude_sonnet_4_5
+  python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt4o --without_prompt
   python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 1000 --model claude_sonnet_4_5 --without_prompt --start_idx 466 --end_idx 1000 --resume_dir results/runs/3dsrbench/api_models/20260217_060437/claude_sonnet_4_5_without_prompt  # reprise 466-999
 
 Env: ANTHROPIC_API_KEY, OPENAI_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY
@@ -65,7 +66,7 @@ def get_runner(model_key: str, config: dict):
     model_id = cfg.get("model_id", "")
     if model_key == "claude_sonnet_4_5":
         return ClaudeRunner(model_id=model_id, api_key=api_key)
-    if model_key == "gpt4o":
+    if model_key in ("gpt4o", "gpt_5_2"):
         return GPT4oRunner(model_id=model_id, api_key=api_key)
     if model_key == "deepseek_vl":
         return DeepSeekVLRunner(
@@ -78,12 +79,24 @@ def get_runner(model_key: str, config: dict):
     return None
 
 
+def _write_details_checkpoint(model_dir: Path, details: list) -> None:
+    """상용: 중간 저장 (중단 시 resume_dir + start_idx로 이어가기)."""
+    path = model_dir / "details.jsonl"
+    with open(path, "w", encoding="utf-8") as f:
+        for d in details:
+            f.write(json.dumps(d, ensure_ascii=False) + "\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description="3DSRBench API models")
     parser.add_argument("--config", default=str(Path(__file__).parent / "config_api.yaml"))
     parser.add_argument("--max_samples", type=int, default=None, help="Limiter à N samples (défaut: 1000 si pas --full_dataset)")
     parser.add_argument("--full_dataset", action="store_true", help="Dataset complet, sortie dans full_dataset/")
-    parser.add_argument("--model", choices=["claude_sonnet_4_5", "gpt4o", "gemini_robotics_er"], help="Un seul modèle (pour terminaux séparés)")
+    parser.add_argument(
+        "--model",
+        choices=["claude_sonnet_4_5", "gpt4o", "gpt_5_2", "gemini_robotics_er"],
+        help="Un seul modèle (pour terminaux séparés)",
+    )
     parser.add_argument("--without_prompt", action="store_true", help="Question seule (un seul run)")
     parser.add_argument("--prompt_variant", choices=["with_prompt", "without_prompt"], help="Une seule variante (exclut l'autre)")
     parser.add_argument("--start_idx", type=int, default=None, help="Reprise : indices à partir de (ex: 466)")
@@ -91,6 +104,12 @@ def main():
     parser.add_argument("--resume_dir", default=None, help="Reprise : dossier du run existant (ex: .../claude_sonnet_4_5_without_prompt)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max_tokens", type=int, default=1024)
+    parser.add_argument(
+        "--checkpoint_every",
+        type=int,
+        default=10,
+        help="Write details.jsonl every N samples (0 = only at end).",
+    )
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
@@ -118,8 +137,16 @@ def main():
         start_idx = 0
         end_idx = None  # set after load
 
-    print(f"Loading 3DSRBench... (max_samples={'all' if use_full else max_samples}, seed={seed})")
-    dataset = load_benchmark("3dsrbench", max_samples=max_samples, seed=seed)
+    print(
+        f"Loading 3DSRBench... (max_samples={'all' if use_full else max_samples}, "
+        f"seed={seed}, use_frozen={not use_full})"
+    )
+    dataset = load_benchmark(
+        "3dsrbench",
+        max_samples=max_samples,
+        seed=seed,
+        use_frozen=not use_full,
+    )
     print(f"  {len(dataset)} samples")
     if use_resume:
         print(f"  Reprise: indices {start_idx} à {end_idx - 1} ({end_idx - start_idx} samples)")
@@ -130,6 +157,8 @@ def main():
             model_keys = ["claude_sonnet_4_5"]
         elif "gpt4o" in resume_path.name:
             model_keys = ["gpt4o"]
+        elif "gpt_5_2" in resume_path.name:
+            model_keys = ["gpt_5_2"]
         elif "gemini" in resume_path.name:
             model_keys = ["gemini_robotics_er"]
         else:
@@ -138,7 +167,11 @@ def main():
         prompt_fn = (lambda q: q) if variant_name == "without_prompt" else (lambda q: build_spatial_prompt(q))
         prompt_variants = [(variant_name, prompt_fn)]
     else:
-        model_keys = [args.model] if args.model else ["claude_sonnet_4_5", "gpt4o", "deepseek_vl", "gemini_robotics_er"]
+        model_keys = (
+            [args.model]
+            if args.model
+            else ["claude_sonnet_4_5", "gpt4o", "gpt_5_2", "deepseek_vl", "gemini_robotics_er"]
+        )
         if args.prompt_variant == "with_prompt":
             prompt_variants = [("with_prompt", lambda q: build_spatial_prompt(q))]
         elif args.without_prompt or args.prompt_variant == "without_prompt":
@@ -233,6 +266,9 @@ def main():
                     preds.append("")
                     gt_list.append(gt)
                     details.append({"idx": i, "error": str(e), "gt": gt, "category_gt": gt_category_norm})
+
+                if args.checkpoint_every and len(details) % args.checkpoint_every == 0:
+                    _write_details_checkpoint(model_dir, details)
 
             if use_resume and details:
                 details.sort(key=lambda d: d.get("idx", 0))
