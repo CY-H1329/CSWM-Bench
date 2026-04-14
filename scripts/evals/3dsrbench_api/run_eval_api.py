@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-3DSRBench & CV-Bench — API models (Claude Sonnet 4.5, GPT-4o, GPT-5.2, DeepSeek-VL, Gemini Robotics-ER).
+3DSRBench, CV-Bench & MMSI-Bench — API models (Claude Sonnet 4.5, GPT-4o, GPT-5.2, DeepSeek-VL, Gemini).
 
 Usage:
   python scripts/evals/3dsrbench_api/run_eval_api.py
   python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark cvbench --max_samples 200
   python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark cvbench --full_dataset
+  python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark mmsibench --full_dataset --model gpt_5_2
   # Full HF test split (not frozen): --full_dataset sets use_frozen=False
   python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset --model gpt_5_2
   python scripts/evals/3dsrbench_api/run_eval_api.py --full_dataset   # all enabled models
@@ -33,13 +34,14 @@ from src.benchmarks import (
     load_benchmark,
     get_benchmark_prompt,
     get_benchmark_answer,
-    get_benchmark_image,
+    get_benchmark_images,
     get_benchmark_category,
 )
 from src.data import (
     normalize_answer_only,
     accuracy,
     extract_predicted_category,
+    extract_mmsi_predicted_task,
     normalize_category,
     CV_BENCH_CLASSIFICATION_CATS,
 )
@@ -52,6 +54,7 @@ _common = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_common)
 build_spatial_prompt = _common.build_spatial_prompt
 build_cvbench_prompt = _common.build_cvbench_prompt
+build_mmsi_prompt = _common.build_mmsi_prompt
 
 # Import API runners (same directory)
 _runners_path = Path(__file__).parent / "runners.py"
@@ -115,12 +118,12 @@ def _per_category_answer_accuracy(details: list, preds: list, gt_list: list) -> 
 
 
 def main():
-    parser = argparse.ArgumentParser(description="3DSRBench / CV-Bench API models")
+    parser = argparse.ArgumentParser(description="3DSRBench / CV-Bench / MMSI-Bench API models")
     parser.add_argument(
         "--benchmark",
-        choices=["3dsrbench", "cvbench"],
+        choices=["3dsrbench", "cvbench", "mmsibench"],
         default="3dsrbench",
-        help="Frozen local split by default; --full_dataset loads full HF test",
+        help="Frozen local split (cvbench/3dsr) when applicable; mmsibench = HF only; --full_dataset = full HF test",
     )
     parser.add_argument("--config", default=str(Path(__file__).parent / "config_api.yaml"))
     parser.add_argument("--max_samples", type=int, default=None, help="Limiter à N samples (défaut: 1000 si pas --full_dataset)")
@@ -154,7 +157,12 @@ def main():
     max_samples = None if use_full else (args.max_samples or ds_cfg.get("max_samples", 1000))
     seed = args.seed or ds_cfg.get("seed", 42)
     output_dir = Path(config.get("output", {}).get("dir", "results"))
-    prompt_with_ctx = build_cvbench_prompt if bench_name == "cvbench" else build_spatial_prompt
+    if bench_name == "cvbench":
+        prompt_with_ctx = build_cvbench_prompt
+    elif bench_name == "mmsibench":
+        prompt_with_ctx = build_mmsi_prompt
+    else:
+        prompt_with_ctx = build_spatial_prompt
     valid_cls_cats = CV_BENCH_CLASSIFICATION_CATS if bench_name == "cvbench" else None
 
     use_resume = args.resume_dir and args.start_idx is not None and args.end_idx is not None
@@ -173,7 +181,7 @@ def main():
         start_idx = 0
         end_idx = None  # set after load
 
-    bench_label = "CV-Bench" if bench_name == "cvbench" else "3DSRBench"
+    bench_label = {"cvbench": "CV-Bench", "mmsibench": "MMSI-Bench"}.get(bench_name, "3DSRBench")
     print(
         f"Loading {bench_label}... (max_samples={'all' if use_full else max_samples}, "
         f"seed={seed}, use_frozen={not use_full})"
@@ -266,13 +274,13 @@ def main():
             indices = list(range(start_idx, min(end_idx, len(dataset))))
             for i in tqdm(indices, desc=run_key):
                 example = dataset[i]
-                image = get_benchmark_image(example, bench_name)
+                images_list = get_benchmark_images(example, bench_name)
                 query = get_benchmark_prompt(example, bench_name)
                 gt = get_benchmark_answer(example, bench_name)
                 category = get_benchmark_category(example, bench_name) or "unknown"
                 gt_category_norm = normalize_category(category) if category and category != "unknown" else ""
 
-                if image is None:
+                if not images_list:
                     preds.append("")
                     gt_list.append(gt)
                     details.append({
@@ -284,17 +292,21 @@ def main():
                     })
                     continue
 
+                image_payload = images_list[0] if len(images_list) == 1 else images_list
                 full_prompt = prompt_fn(query)
 
                 try:
                     response = runner.generate(
-                        image,
+                        image_payload,
                         full_prompt,
                         temperature=0.0,
                         max_tokens=args.max_tokens,
                     )
                     letter = normalize_answer_only(response)
-                    pred_category = extract_predicted_category(response, valid_cats=valid_cls_cats)
+                    if bench_name == "mmsibench":
+                        pred_category = extract_mmsi_predicted_task(response)
+                    else:
+                        pred_category = extract_predicted_category(response, valid_cats=valid_cls_cats)
                     preds.append(letter)
                     gt_list.append(gt)
                     details.append({

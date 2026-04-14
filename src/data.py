@@ -10,6 +10,8 @@ import shutil
 import tempfile
 from typing import Optional
 
+from src.benchmarks.loaders import MMSI_BENCH_QUESTION_TYPES
+
 from datasets import load_dataset
 
 
@@ -198,16 +200,53 @@ _CV_BENCH_CATS = frozenset({"count", "relation", "depth", "distance"})
 CV_BENCH_CLASSIFICATION_CATS = _CV_BENCH_CATS  # pass to extract_predicted_category(valid_cats=...)
 
 
+def _norm_mmsi_task(s: str) -> str:
+    """Canonical form for MMSI-Bench `question_type` string matching."""
+    import unicodedata
+
+    if not s:
+        return ""
+    t = unicodedata.normalize("NFKC", str(s).strip())
+    for ch in ("\u2013", "\u2014", "\u2212"):
+        t = t.replace(ch, "-")
+    t = t.lower()
+    t = re.sub(r"\s+", " ", t)
+    return t.strip()
+
+
+MMSI_TASK_NORM_SET = frozenset(_norm_mmsi_task(x) for x in MMSI_BENCH_QUESTION_TYPES)
+
+
 def normalize_category(cat: str) -> str:
-    """Normalize benchmark task/category for comparison (3DSRBench + CV-Bench)."""
+    """Normalize benchmark task/category for comparison (3DSRBench, CV-Bench, MMSI-Bench)."""
     if not cat or not str(cat).strip():
         return ""
+    nm_m = _norm_mmsi_task(cat)
+    if nm_m in MMSI_TASK_NORM_SET:
+        return nm_m
     s = str(cat).strip().lower().replace(" ", "_").replace("-", "_")
     if s in _3DSRBENCH_CATS:
         return s
     if s in _CV_BENCH_CATS:
         return s
     return cat.strip()
+
+
+def extract_mmsi_predicted_task(response: str) -> str:
+    """Parse STEP 1 task label from model output; returns normalized key in MMSI_TASK_NORM_SET or \"\"."""
+    if not response or not str(response).strip():
+        return ""
+    text = response.strip()
+    m = re.search(r"Task\s*Category\s*:?\s*\n?\s*([^\n]+)", text, re.IGNORECASE)
+    if m:
+        cand = _norm_mmsi_task(m.group(1))
+        if cand in MMSI_TASK_NORM_SET:
+            return cand
+    for line in text.split("\n"):
+        cand = _norm_mmsi_task(line.strip())
+        if cand in MMSI_TASK_NORM_SET:
+            return cand
+    return ""
 
 
 def extract_predicted_category(response: str, valid_cats: Optional[set] = None) -> str:

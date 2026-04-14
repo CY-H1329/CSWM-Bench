@@ -6,7 +6,8 @@ import os
 import io
 import base64
 import time
-from typing import Optional
+from typing import List, Optional, Sequence, Union
+
 from PIL import Image
 
 # Claude (Anthropic)
@@ -38,6 +39,32 @@ def _img_to_base64(image: Image.Image, fmt: str = "PNG") -> str:
     return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
 
 
+def _coerce_images(image: Union[Image.Image, Sequence[Image.Image]]) -> List[Image.Image]:
+    if isinstance(image, Image.Image):
+        return [image]
+    return [im for im in image if im is not None]
+
+
+def _stitch_images_vertical(images: List[Image.Image]) -> Image.Image:
+    """Stack images top-to-bottom (DeepSeek native vision: single image)."""
+    if len(images) == 1:
+        return images[0]
+    w = max(im.width for im in images)
+    resized: List[Image.Image] = []
+    for im in images:
+        if im.width != w:
+            nh = max(1, int(round(im.height * w / im.width)))
+            im = im.resize((w, nh), Image.Resampling.LANCZOS)
+        resized.append(im)
+    h = sum(im.height for im in resized)
+    out = Image.new("RGB", (w, h), (0, 0, 0))
+    y = 0
+    for im in resized:
+        out.paste(im, (0, y))
+        y += im.height
+    return out
+
+
 def _sanitize(s: str) -> str:
     return (s or "").replace("\u2028", " ").replace("\u2029", " ").strip()
 
@@ -55,30 +82,29 @@ class ClaudeRunner:
 
     def generate(
         self,
-        image: Image.Image,
+        image: Union[Image.Image, Sequence[Image.Image]],
         prompt: str,
         temperature: float = 0.0,
         max_tokens: int = 1024,
         **kwargs,
     ) -> str:
         prompt = _sanitize(prompt)
-        b64 = _img_to_base64(image)
+        images = _coerce_images(image)
+        content: List[dict] = []
+        for im in images:
+            b64 = _img_to_base64(im)
+            content.append(
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": "image/png", "data": b64},
+                }
+            )
+        content.append({"type": "text", "text": prompt})
         msg = self.client.messages.create(
             model=self.model_id,
             max_tokens=max_tokens,
             temperature=max(0.0, temperature),
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {"type": "base64", "media_type": "image/png", "data": b64},
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
+            messages=[{"role": "user", "content": content}],
         )
         return (msg.content[0].text if msg.content else "").strip()
 
@@ -122,27 +148,24 @@ class GPT4oRunner:
 
     def generate(
         self,
-        image: Image.Image,
+        image: Union[Image.Image, Sequence[Image.Image]],
         prompt: str,
         temperature: float = 0.0,
         max_tokens: int = 1024,
         **kwargs,
     ) -> str:
         prompt = _sanitize(prompt)
-        b64 = _img_to_base64(image)
+        images = _coerce_images(image)
+        parts = [
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{_img_to_base64(im)}"}}
+            for im in images
+        ]
+        parts.append({"type": "text", "text": prompt})
         mid = (self.model_id or "").lower()
         tok_param = {"max_completion_tokens": max_tokens} if "gpt-5" in mid else {"max_tokens": max_tokens}
         req = dict(
             model=self.model_id,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
+            messages=[{"role": "user", "content": parts}],
             **tok_param,
         )
         if not mid.startswith("gpt-5") and not mid.startswith("o1") and not mid.startswith("o3"):
@@ -192,31 +215,30 @@ class DeepSeekVLRunner:
 
     def generate(
         self,
-        image: Image.Image,
+        image: Union[Image.Image, Sequence[Image.Image]],
         prompt: str,
         temperature: float = 0.0,
         max_tokens: int = 1024,
         **kwargs,
     ) -> str:
         prompt = _sanitize(prompt)
-        b64 = _img_to_base64(image)
-
+        images = _coerce_images(image)
         if self._use_openrouter:
+            content = [
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{_img_to_base64(im)}"}}
+                for im in images
+            ]
+            content.append({"type": "text", "text": prompt})
             resp = self.client.chat.completions.create(
                 model=self.model_id,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                            {"type": "text", "text": prompt},
-                        ],
-                    }
-                ],
+                messages=[{"role": "user", "content": content}],
                 max_tokens=max_tokens,
                 temperature=max(0.0, temperature),
             )
             return (resp.choices[0].message.content or "").strip()
+
+        im_one = _stitch_images_vertical(images) if len(images) > 1 else images[0]
+        b64 = _img_to_base64(im_one)
 
         # api.deepseek.com : endpoint /v1/vision (chat/completions rejette image_url)
         url = f"{self.base_url}/v1/vision"
@@ -261,7 +283,7 @@ class OpenRouterRunner:
 
     def generate(
         self,
-        image: Image.Image,
+        image: Union[Image.Image, Sequence[Image.Image]],
         prompt: str,
         temperature: float = 0.0,
         max_tokens: int = 1024,
@@ -271,11 +293,12 @@ class OpenRouterRunner:
         if self.text_only:
             content = [{"type": "text", "text": prompt}]
         else:
-            b64 = _img_to_base64(image)
+            images = _coerce_images(image)
             content = [
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{_img_to_base64(im)}"}}
+                for im in images
             ]
+            content.append({"type": "text", "text": prompt})
         resp = self.client.chat.completions.create(
             model=self.model_id,
             messages=[{"role": "user", "content": content}],
@@ -298,19 +321,23 @@ class GeminiRunner:
 
     def generate(
         self,
-        image: Image.Image,
+        image: Union[Image.Image, Sequence[Image.Image]],
         prompt: str,
         temperature: float = 0.0,
         max_tokens: int = 1024,
         **kwargs,
     ) -> str:
         prompt = _sanitize(prompt)
-        buf = io.BytesIO()
-        image.save(buf, format="PNG")
-        img_part = types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png")
+        images = _coerce_images(image)
+        parts = []
+        for im in images:
+            buf = io.BytesIO()
+            im.save(buf, format="PNG")
+            parts.append(types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"))
+        parts.append(prompt)
         resp = self.client.models.generate_content(
             model=self.model_id,
-            contents=[img_part, prompt],
+            contents=parts,
             config=types.GenerateContentConfig(
                 max_output_tokens=max_tokens,
                 temperature=max(0.0, temperature),

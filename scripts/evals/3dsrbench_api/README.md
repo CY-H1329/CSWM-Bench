@@ -1,8 +1,8 @@
-# 3DSRBench & CV-Bench — API Models
+# 3DSRBench, CV-Bench & MMSI-Bench — API Models
 
-Évaluation des modèles API sur **3DSRBench** et **CV-Bench** (`--benchmark cvbench`). **Séparé** du code GPU existant (Qwen3, Sa2VA, LLaVA4D).
+Évaluation des modèles API sur **3DSRBench**, **CV-Bench** et **MMSI-Bench** (`--benchmark mmsibench`, multi-images HF `RunsenXu/MMSI-Bench`). **Séparé** du code GPU existant (Qwen3, Sa2VA, LLaVA4D).
 
-- **Push / pull, commandes séparées 3DSRBench vs CV-Bench, où lire les métriques par catégorie** → **[PUSH_PULL_AND_COMMANDS.md](PUSH_PULL_AND_COMMANDS.md)**
+- **Push / pull, commandes séparées (3DSRBench / CV-Bench / MMSI-Bench), métriques par catégorie** → **[PUSH_PULL_AND_COMMANDS.md](PUSH_PULL_AND_COMMANDS.md)**
 - **Par catégorie** : chaque `results.json` contient `per_category_answer_accuracy` (accuracy lettre MCQ par `category` / `task`). `summary.txt` reprend un tableau par modèle ; le terminal imprime aussi `Per-category (answer acc)`.
 
 ## Dépendances
@@ -23,7 +23,7 @@ pip install anthropic openai google-genai
 
 ## Usage
 
-**Référence complète (git + 3DSRBench seul + CV-Bench seul + catégories)** : [PUSH_PULL_AND_COMMANDS.md](PUSH_PULL_AND_COMMANDS.md)
+**Référence complète (git + benchmarks séparés + catégories)** : [PUSH_PULL_AND_COMMANDS.md](PUSH_PULL_AND_COMMANDS.md)
 
 ```bash
 # --- 3DSRBench seul (défaut : --benchmark 3dsrbench) ---
@@ -35,6 +35,11 @@ bash scripts/evals/3dsrbench_api/h100_run_gpt52_3dsrbench.sh
 python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark cvbench
 python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark cvbench --full_dataset --model gpt_5_2 --prompt_variant with_prompt
 bash scripts/evals/3dsrbench_api/h100_run_gpt52_cvbench.sh
+
+# --- MMSI-Bench seul (multi-image, HF uniquement) ---
+python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark mmsibench
+python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark mmsibench --full_dataset --model gpt_5_2 --prompt_variant with_prompt
+bash scripts/evals/3dsrbench_api/h100_run_gpt52_mmsibench.sh
 
 # 50 samples (3DSRBench)
 python scripts/evals/3dsrbench_api/run_eval_api.py --max_samples 50
@@ -80,6 +85,7 @@ Estimation par requête : ~1 500–2 000 tokens input (image + prompt), ~100 tok
 ```
 results/runs/3dsrbench/api_models/<timestamp>/   # ou full_dataset/ si --full_dataset
 results/runs/cvbench/api_models/<timestamp>/ # --benchmark cvbench
+results/runs/mmsibench/api_models/<timestamp>/ # --benchmark mmsibench
 ├── claude_sonnet_4_5_with_prompt/
 ├── claude_sonnet_4_5_without_prompt/
 ├── gpt4o_with_prompt/

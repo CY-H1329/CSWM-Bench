@@ -1,6 +1,6 @@
 """
-Unified loaders for all 4 benchmarks.
-Returns normalized format: image, question, options (list or None), answer, category (optional).
+Unified loaders for vision benchmarks (CV-Bench, 3DSRBench, MMSI-Bench, …).
+Returns normalized format: image(s), question, options (list or None), answer, category (optional).
 
 Supports frozen benchmarks: when use_frozen=True (default), loads from data/frozen_benchmarks/
 for reproducible paper experiments. Set use_frozen=False to load from HuggingFace with sampling.
@@ -55,7 +55,32 @@ BENCHMARK_CONFIGS = {
         "answer_key": "answer",
         "category_key": "category",
     },
+    # Multi-image spatial MCQ (HF decodes JPEGs). No frozen snapshot in repo.
+    "mmsibench": {
+        "name": "RunsenXu/MMSI-Bench",
+        "split": "test",
+        "images_key": "images",
+        "question_key": "question",
+        "answer_key": "answer",
+        "category_key": "question_type",
+        "answer_is_mcq_letter": True,
+    },
 }
+
+# Exact `question_type` strings on HuggingFace (RunsenXu/MMSI-Bench, test split).
+MMSI_BENCH_QUESTION_TYPES = (
+    "Attribute (Appr.)",
+    "Attribute (Meas.)",
+    "MSR",
+    "Motion (Cam.)",
+    "Motion (Obj.)",
+    "Positional Relationship (Cam.–Cam.)",
+    "Positional Relationship (Cam.–Obj.)",
+    "Positional Relationship (Cam.–Reg.)",
+    "Positional Relationship (Obj.–Obj.)",
+    "Positional Relationship (Obj.–Reg.)",
+    "Positional Relationship (Reg.–Reg.)",
+)
 
 
 def _fetch_image_from_url(url: str) -> Optional[Image.Image]:
@@ -144,9 +169,13 @@ def load_benchmark(
 
 
 def get_benchmark_image(example: Dict, benchmark: str) -> Optional[Image.Image]:
-    """Extract PIL Image from example."""
+    """Extract a single PIL Image (None for multi-image benchmarks — use get_benchmark_images)."""
     cfg = BENCHMARK_CONFIGS[benchmark]
-    img_key = cfg["image_key"]
+    if cfg.get("images_key"):
+        return None
+    img_key = cfg.get("image_key")
+    if not img_key:
+        return None
 
     if img_key == "image_url":
         url = example.get(img_key)
@@ -160,6 +189,28 @@ def get_benchmark_image(example: Dict, benchmark: str) -> Optional[Image.Image]:
     if hasattr(img, "convert"):
         return img.convert("RGB")
     return img
+
+
+def get_benchmark_images(example: Dict, benchmark: str) -> List[Image.Image]:
+    """All images for the example (MMSI-Bench: 2–10 frames). Single-image benchmarks return a list of length 1."""
+    cfg = BENCHMARK_CONFIGS[benchmark]
+    key = cfg.get("images_key")
+    if key:
+        raw = example.get(key) or []
+        out: List[Image.Image] = []
+        for im in raw:
+            if im is None:
+                continue
+            if hasattr(im, "convert"):
+                out.append(im.convert("RGB"))
+            elif isinstance(im, (bytes, bytearray)):
+                try:
+                    out.append(Image.open(io.BytesIO(im)).convert("RGB"))
+                except Exception:
+                    continue
+        return out
+    one = get_benchmark_image(example, benchmark)
+    return [one] if one is not None else []
 
 
 def get_benchmark_prompt(example: Dict, benchmark: str, include_options: bool = True) -> str:
@@ -200,6 +251,12 @@ def get_benchmark_answer(example: Dict, benchmark: str) -> str:
     ans_key = cfg["answer_key"]
     ans = example.get(ans_key) or ""
     s = str(ans).strip()
+    if cfg.get("answer_is_mcq_letter"):
+        u = s.upper()
+        for c in "ABCDEF":
+            if u == c or u.startswith(f"{c}:") or u.startswith(f"{c})"):
+                return c
+        return u[:1] if u and u[0] in "ABCDEF" else ""
     # Benchmarks with options: extract letter (CV-Bench uses "(C)")
     if cfg.get("options_key") or cfg.get("options_keys"):
         for c in "ABCDEF":

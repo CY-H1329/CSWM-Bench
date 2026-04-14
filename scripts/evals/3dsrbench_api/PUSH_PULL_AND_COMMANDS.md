@@ -86,6 +86,20 @@ bash scripts/evals/3dsrbench_api/h100_run_gpt52_cvbench.sh
 
 ---
 
+## 4b. MMSI-Bench seul (API, multi-images)
+
+Dataset Hugging Face : `RunsenXu/MMSI-Bench` (1000 questions, plusieurs images par item). Pas de frozen local dans ce dépôt. Sorties : `results/runs/mmsibench/api_models/...`
+
+```bash
+python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark mmsibench
+python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark mmsibench --full_dataset --model gpt_5_2 --prompt_variant with_prompt
+bash scripts/evals/3dsrbench_api/h100_run_gpt52_mmsibench.sh
+```
+
+Les modèles **Claude / GPT / Gemini / OpenRouter** envoient toutes les images dans un même message. **DeepSeek** (`api.deepseek.com` /v1/vision) : les images sont **concaténées verticalement** en une seule si plusieurs cadres.
+
+---
+
 ## 5. Résultats **par catégorie** (tâche)
 
 Pour **chaque** benchmark, le script affiche dans le terminal des lignes du type :
@@ -107,7 +121,8 @@ cat "$RUN/results.json" | python3 -c "import json,sys; d=json.load(sys.stdin); p
 ```
 
 CV-Bench : catégories **Count**, **Relation**, **Depth**, **Distance** (colonne `task` du dataset).  
-3DSRBench : catégories fines du benchmark (ex. `location_above`, …).
+3DSRBench : catégories fines du benchmark (ex. `location_above`, …).  
+MMSI-Bench : 11 valeurs `question_type` du HF (ex. `Motion (Cam.)`, `MSR`, `Positional Relationship (Cam.–Cam.)`, …).
 
 ---
 
@@ -118,4 +133,5 @@ Un lancement = un `--benchmark`. Pour enchaîner les deux :
 ```bash
 python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark 3dsrbench --full_dataset --model gpt_5_2 --prompt_variant with_prompt
 python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark cvbench     --full_dataset --model gpt_5_2 --prompt_variant with_prompt
+python scripts/evals/3dsrbench_api/run_eval_api.py --benchmark mmsibench --full_dataset --model gpt_5_2 --prompt_variant with_prompt
 ```
