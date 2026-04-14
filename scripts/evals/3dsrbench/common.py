@@ -20,6 +20,9 @@ DSR3BENCH_TASK_CATEGORIES = [
     "multi_object_parallel",
 ]
 
+# CV-Bench task column (`task` on HF): Count, Relation, Depth, Distance
+CV_BENCH_TASK_CATEGORIES = ["Count", "Relation", "Depth", "Distance"]
+
 
 def build_spatial_prompt(question: str, task_category: Optional[str] = None) -> str:
     """
@@ -97,6 +100,75 @@ Step-by-Step Reasoning:
 
 Final Answer:
 (Answer letter in parentheses, e.g. (A), (B), (C), or (D))
+
+---
+
+# QUESTION
+
+{question}
+"""
+
+
+def build_cvbench_prompt(question: str, task_category: Optional[str] = None) -> str:
+    """CV-Bench MCQ prompt — model infers task type (4 categories), analogous to 3DSRBench."""
+    cats = "\n".join(f"- {c}" for c in CV_BENCH_TASK_CATEGORIES)
+    return f"""# ROLE
+You are an expert in computer vision and spatial reasoning (CV-Bench style).
+Your objective is to answer multiple-choice questions about the image accurately.
+
+---
+
+# INPUT
+You will receive:
+- An image
+- A question with options A/B/C/D
+
+---
+
+# STEP 1 — TASK CLASSIFICATION
+
+Classify the question into exactly ONE of the following CV-Bench task types:
+
+{cats}
+
+Rules:
+- Select only one type.
+- Choose the type that best describes what the question asks (counting, spatial relation, depth ordering, distance).
+- Do not skip this step.
+
+---
+
+# STEP 2 — TASK-SPECIFIC PLAN
+
+Based on the selected type, outline briefly how you will use the image to decide.
+
+---
+
+# STEP 3 — STEP-BY-STEP REASONING
+
+Analyze the image and reason step by step. Do not guess without looking.
+
+---
+
+# STEP 4 — FINAL ANSWER
+
+For multiple choice: reply with **Final Answer: (X)** where X is A, B, C, or D.
+
+---
+
+# OUTPUT FORMAT (MANDATORY)
+
+Task Category:
+<One of: Count, Relation, Depth, Distance>
+
+Reasoning Plan:
+<Brief plan>
+
+Step-by-Step Reasoning:
+<Steps>
+
+Final Answer:
+(Letter in parentheses, e.g. (A), (B), (C), or (D))
 
 ---
 

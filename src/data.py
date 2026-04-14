@@ -193,13 +193,19 @@ _3DSRBENCH_CATS = frozenset({
     "location_next_to", "multi_object_parallel",
 })
 
+# CV-Bench `task` values (normalized to lowercase underscored)
+_CV_BENCH_CATS = frozenset({"count", "relation", "depth", "distance"})
+CV_BENCH_CLASSIFICATION_CATS = _CV_BENCH_CATS  # pass to extract_predicted_category(valid_cats=...)
+
 
 def normalize_category(cat: str) -> str:
-    """Normalize 3DSRBench category for comparison (12 fine-grained categories)."""
+    """Normalize benchmark task/category for comparison (3DSRBench + CV-Bench)."""
     if not cat or not str(cat).strip():
         return ""
     s = str(cat).strip().lower().replace(" ", "_").replace("-", "_")
     if s in _3DSRBENCH_CATS:
+        return s
+    if s in _CV_BENCH_CATS:
         return s
     return cat.strip()
 
