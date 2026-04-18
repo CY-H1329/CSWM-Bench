@@ -12,8 +12,10 @@ Usage:
   python scripts/evals/mas_pipeline/run_eval_mas.py --test
   python scripts/evals/mas_pipeline/run_eval_mas.py --max_samples 50
   python scripts/evals/mas_pipeline/run_eval_mas.py --full_dataset
+  # Head = LLaVA-NeXT-7B (GPU), sans clé OpenAI pour le Head :
+  python scripts/evals/mas_pipeline/run_eval_mas.py --config scripts/evals/mas_pipeline/config_mas_head_llava_next.yaml --test
 
-Env: OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, DEEPSEEK_API_KEY, OPENROUTER_API_KEY
+Env (API head): OPENAI_API_KEY. Head GPU: pas de clé. Reasoning GPU: CUDA. API specialists: clés habituelles.
 """
 import argparse
 import json
@@ -73,14 +75,33 @@ def _norm_answer(s: str) -> str:
 
 def build_runners(config: dict):
     """Build Head, Specialist, and Reasoning runners from config.
+    Head: API (OpenAI) or GPU (LLaVA-NeXT / Qwen3-VL via backend).
     Specialists: GPU (qwen3_4b, sa2va, llava4d) on H100, API for claude/gpt4o/gemini.
     """
     head_cfg = config.get("head_agent", {})
-    head_key = os.environ.get(head_cfg.get("api_key_env", ""), "").strip()
-    head_runner = GPT4oRunner(
-        model_id=head_cfg.get("model_id", "gpt-4o"),
-        api_key=head_key,
-    ) if head_key else None
+    head_runner = None
+    head_runner_type = head_cfg.get("runner", "api")
+
+    if head_runner_type == "gpu" and GPU_AVAILABLE:
+        device = head_cfg.get("device", "cuda")
+        model_id = head_cfg.get("model_id", "llava-hf/llava-v1.6-mistral-7b-hf")
+        backend = head_cfg.get("backend", "llava").lower()
+        try:
+            if backend == "llava" and LLaVARunner:
+                head_runner = LLaVARunner(model_id=model_id, device=device)
+            elif backend == "qwen3" and Qwen3Runner:
+                head_runner = Qwen3Runner(model_id=model_id, device=device)
+            else:
+                print(f"[skip] Head GPU: unknown backend {backend!r} (use llava or qwen3)")
+        except Exception as e:
+            print(f"[skip] Head GPU ({backend}): {e}")
+    else:
+        head_key = os.environ.get(head_cfg.get("api_key_env", ""), "").strip()
+        if head_key:
+            head_runner = GPT4oRunner(
+                model_id=head_cfg.get("model_id", "gpt-4o"),
+                api_key=head_key,
+            )
 
     reason_cfg = config.get("reasoning_agent", {})
     reason_runner = None
@@ -156,7 +177,10 @@ def main():
 
     head_runner, specialist_runners, reason_runner = build_runners(config)
     if not head_runner:
-        print("ERROR: Head runner (OPENAI_API_KEY) required.")
+        print(
+            "ERROR: Head runner missing. Either set head_agent.runner: gpu + CUDA + LLaVA/Qwen3, "
+            "or set OPENAI_API_KEY for API head (see config_mas.yaml / config_mas_head_llava_next.yaml)."
+        )
         sys.exit(1)
     if not reason_runner:
         print("ERROR: Reasoning runner required. Set runner: gpu in config or DEEPSEEK_API_KEY for API.")
@@ -177,6 +201,9 @@ def main():
     run_dir.mkdir(parents=True, exist_ok=True)
 
     def head_gen(img: Image.Image, prompt: str) -> str:
+        mod = type(head_runner).__module__ or ""
+        if "src.models" in mod:
+            return head_runner.generate(img, prompt, max_new_tokens=2048)
         return head_runner.generate(img, prompt, max_tokens=2048)
 
     def spec_gen(agent_name: str, img: Image.Image, prompt: str) -> str:
