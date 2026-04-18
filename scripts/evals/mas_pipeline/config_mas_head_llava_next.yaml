@@ -1,5 +1,9 @@
 # Spatial MAS — Head-Agent = LLaVA-NeXT-7B (GPU, HuggingFace Transformers)
-# mas_pipeline_version: head-llava-next-7b-2026.04.02
+# mas_pipeline_version: head-llava-next-7b-cvbench-full-hf-2026.04.03
+#
+# CV-Bench « full » (split HF test ~2638) :
+#   python .../run_eval_mas.py --config .../config_mas_head_llava_next.yaml --benchmark cvbench --full_dataset
+# Sans --full_dataset : sous-échantillon (max_samples) ou frozen cvbench_400 si présent sur disque.
 #
 # HF: llava-hf/llava-v1.6-mistral-7b-hf (LLaVA-1.6 / NeXT, 7B, Mistral backbone)
 # Alternative Vicuna backbone: llava-hf/llava-v1.6-vicuna-7b-hf
@@ -54,3 +58,4 @@ dataset:
 
 output:
   dir: "results/runs/mas_pipeline"
+  # Run full HF CV-Bench : sortie sous results/runs/mas_pipeline/full_cvbench_hf/

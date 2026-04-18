@@ -14,6 +14,8 @@ Usage:
   python scripts/evals/mas_pipeline/run_eval_mas.py --full_dataset
   # Head = LLaVA-NeXT-7B (GPU), sans clé OpenAI pour le Head :
   python scripts/evals/mas_pipeline/run_eval_mas.py --config scripts/evals/mas_pipeline/config_mas_head_llava_next.yaml --test
+  # CV-Bench split HF complet (~2638) :
+  python scripts/evals/mas_pipeline/run_eval_mas.py --config scripts/evals/mas_pipeline/config_mas_head_llava_next.yaml --benchmark cvbench --full_dataset
 
 Env (API head): OPENAI_API_KEY. Head GPU: pas de clé. Reasoning GPU: CUDA. API specialists: clés habituelles.
 """
@@ -192,13 +194,21 @@ def main():
     )
     benchmark = args.benchmark or ds_cfg.get("benchmark", "cvbench")
     seed = args.seed or ds_cfg.get("seed", 42)
-
-    ds = load_benchmark(benchmark, max_samples=max_samples, seed=seed)
+    # Full benchmark split from HuggingFace (e.g. CV-Bench ~2638), not frozen local snapshot
+    use_frozen = not args.full_dataset
 
     out_dir = Path(config.get("output", {}).get("dir", "results/runs/mas_pipeline"))
-    subdir = "test" if args.test else ("full" if args.full_dataset else datetime.now().strftime("%Y%m%d_%H%M%S"))
+    subdir = "test" if args.test else (
+        f"full_{benchmark}_hf" if args.full_dataset else datetime.now().strftime("%Y%m%d_%H%M%S")
+    )
     run_dir = Path(out_dir) / subdir
     run_dir.mkdir(parents=True, exist_ok=True)
+
+    ds = load_benchmark(benchmark, max_samples=max_samples, seed=seed, use_frozen=use_frozen)
+    print(
+        f"[dataset] benchmark={benchmark}  n={len(ds)}  use_frozen={use_frozen}  "
+        f"max_samples={max_samples}  out={run_dir}"
+    )
 
     def head_gen(img: Image.Image, prompt: str) -> str:
         mod = type(head_runner).__module__ or ""
