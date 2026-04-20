@@ -15,6 +15,17 @@ except ImportError:
     pipeline = None
 
 
+def _normalize_image_for_deepseek_vl(image: Image.Image, target: int = 1024) -> Image.Image:
+    """
+    DeepSeek-VL hybrid uses SAM for high-res patches; it requires exact spatial size (e.g. 1024×1024).
+    CV-Bench images can be 1023×1023 or other sizes → ValueError in patch_embed without resize.
+    """
+    img = image.convert("RGB")
+    if img.size == (target, target):
+        return img
+    return img.resize((target, target), Image.Resampling.LANCZOS)
+
+
 class DeepSeekVLRunner:
     """GPU runner for DeepSeek-VL (open-source)."""
 
@@ -50,6 +61,7 @@ class DeepSeekVLRunner:
         top_p: float = 0.0,
         **kwargs,
     ) -> str:
+        image = _normalize_image_for_deepseek_vl(image)
         # Pipeline: try PIL in content first, else data URL
         messages = [
             {
