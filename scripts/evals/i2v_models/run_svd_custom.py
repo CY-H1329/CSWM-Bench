@@ -4,8 +4,8 @@ Custom qualitative I2V runner (SVD) for user-provided images.
 
 This is designed for "human-in-the-loop" comparison (no automatic scoring):
 - You provide one or more images
-- You provide one or more action prompts (text)
-- It generates one video per (image, prompt)
+- You provide one or more action prompts (text) **as labels**
+- It generates one video per (image, prompt label) but **SVD ignores text**
 
 Outputs:
   results/runs/i2v/svd_custom/<timestamp>/
@@ -53,7 +53,12 @@ def _save_mp4(frames: List[np.ndarray], out_path: Path, fps: int) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--image", action="append", required=True, help="Path to an input image (can repeat)")
-    ap.add_argument("--prompt", action="append", required=True, help="Action prompt text (can repeat)")
+    ap.add_argument(
+        "--prompt",
+        action="append",
+        required=True,
+        help="Action prompt text label (can repeat). NOTE: SVD does NOT condition on text; prompts are saved only for your comparison/viewer.",
+    )
     ap.add_argument("--group", default="custom", help="Group name (door/cup/...) for filenames")
     ap.add_argument("--model_id", default="stabilityai/stable-video-diffusion-img2vid-xt")
     ap.add_argument("--fps", type=int, default=8)
@@ -98,13 +103,14 @@ def main() -> None:
             im = Image.open(im_path).convert("RGB")
             for j, prompt in enumerate(args.prompt):
                 job_key = f"{args.group}_p{j+1}"
+                # Stable Video Diffusion (SVD) is image-conditioned only; it ignores text prompts.
+                # We keep `prompt` in the manifest so you can visually compare outputs across labels.
                 gen = pipe(
                     image=im,
-                    prompt=prompt,
                     num_frames=args.num_frames,
                     motion_bucket_id=args.motion_bucket_id,
                     noise_aug_strength=args.noise_aug_strength,
-                    generator=torch.Generator(device=args.device).manual_seed(args.seed),
+                    generator=torch.Generator(device=args.device).manual_seed(args.seed + j),
                 )
                 frames = gen.frames[0]
                 frames_np = [np.asarray(fr.convert("RGB")) for fr in frames]

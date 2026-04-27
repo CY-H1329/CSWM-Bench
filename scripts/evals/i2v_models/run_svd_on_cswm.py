@@ -118,9 +118,9 @@ def main() -> None:
 
             for j in jobs:
                 im = _load_image(j["image"])
+                # SVD is image-conditioned only (no text). Keep prompt in manifest only.
                 gen = pipe(
                     image=im,
-                    prompt=j["prompt"],
                     num_frames=args.num_frames,
                     motion_bucket_id=args.motion_bucket_id,
                     noise_aug_strength=args.noise_aug_strength,
