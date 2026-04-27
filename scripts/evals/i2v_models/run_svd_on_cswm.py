@@ -107,10 +107,11 @@ def main() -> None:
                     {"key": "case1", "image": imgs[0], "prompt": "A door opens to 90 degrees."},
                     {"key": "case2", "image": imgs[1], "prompt": "A door opens to 90 degrees."},
                 ]
-            elif task == "B" and len(imgs) == 1:
+            elif task == "B" and len(imgs) == 2:
+                # Same action prompt; only the image differs slightly.
                 jobs = [
-                    {"key": "push2", "image": imgs[0], "prompt": "A hand pushes the cup 2cm to the right."},
-                    {"key": "push6", "image": imgs[0], "prompt": "A hand pushes the cup 6cm to the right."},
+                    {"key": "case1", "image": imgs[0], "prompt": "A hand pushes the cup 4cm to the right."},
+                    {"key": "case2", "image": imgs[1], "prompt": "A hand pushes the cup 4cm to the right."},
                 ]
             else:
                 continue

@@ -108,15 +108,21 @@ def _score_item(item: Dict[str, Any], pred_obj: Dict[str, Any]) -> Dict[str, Any
         return out
 
     if task == "B":
-        gt_label = gt.get("divergence_label")
+        # Task B is now a pair with same action, like Task A.
+        gt_div = gt.get("divergence")
+        gt_c1 = gt.get("case1_outcome")
+        gt_c2 = gt.get("case2_outcome")
         gt_reason = gt.get("reason_label")
 
-        pr_label = str(pred_obj.get("divergence_label", "")).strip()
+        pr_div = str(pred_obj.get("divergence", "")).strip().lower()
+        pr_c1 = str(pred_obj.get("case1_outcome", "")).strip().lower()
+        pr_c2 = str(pred_obj.get("case2_outcome", "")).strip().lower()
         pr_reason = str(pred_obj.get("reason_label", "")).strip()
 
-        out["divergence_correct"] = (pr_label == gt_label)
+        out["divergence_correct"] = (pr_div == str(gt_div).strip().lower())
+        out["outcomes_correct"] = (pr_c1 == str(gt_c1).strip().lower() and pr_c2 == str(gt_c2).strip().lower())
         out["reason_correct"] = (pr_reason == gt_reason)
-        out["all_correct"] = out["divergence_correct"] and out["reason_correct"]
+        out["all_correct"] = out["divergence_correct"] and out["outcomes_correct"] and out["reason_correct"]
         return out
 
     out["error"] = f"unknown_task:{task}"

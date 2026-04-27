@@ -238,41 +238,59 @@ def build_items(n_a: int = 24, n_b: int = 24, seed: int = 42) -> List[Item]:
             )
         )
 
-    # Task B: single image
-    # We sample edge distances to produce all three GT classes.
-    # - edge_cm in (6.5..9.0) => both_safe for pushes 2/6
-    # - edge_cm in (0.5..1.8) => both_fall
-    # - edge_cm in (2.5..5.5) => threshold crossing (2 safe, 6 fall)
-    bands = [
-        ("both_safe", (6.5, 9.0)),
-        ("both_fall", (0.8, 1.8)),
-        ("push2_safe_push6_fall", (2.5, 5.5)),
-    ]
+    # Task B: contrastive pair of images, SAME action.
+    # We create two nearly identical scenes where only edge distance differs around a threshold.
+    # Action is fixed: push 4cm to the right.
+    push_cm = 4.0
     for i in range(n_b):
         base_seed = rng.randint(0, 10_000_000)
-        tgt, (lo, hi) = bands[i % len(bands)]
-        edge_cm = rng.uniform(lo, hi)
-        im, meta = _task_b_scene(edge_cm=edge_cm, seed=base_seed)
-        assert meta["gt"] == tgt
-        rel = Path("data/cswmbench/images") / f"B_{i:03d}.png"
-        p = _save(im, rel)
 
-        gt = {"divergence_label": meta["gt"], "reason_label": meta["reason_label"], "edge_cm": edge_cm}
+        # Place one cup slightly farther than push (safe), and the other slightly closer (fall).
+        # Keep deltas small to enforce "minimal scene difference".
+        delta = rng.uniform(0.3, 0.8)
+        edge_safe = push_cm + delta
+        edge_fall = max(0.6, push_cm - delta)
+
+        # Randomize which case is safe to avoid positional shortcuts.
+        safe_is_case1 = bool(rng.getrandbits(1))
+        edge1 = edge_safe if safe_is_case1 else edge_fall
+        edge2 = edge_fall if safe_is_case1 else edge_safe
+
+        im1, meta1 = _task_b_scene(edge_cm=edge1, seed=base_seed)
+        im2, meta2 = _task_b_scene(edge_cm=edge2, seed=base_seed)
+
+        # Outcomes for the fixed push_cm (we ignore the drawn 2/6 arrows; they're still useful context).
+        out1 = "fall" if push_cm >= edge1 else "safe"
+        out2 = "fall" if push_cm >= edge2 else "safe"
+
+        rel1 = Path("data/cswmbench/images") / f"B_{i:03d}_case1.png"
+        rel2 = Path("data/cswmbench/images") / f"B_{i:03d}_case2.png"
+        p1 = _save(im1, rel1)
+        p2 = _save(im2, rel2)
+
+        gt = {
+            "divergence": "different" if out1 != out2 else "same",
+            "case1_outcome": out1,
+            "case2_outcome": out2,
+            "reason_label": "threshold_crossing",
+            "push_cm": push_cm,
+            "edge_cm_case1": edge1,
+            "edge_cm_case2": edge2,
+        }
         prompt = (
-            "You are shown ONE image. A cup is on a table near the right edge.\n"
-            "Two actions are considered: push 2cm to the right vs push 6cm to the right.\n\n"
-            "Choose ONE label:\n"
-            "- both_safe\n"
-            "- both_fall\n"
-            "- push2_safe_push6_fall\n\n"
-            "Reason labels: [threshold_crossing, insufficient_displacement, both_cross_edge_threshold]\n\n"
-            "Return ONLY strict JSON with keys: divergence_label, reason_label."
+            "You are shown TWO images (case1, case2). The scenes differ only slightly.\n"
+            f"Action (SAME for both cases): push the cup {push_cm:.0f}cm to the right.\n\n"
+            "Question: Do the outcomes differ between case1 and case2?\n\n"
+            "Choose divergence: [same, different]\n"
+            "Outcome labels per case: [safe, fall]\n"
+            "Reason labels: [threshold_crossing]\n\n"
+            "Return ONLY strict JSON with keys: divergence, case1_outcome, case2_outcome, reason_label."
         )
         items.append(
             Item(
                 id=f"cswm_B_{i:03d}",
                 task="B",
-                images=[p],
+                images=[p1, p2],
                 prompt=prompt,
                 gt=gt,
                 category="marginal_consequence",
