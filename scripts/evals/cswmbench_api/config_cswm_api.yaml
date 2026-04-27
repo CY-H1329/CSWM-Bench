@@ -1,0 +1,41 @@
+# CSWM-Bench (toy) — API models config
+#
+# Keys:
+# - OPENAI_API_KEY (OpenAI)
+# - GEMINI_API_KEY (Gemini)
+# - ANTHROPIC_API_KEY (Claude)
+# - OPENROUTER_API_KEY (OpenRouter; optional, for Qwen3-VL via OpenRouter)
+#
+# For Qwen3-VL via an OpenAI-compatible endpoint other than OpenRouter,
+# set api_runner=openai_compatible, base_url, api_key_env accordingly.
+
+models:
+  gpt4o:
+    enabled: true
+    model_id: "gpt-4o"
+    api_key_env: "OPENAI_API_KEY"
+  gpt_5_2:
+    enabled: false
+    model_id: "gpt-5.2"
+    api_key_env: "OPENAI_API_KEY"
+  claude_sonnet_4_5:
+    enabled: false
+    model_id: "claude-sonnet-4-5-20250929"
+    api_key_env: "ANTHROPIC_API_KEY"
+  gemini_robotics_er:
+    enabled: false
+    model_id: "gemini-2.0-flash"
+    api_key_env: "GEMINI_API_KEY"
+
+  # Example: Qwen3-VL API via OpenRouter (vision-capable).
+  # If you use DashScope or another provider, change base_url + api_key_env.
+  qwen3_vl_32b_instruct:
+    enabled: false
+    api_runner: "openai_compatible"
+    base_url: "https://openrouter.ai/api/v1"
+    model_id: "qwen/qwen2.5-vl-32b-instruct"
+    api_key_env: "OPENROUTER_API_KEY"
+
+output:
+  dir: "results"
+
