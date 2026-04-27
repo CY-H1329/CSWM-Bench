@@ -1,0 +1,21 @@
+models:
+  gpt4o:
+    enabled: true
+    model_id: "gpt-4o"
+    api_key_env: "OPENAI_API_KEY"
+  gpt_5_2:
+    enabled: false
+    model_id: "gpt-5.2"
+    api_key_env: "OPENAI_API_KEY"
+  claude_sonnet_4_5:
+    enabled: false
+    model_id: "claude-sonnet-4-5-20250929"
+    api_key_env: "ANTHROPIC_API_KEY"
+  gemini_robotics_er:
+    enabled: false
+    model_id: "gemini-2.0-flash"
+    api_key_env: "GEMINI_API_KEY"
+
+output:
+  dir: "results"
+
