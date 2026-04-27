@@ -20,6 +20,7 @@ results/
 results_summary/
 data/cswmbench/images/
 data/cswmbench/*.jsonl
+data/cswmbench_wm/
 
 # Secrets
 .env
