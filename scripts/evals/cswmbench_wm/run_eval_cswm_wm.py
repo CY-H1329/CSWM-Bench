@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
-from predictors import OraclePredictor, RandomPredictor
+from predictors import OraclePredictor, RandomPredictor, LearnedMLPPredictor
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -77,9 +77,11 @@ def _aggregate(scores: List[Dict[str, Any]]) -> Dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="CSWM-Bench WM track eval")
     parser.add_argument("--data", default=str(ROOT / "data" / "cswmbench_wm" / "cswmbench_wm.jsonl"))
-    parser.add_argument("--predictor", choices=["oracle", "random"], default="oracle")
+    parser.add_argument("--predictor", choices=["oracle", "random", "mlp"], default="oracle")
     parser.add_argument("--max_samples", type=int, default=200)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--ckpt", default=str(ROOT / "results" / "runs" / "cswmbench_wm_models" / "mlp_multihead" / "ckpt.pt"))
+    parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
 
     data = _read_jsonl(Path(args.data))
@@ -88,8 +90,10 @@ def main() -> None:
 
     if args.predictor == "oracle":
         pred = OraclePredictor()
-    else:
+    elif args.predictor == "random":
         pred = RandomPredictor(seed=args.seed)
+    else:
+        pred = LearnedMLPPredictor(checkpoint_path=args.ckpt, device=args.device)
 
     details = []
     scores = []

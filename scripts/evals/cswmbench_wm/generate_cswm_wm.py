@@ -26,38 +26,50 @@ def _mk_task_a(rng: random.Random, i: int) -> Dict:
     r = 1.0
     box_size = (0.35, 0.35)
 
-    # Case1: inside arc (hit) — near the hinge within radius.
-    s1 = DoorState(
-        door_radius=r,
-        box_center=(rng.uniform(0.25, 0.55), rng.uniform(0.25, 0.55)),
-        box_size=box_size,
-    )
-    out1, reason1 = door_outcome_at_90(s1)
+    # Randomize which case is the "hit" one to make reason_label meaningful.
+    hit_is_case1 = bool(rng.getrandbits(1))
 
-    # Case2: outside arc (clear)
-    s2 = DoorState(
-        door_radius=r,
-        box_center=(rng.uniform(0.95, 1.25), rng.uniform(0.95, 1.25)),
-        box_size=box_size,
-    )
-    out2, reason2 = door_outcome_at_90(s2)
+    def sample_hit_state() -> DoorState:
+        return DoorState(
+            door_radius=r,
+            box_center=(rng.uniform(0.25, 0.55), rng.uniform(0.25, 0.55)),
+            box_size=box_size,
+        )
 
-    # We want divergence by construction; resample until holds.
-    tries = 0
-    while out1 == out2 and tries < 50:
-        s2 = DoorState(
+    def sample_clear_state() -> DoorState:
+        return DoorState(
             door_radius=r,
             box_center=(rng.uniform(0.95, 1.35), rng.uniform(0.95, 1.35)),
             box_size=box_size,
         )
-        out2, reason2 = door_outcome_at_90(s2)
+
+    if hit_is_case1:
+        s1 = sample_hit_state()
+        s2 = sample_clear_state()
+    else:
+        s1 = sample_clear_state()
+        s2 = sample_hit_state()
+
+    out1, _ = door_outcome_at_90(s1)
+    out2, _ = door_outcome_at_90(s2)
+
+    # We want divergence by construction; resample until holds.
+    tries = 0
+    while out1 == out2 and tries < 50:
+        # Resample the "clear" state if needed.
+        if hit_is_case1:
+            s2 = sample_clear_state()
+        else:
+            s1 = sample_clear_state()
+        out1, _ = door_outcome_at_90(s1)
+        out2, _ = door_outcome_at_90(s2)
         tries += 1
 
     gt = {
         "divergence": divergence_same_or_different(out1, out2),
         "case1_outcome": out1,
         "case2_outcome": out2,
-        "reason_label": "collision_with_swing_arc",
+        "reason_label": "case1_collision" if hit_is_case1 else "case2_collision",
     }
     return {
         "id": f"cswm_wm_A_{i:04d}",

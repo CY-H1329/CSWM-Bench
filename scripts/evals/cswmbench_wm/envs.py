@@ -24,7 +24,7 @@ def door_outcome_at_90(state: DoorState) -> Tuple[str, str]:
       - hit: door sweep intersects box
       - clear: no intersection
 
-    Reason labels (coarse):
+    Reason labels (coarse, for single-state outcome):
       - collision_with_swing_arc
       - outside_swing_arc
     """
