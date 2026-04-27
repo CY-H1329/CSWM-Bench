@@ -21,6 +21,8 @@ results_summary/
 data/cswmbench/images/
 data/cswmbench/*.jsonl
 data/cswmbench_wm/
+data/cswmbench_phyre/
+reports/
 
 # Secrets
 .env
