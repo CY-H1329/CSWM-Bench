@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import html
 import json
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -30,19 +31,25 @@ def _read_jsonl(path: Path) -> List[Dict[str, Any]]:
     return out
 
 
-def _rel_to_reports(rel_path: str, out_dir: Path) -> str:
+def _copy_image(rel_path: str, images_dir: Path) -> str:
     """
-    Convert repo-relative image path to a relative path from out_dir.
-    We keep references to files in-place (no copying).
+    Make viewer portable: copy images into <viewer>/images/ and reference them locally.
+    Returns a relative path like "images/<name>.png".
     """
-    img_abs = (ROOT / rel_path).resolve()
-    return html.escape(str(img_abs.relative_to(out_dir.resolve().parent.parent))) if False else html.escape(rel_path)
+    src = (ROOT / rel_path).resolve()
+    name = Path(rel_path).name
+    dst = images_dir / name
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if not dst.exists():
+        shutil.copy2(src, dst)
+    return f"images/{name}"
 
 
-def _img_tag(rel_path: str, max_w: int = 420) -> str:
-    # Use repo-relative path; viewer is placed under reports/ -> go up two levels.
-    src = f"../../{rel_path}"
-    return f'<img src="{html.escape(src)}" style="max-width:{max_w}px;width:100%;border-radius:10px;border:1px solid #2a2a2a;" />'
+def _img_tag(local_rel: str, max_w: int = 420) -> str:
+    return (
+        f'<img src="{html.escape(local_rel)}" '
+        f'style="max-width:{max_w}px;width:100%;border-radius:10px;border:1px solid #2a2a2a;" />'
+    )
 
 
 def main() -> None:
@@ -52,7 +59,9 @@ def main() -> None:
 
     items = _read_jsonl(data_path)
     out_dir = ROOT / "reports" / "cswmbench_api_viewer"
+    images_dir = out_dir / "images"
     out_dir.mkdir(parents=True, exist_ok=True)
+    images_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "index.html"
 
     cards = []
@@ -65,14 +74,17 @@ def main() -> None:
         prompt = ex.get("prompt", "")
 
         if len(imgs) == 2:
+            p1 = _copy_image(imgs[0], images_dir)
+            p2 = _copy_image(imgs[1], images_dir)
             imgs_html = (
                 '<div class="imggrid">'
-                f'<div><div class="label">case1</div>{_img_tag(imgs[0])}</div>'
-                f'<div><div class="label">case2</div>{_img_tag(imgs[1])}</div>'
+                f'<div><div class="label">case1</div>{_img_tag(p1)}</div>'
+                f'<div><div class="label">case2</div>{_img_tag(p2)}</div>'
                 "</div>"
             )
         elif len(imgs) == 1:
-            imgs_html = f'<div class="imggrid one">{_img_tag(imgs[0], max_w=520)}</div>'
+            p = _copy_image(imgs[0], images_dir)
+            imgs_html = f'<div class="imggrid one">{_img_tag(p, max_w=520)}</div>'
         else:
             imgs_html = '<div class="muted">No images</div>'
 
