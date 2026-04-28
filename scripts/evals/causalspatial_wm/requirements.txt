@@ -1,0 +1,17 @@
+torch>=2.1.0
+torchvision>=0.16.0
+transformers>=4.45.0
+datasets>=2.20.0
+huggingface_hub>=0.24.0
+accelerate>=0.33.0
+diffusers>=0.30.0
+safetensors>=0.4.3
+
+pillow>=10.4.0
+opencv-python>=4.10.0.84
+numpy>=1.26.4
+pandas>=2.2.2
+tqdm>=4.66.4
+pyyaml>=6.0.2
+imageio>=2.34.2
+imageio-ffmpeg>=0.5.1
