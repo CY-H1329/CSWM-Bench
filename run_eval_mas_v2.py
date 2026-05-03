@@ -26,6 +26,7 @@ Test-only (no train split):
 import argparse
 import json
 import logging
+import os
 import random
 import sys
 import warnings
@@ -288,6 +289,7 @@ def run_test_only(
     verbose: bool = True,
     updater=None,
     use_frozen: bool = True,
+    timing_log_path: Optional[str] = None,
 ):
     """Run MAS v2 pipeline on N samples.
 
@@ -316,6 +318,18 @@ def run_test_only(
     logger.info("=" * 60)
     logger.info("TESTING (%d samples, random_agents=%s, tto_updates=%s)", len(dataset), use_random, updater is not None)
     logger.info("=" * 60)
+
+    ts = None
+    out_path = None
+    if output_dir:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = Path(output_dir) / ts
+        out_path.mkdir(parents=True, exist_ok=True)
+
+    tl_path = timing_log_path
+    if tl_path is None and out_path is not None:
+        tl_path = str(out_path / "mas_timing.jsonl")
+
     results = run_test(
         dataset=dataset,
         benchmark=benchmark,
@@ -328,6 +342,7 @@ def run_test_only(
         verbose=verbose,
         updater=updater,
         update_scores=updater is not None,
+        timing_log_path=tl_path,
     )
     metrics = compute_accuracy(results)
     logger.info(
@@ -336,10 +351,7 @@ def run_test_only(
         metrics["correct"], metrics["total"],
     )
 
-    if output_dir:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_path = Path(output_dir) / ts
-        out_path.mkdir(parents=True, exist_ok=True)
+    if output_dir and out_path is not None:
         summary = {
             "benchmark": benchmark,
             "samples": len(dataset),
@@ -352,6 +364,7 @@ def run_test_only(
             "specialist_llms": specialist_llms,
             "roles": ROLES,
             "timestamp": ts,
+            "timing_log_jsonl": tl_path,
         }
         (out_path / "summary.json").write_text(
             json.dumps(summary, indent=2, ensure_ascii=False)
@@ -360,6 +373,8 @@ def run_test_only(
             for r in results:
                 f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
         logger.info("Results saved to %s", out_path)
+        if tl_path:
+            logger.info("Timing log (JSONL + .log): %s", tl_path)
 
     return {"results": results, "metrics": metrics}
 
@@ -382,6 +397,7 @@ def run_experiment(
     specialist_llms: list = None,
     dataset_subdir: str = None,
     use_frozen: bool = True,
+    timing_log_path: Optional[str] = None,
 ):
     """Run full MAS v2 experiment: load data -> split -> train -> test -> report.
 
@@ -420,6 +436,16 @@ def run_experiment(
     score_map = ScoreMap(categories=ALL_CATEGORIES, llms=specialist_llms, seed=seed)
     updater = updater or ScoreMapUpdater()
 
+    out_path = None
+    ts = None
+    tl_path = timing_log_path
+    if output_dir:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = Path(output_dir) / ts
+        out_path.mkdir(parents=True, exist_ok=True)
+        if tl_path is None:
+            tl_path = str(out_path / "mas_timing.jsonl")
+
     # --- Train phase ---
     logger.info("=" * 60)
     logger.info("TRAIN PHASE")
@@ -434,6 +460,7 @@ def run_experiment(
         updater=updater,
         seed=seed,
         use_vlm_reasoning=use_vlm_reasoning,
+        timing_log_path=tl_path,
     )
     train_metrics = compute_accuracy(train_results)
     logger.info(
@@ -454,6 +481,7 @@ def run_experiment(
         specialist_generate=specialist_generate,
         reasoning_generate=reasoning_generate,
         use_vlm_reasoning=use_vlm_reasoning,
+        timing_log_path=tl_path,
     )
     test_metrics = compute_accuracy(test_results)
     logger.info(
@@ -463,10 +491,7 @@ def run_experiment(
     )
 
     # --- Save results ---
-    if output_dir:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_path = Path(output_dir) / ts
-        out_path.mkdir(parents=True, exist_ok=True)
+    if output_dir and out_path is not None:
 
         score_map.save(str(out_path / "score_map_final.json"))
 
@@ -483,6 +508,7 @@ def run_experiment(
             "specialist_llms": specialist_llms,
             "roles": ROLES,
             "timestamp": ts,
+            "timing_log_jsonl": tl_path,
         }
         (out_path / "summary.json").write_text(
             json.dumps(summary, indent=2, ensure_ascii=False)
@@ -496,6 +522,8 @@ def run_experiment(
                 f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
 
         logger.info("Results saved to %s", out_path)
+        if tl_path:
+            logger.info("Timing log (JSONL + .log): %s", tl_path)
 
     return {
         "score_map": score_map,
@@ -511,7 +539,7 @@ def run_experiment(
 # ======================================================================
 def main():
     parser = argparse.ArgumentParser(description="MAS v2 evaluation")
-    parser.add_argument("--benchmark", choices=["3dsrbench", "cvbench"], required=True)
+    parser.add_argument("--benchmark", choices=["3dsrbench", "cvbench", "mindcube"], required=True)
     parser.add_argument("--train_ratio", type=float, default=0.5,
                         help="Random fraction for train split (ignored if --train_samples is set)")
     parser.add_argument(
@@ -520,6 +548,18 @@ def main():
         default=None,
         help="Exact train size for TTO (e.g. 500 on full HF); remaining rows = inference test. "
              "Requires full dataset (e.g. --hf_full_dataset). Overrides --train_ratio.",
+    )
+    parser.add_argument(
+        "--timing_log",
+        type=str,
+        default=None,
+        help="Chemin mas_timing.jsonl (append JSONL + .log). Par défaut: sous-dossier horodaté avec --output_dir.",
+    )
+    parser.add_argument(
+        "--mindcube_split",
+        type=str,
+        default="train",
+        help="Split Hugging Face MindCube (ex. train, test). Équivaut à MINDCUBE_SPLIT.",
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
@@ -570,8 +610,8 @@ def main():
     parser.add_argument(
         "--hf_full_dataset",
         action="store_true",
-        help="Load full benchmark from HuggingFace (ccvl/3DSRBench …) instead of frozen subset "
-        "(data/frozen_benchmarks/3dsrbench_500). Ignored if --dataset_subdir is set.",
+        help="Load full benchmark from HuggingFace (MindCube, ccvl/3DSRBench, …) instead of frozen subset "
+        "(data/frozen_benchmarks/…). Ignored if --dataset_subdir is set.",
     )
     parser.add_argument(
         "--use_tto",
@@ -609,6 +649,9 @@ def main():
     )
     args = parser.parse_args()
 
+    if args.benchmark == "mindcube":
+        os.environ["MINDCUBE_SPLIT"] = args.mindcube_split
+
     specialist_whitelist = None
     if args.low_memory:
         specialist_whitelist = ["qwen3_4b", "llava4d", "spatial_reasoner"]
@@ -621,6 +664,8 @@ def main():
             specialist_whitelist = None
 
     use_frozen = not args.hf_full_dataset
+    if args.benchmark == "mindcube":
+        use_frozen = False
 
     if args.test_only and not args.max_samples and not args.hf_full_dataset:
         parser.error(
@@ -686,6 +731,7 @@ def main():
             verbose=not args.no_verbose,
             updater=updater if args.use_tto else None,
             use_frozen=use_frozen,
+            timing_log_path=args.timing_log,
         )
     else:
         if args.max_samples:
@@ -709,6 +755,7 @@ def main():
             use_vlm_reasoning=args.use_vlm_reasoning,
             dataset_subdir=args.dataset_subdir,
             use_frozen=use_frozen,
+            timing_log_path=args.timing_log,
         )
 
 

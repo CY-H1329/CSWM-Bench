@@ -12,9 +12,11 @@ Models:
   5 SPECIALISTS   = Qwen3/Sa2VA/LLaVA4D/SpatialRGPT/SpatialReasoner (VLM)
   FINAL REASONING = DeepSeek-R1    (text-only, SharedMemory + query -> answer)
 """
+import json
 import logging
 import re
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
@@ -41,6 +43,62 @@ def _infer_answer_type(query: str) -> str:
 _ROLES_WITH_TOOLS = {"explicit_3d_representation", "scene_graph_construction"}
 
 logger = logging.getLogger(__name__)
+
+
+def append_timing_log_record(
+    path: Union[str, Path],
+    *,
+    phase: str,
+    step_index: int,
+    benchmark: str,
+    timing: Dict,
+    correct: Optional[bool] = None,
+) -> None:
+    """Append one JSON line per sample: head / specialists per role / reasoning / total."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    specialists_by_role = {}
+    for s in timing.get("specialists_sec", []) or []:
+        role = s.get("role") or "unknown"
+        specialists_by_role[role] = {
+            "llm": s.get("llm", ""),
+            "sec": float(s.get("sec") or 0),
+        }
+    rec = {
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "phase": phase,
+        "benchmark": benchmark,
+        "step": step_index,
+        "correct": correct,
+        "head_agent_sec": float(timing.get("head_agent_sec") or 0),
+        "object_extraction_sec": float(timing.get("object_extraction_sec") or 0),
+        "specialists_by_role_sec": specialists_by_role,
+        "reasoning_agent_sec": float(timing.get("reasoning_agent_sec") or 0),
+        "total_sec": float(timing.get("total_sec") or 0),
+    }
+    line = json.dumps(rec, ensure_ascii=False)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(line + "\n")
+        f.flush()
+    log_txt = path.with_suffix(".log")
+    parts = [
+        rec["ts"],
+        f"phase={phase}",
+        f"step={step_index}",
+        f"benchmark={benchmark}",
+        f"head={rec['head_agent_sec']:.3f}s",
+        f"object_extract={rec['object_extraction_sec']:.3f}s",
+        f"reasoning={rec['reasoning_agent_sec']:.3f}s",
+        f"total={rec['total_sec']:.3f}s",
+    ]
+    role_bits = [f"{r}:{v['sec']:.3f}s" for r, v in specialists_by_role.items()]
+    if role_bits:
+        parts.append("roles=" + ",".join(role_bits))
+    if correct is not None:
+        parts.append(f"correct={correct}")
+    with open(log_txt, "a", encoding="utf-8") as f:
+        f.write(" | ".join(parts) + "\n")
+        f.flush()
 
 
 def _save_timing_to_file(
@@ -371,6 +429,7 @@ def run_train(
     get_answer_fn: Callable = None,
     seed: int = 42,
     use_vlm_reasoning: bool = False,
+    timing_log_path: Optional[Union[str, Path]] = None,
 ) -> List[Dict]:
     """Train phase: iterate over dataset, update score map with GT.
 
@@ -412,6 +471,15 @@ def run_train(
             use_vlm_reasoning=use_vlm_reasoning,
         )
         results.append(result)
+        if timing_log_path:
+            append_timing_log_record(
+                timing_log_path,
+                phase="train",
+                step_index=step,
+                benchmark=benchmark,
+                timing=result.get("timing") or {},
+                correct=result.get("correct"),
+            )
 
         if (step + 1) % 50 == 0 or step == total - 1:
             correct_so_far = sum(1 for r in results if r.get("correct"))
@@ -445,6 +513,7 @@ def run_test(
     max_steps: Optional[int] = None,
     checkpoint_every: Optional[int] = None,
     checkpoint_callback: Optional[Callable] = None,
+    timing_log_path: Optional[Union[str, Path]] = None,
 ) -> List[Dict]:
     """Test phase: iterate over dataset.
 
@@ -497,6 +566,15 @@ def run_test(
         if gt_category is not None:
             result["gt_category"] = gt_category
         results.append(result)
+        if timing_log_path:
+            append_timing_log_record(
+                timing_log_path,
+                phase="test",
+                step_index=step,
+                benchmark=benchmark,
+                timing=result.get("timing") or {},
+                correct=result.get("correct"),
+            )
 
         if verbose_markdown and result.get("verbose_markdown"):
             print(result["verbose_markdown"])

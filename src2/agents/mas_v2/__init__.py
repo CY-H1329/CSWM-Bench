@@ -13,6 +13,7 @@ from .prompts import (
 )
 from .pipeline import (
     run_step, run_train, run_test, compute_accuracy,
+    append_timing_log_record,
 )
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "ScoreMap", "ScoreMapUpdater", "SharedMemory",
     "build_head_agent_prompt", "build_role_prompt", "build_final_reasoning_prompt",
     "run_step", "run_train", "run_test", "compute_accuracy",
+    "append_timing_log_record",
 ]

@@ -1,5 +1,5 @@
 """
-Unified loaders for all 4 benchmarks.
+Unified loaders for benchmarks (CV-Bench, 3DSRBench, ST-VQA, MindCube, …).
 Returns normalized format: image, question, options (list or None), answer, category (optional).
 
 3DSRBench: images are fetched from URL. Use image_cache_dir to cache locally for faster reruns.
@@ -11,6 +11,7 @@ import hashlib
 import io
 import os
 import random
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -83,6 +84,17 @@ BENCHMARK_CONFIGS = {
         "answer_fallback": "answer_only",
         "category_key": "category",
     },
+    # Hugging Face: zip ~600MB au premier chargement (H100 / cache HF recommandé).
+    # Split: env MINDCUBE_SPLIT ou défaut ci-dessous (souvent train / test selon version HF).
+    "mindcube": {
+        "name": "MLL-Lab/MindCube",
+        "split": "train",
+        "image_key": "image",
+        "question_key": "question",
+        "options_key": "choices",
+        "answer_key": "answer",
+        "category_key": "task_type",
+    },
 }
 
 
@@ -113,6 +125,107 @@ def _fetch_image_from_url(url: str) -> Optional[Image.Image]:
         return img
     except Exception:
         return None
+
+
+def _mindcube_text_field(example: Dict, keys: tuple) -> str:
+    for k in keys:
+        v = example.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if s:
+            return s
+    return ""
+
+
+def mindcube_question(example: Dict) -> str:
+    return _mindcube_text_field(
+        example,
+        ("question", "query", "instruction", "input_prompt", "problem", "text"),
+    )
+
+
+def mindcube_option_list(example: Dict) -> Optional[List[str]]:
+    for k in ("choices", "options", "answer_choices", "candidates"):
+        v = example.get(k)
+        if v is None:
+            continue
+        if isinstance(v, (list, tuple)):
+            out = [str(x).strip() for x in v if x is not None and str(x).strip()]
+            return out or None
+        if isinstance(v, str) and v.strip():
+            parts = [p.strip() for p in v.split("|") if p.strip()]
+            return parts or None
+    return None
+
+
+def mindcube_answer_raw(example: Dict) -> str:
+    for k in ("answer", "label", "gold", "ground_truth", "gt"):
+        v = example.get(k)
+        if v is None:
+            continue
+        s = str(v).strip()
+        if s:
+            return s
+    v = example.get("grounded_output")
+    if v is not None:
+        s = str(v).strip()
+        if s:
+            return s
+    return ""
+
+
+def _mindcube_resize_height(img: Image.Image, target_h: int) -> Image.Image:
+    w, h = img.size
+    if h <= 0:
+        return img.convert("RGB")
+    if h == target_h:
+        return img.convert("RGB")
+    nw = max(1, int(w * (target_h / float(h))))
+    return img.convert("RGB").resize((nw, target_h), Image.Resampling.LANCZOS)
+
+
+def _mindcube_concat_horizontal(images: List[Image.Image]) -> Image.Image:
+    target_h = min(im.height for im in images)
+    resized = [_mindcube_resize_height(im, target_h) for im in images]
+    total_w = sum(im.width for im in resized)
+    out = Image.new("RGB", (total_w, target_h))
+    x = 0
+    for im in resized:
+        out.paste(im, (x, 0))
+        x += im.width
+    return out
+
+
+def mindcube_get_image(example: Dict) -> Optional[Image.Image]:
+    """Une image ou plusieurs vues (liste) — collage horizontal pour le pipeline MAS."""
+    for key in ("image", "images", "views", "pixel_values"):
+        v = example.get(key)
+        if v is None:
+            continue
+        if hasattr(v, "convert"):
+            return v.convert("RGB")
+        if isinstance(v, (list, tuple)):
+            pil_list: List[Image.Image] = []
+            for item in v[:8]:
+                if item is None:
+                    continue
+                if hasattr(item, "convert"):
+                    pil_list.append(item)
+            if pil_list:
+                return pil_list[0] if len(pil_list) == 1 else _mindcube_concat_horizontal(pil_list)
+    for path_key in ("image_path", "img_path", "filepath"):
+        p = example.get(path_key)
+        if not p:
+            continue
+        root = os.environ.get("MINDCUBE_IMAGE_ROOT", "")
+        path = Path(root) / str(p) if root else Path(str(p))
+        if path.is_file():
+            try:
+                return Image.open(path).convert("RGB")
+            except Exception:
+                continue
+    return None
 
 
 def load_benchmark(
@@ -157,9 +270,12 @@ def load_benchmark(
                 )
 
     # Fallback: load from HuggingFace if frozen didn't succeed
-    cfg = BENCHMARK_CONFIGS[benchmark]
+    cfg = dict(BENCHMARK_CONFIGS[benchmark])
     name = cfg["name"]
     split = cfg["split"]
+    if benchmark == "mindcube":
+        split = os.environ.get("MINDCUBE_SPLIT", split)
+        cfg["split"] = split
     subset = cfg.get("subset")
 
     if ds is None:
@@ -278,6 +394,11 @@ def load_benchmark_from_dataset(
 
 def get_benchmark_image(example: Dict, benchmark: str) -> Optional[Image.Image]:
     """Extract PIL Image from example."""
+    if benchmark == "mindcube":
+        img = mindcube_get_image(example)
+        if img is not None:
+            return img
+
     cfg = BENCHMARK_CONFIGS[benchmark]
     img_key = cfg["image_key"]
 
@@ -297,6 +418,9 @@ def get_benchmark_image(example: Dict, benchmark: str) -> Optional[Image.Image]:
 
 def is_multiple_choice(example: Dict, benchmark: str) -> bool:
     """True if the question has multiple-choice options (A/B/C/D...), False for free-form/numeric."""
+    if benchmark == "mindcube":
+        return bool(mindcube_option_list(example))
+
     cfg = BENCHMARK_CONFIGS[benchmark]
     opts_key = cfg.get("options_key")
     opts_keys = cfg.get("options_keys")
@@ -322,6 +446,19 @@ def infer_answer_type_from_query(query: str) -> str:
 
 def get_benchmark_prompt(example: Dict, benchmark: str, include_options: bool = True) -> str:
     """Build prompt (question + options if any)."""
+    if benchmark == "mindcube":
+        question = mindcube_question(example)
+        if not include_options:
+            return question
+        opts = mindcube_option_list(example)
+        if opts:
+            lines = [question, "Options:"]
+            for i, o in enumerate(opts):
+                label = chr(65 + i)
+                lines.append(f"({label}) {o}")
+            return "\n".join(lines)
+        return question
+
     cfg = BENCHMARK_CONFIGS[benchmark]
     q_key = cfg["question_key"]
     question = (example.get(q_key) or "").strip()
@@ -356,6 +493,18 @@ def get_benchmark_prompt(example: Dict, benchmark: str, include_options: bool = 
 
 def get_benchmark_answer(example: Dict, benchmark: str) -> str:
     """Ground-truth answer (letter A/B/C/D or raw string)."""
+    if benchmark == "mindcube":
+        s = mindcube_answer_raw(example)
+        sup = s.upper()
+        if mindcube_option_list(example):
+            for c in "ABCDEF":
+                if f"({c})" in sup or sup == c:
+                    return c
+            m = re.search(r"\b([A-F])\b", sup)
+            if m:
+                return m.group(1).upper()
+        return s.strip()
+
     cfg = BENCHMARK_CONFIGS[benchmark]
     ans_key = cfg["answer_key"]
     ans = example.get(ans_key) or ""
@@ -372,6 +521,13 @@ def get_benchmark_answer(example: Dict, benchmark: str) -> str:
 
 def get_benchmark_category(example: Dict, benchmark: str) -> Optional[str]:
     """Category if available (for evaluation only - never pass to Head-Agent)."""
+    if benchmark == "mindcube":
+        for k in ("task_type", "task", "category", "subtask", "split"):
+            v = example.get(k)
+            if v is not None and str(v).strip():
+                return str(v).strip()
+        return None
+
     cfg = BENCHMARK_CONFIGS[benchmark]
     cat_key = cfg.get("category_key")
     if cat_key and cat_key in example:
