@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -38,6 +39,7 @@ from src.benchmarks import (
     get_benchmark_prompt,
     get_benchmark_answer,
     get_benchmark_image,
+    get_benchmark_images,
     get_benchmark_category,
 )
 from src.agents.mas import run_spatial_mas_pipeline, ScoreManager
@@ -73,6 +75,30 @@ def _norm_answer(s: str) -> str:
         if c in s or f"({c})" in s:
             return f"({c})"
     return s
+
+
+def _tile_views(views: list[Image.Image]) -> Image.Image:
+    """
+    MindCube (and some multi-view tasks) provide 2–4 images. Most GPU runners here are single-image.
+    We tile them into a 2x2 grid (pad with black if needed) so we can run the MAS pipeline unchanged.
+    """
+    if not views:
+        raise ValueError("No views to tile")
+    ims = [v.convert("RGB") for v in views if v is not None]
+    if len(ims) == 1:
+        return ims[0]
+    # make a 2x2 grid
+    while len(ims) < 4:
+        ims.append(Image.new("RGB", ims[0].size, (0, 0, 0)))
+    w = max(im.width for im in ims)
+    h = max(im.height for im in ims)
+    ims = [im.resize((w, h), Image.Resampling.LANCZOS) if im.size != (w, h) else im for im in ims[:4]]
+    grid = Image.new("RGB", (2 * w, 2 * h), (0, 0, 0))
+    grid.paste(ims[0], (0, 0))
+    grid.paste(ims[1], (w, 0))
+    grid.paste(ims[2], (0, h))
+    grid.paste(ims[3], (w, h))
+    return grid
 
 
 def build_runners(config: dict):
@@ -170,7 +196,7 @@ def main():
     parser.add_argument("--test", action="store_true", help="5 samples only")
     parser.add_argument("--max_samples", type=int, default=None)
     parser.add_argument("--full_dataset", action="store_true")
-    parser.add_argument("--benchmark", choices=["cvbench", "3dsrbench"], default="cvbench")
+    parser.add_argument("--benchmark", choices=["cvbench", "3dsrbench", "mindcube"], default="cvbench")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -210,27 +236,57 @@ def main():
         f"max_samples={max_samples}  out={run_dir}"
     )
 
+    timing_path = run_dir / "timing.jsonl"
+    timing_csv_path = run_dir / "timing.csv"
+    with open(timing_csv_path, "w", encoding="utf-8") as f:
+        f.write(
+            "idx,head_sec,specialist1_name,specialist1_sec,specialist2_name,specialist2_sec,"
+            "specialist3_name,specialist3_sec,reasoning_sec,total_sec\n"
+        )
+
+    # Per-sample timing context populated by generator wrappers.
+    _timing_ctx = {"head_sec": 0.0, "reasoning_sec": 0.0, "specialist_sec": {}}
+
+    def _reset_timing_ctx():
+        _timing_ctx["head_sec"] = 0.0
+        _timing_ctx["reasoning_sec"] = 0.0
+        _timing_ctx["specialist_sec"] = {}
+
     def head_gen(img: Image.Image, prompt: str) -> str:
+        t = time.perf_counter()
         mod = type(head_runner).__module__ or ""
         if "src.models" in mod:
-            return head_runner.generate(img, prompt, max_new_tokens=2048)
-        return head_runner.generate(img, prompt, max_tokens=2048)
+            out = head_runner.generate(img, prompt, max_new_tokens=2048)
+        else:
+            out = head_runner.generate(img, prompt, max_tokens=2048)
+        _timing_ctx["head_sec"] += time.perf_counter() - t
+        return out
 
     def spec_gen(agent_name: str, img: Image.Image, prompt: str) -> str:
         r = specialist_runners.get(agent_name)
         if not r:
             return ""
+        t = time.perf_counter()
         # GPU runners use max_new_tokens, API use max_tokens
         mod = type(r).__module__ or ""
         if "src.models" in mod:
-            return r.generate(img, prompt, max_new_tokens=2048)
-        return r.generate(img, prompt, max_tokens=2048)
+            out = r.generate(img, prompt, max_new_tokens=2048)
+        else:
+            out = r.generate(img, prompt, max_tokens=2048)
+        _timing_ctx["specialist_sec"][agent_name] = _timing_ctx["specialist_sec"].get(agent_name, 0.0) + (
+            time.perf_counter() - t
+        )
+        return out
 
     def reason_gen(img: Image.Image, prompt: str) -> str:
+        t = time.perf_counter()
         mod = type(reason_runner).__module__ or ""
         if "src.models" in mod:
-            return reason_runner.generate(img, prompt, max_new_tokens=1024)
-        return reason_runner.generate(img, prompt, max_tokens=1024)
+            out = reason_runner.generate(img, prompt, max_new_tokens=1024)
+        else:
+            out = reason_runner.generate(img, prompt, max_tokens=1024)
+        _timing_ctx["reasoning_sec"] += time.perf_counter() - t
+        return out
 
     score_manager = ScoreManager()
     category_seen = {c: False for c in TASK_CATEGORIES}
@@ -242,13 +298,19 @@ def main():
 
     for i in tqdm(range(len(ds)), desc="MAS Pipeline"):
         ex = ds[i]
+        # Single-image benchmarks use get_benchmark_image; multi-view (MindCube) tiles views into one image.
         img = get_benchmark_image(ex, benchmark)
         if img is None:
-            continue
+            views = get_benchmark_images(ex, benchmark)
+            if not views:
+                continue
+            img = _tile_views(views)
         query = get_benchmark_prompt(ex, benchmark)
         gt = get_benchmark_answer(ex, benchmark)
         gt_norm = _norm_answer(gt)
 
+        _reset_timing_ctx()
+        t0 = time.perf_counter()
         out = run_spatial_mas_pipeline(
             image=img,
             query=query,
@@ -259,6 +321,29 @@ def main():
             score_manager=score_manager,
             category_seen=category_seen,
         )
+        t_total = time.perf_counter() - t0
+        head_sec = float(_timing_ctx["head_sec"] or 0.0)
+        reasoning_sec = float(_timing_ctx["reasoning_sec"] or 0.0)
+
+        # If pipeline failed, still log total time.
+        if "error" in out:
+            results.append({"idx": i, "error": out["error"], "gt": gt})
+            with open(timing_path, "a", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "idx": i,
+                            "error": out["error"],
+                            "head_sec": head_sec,
+                            "reasoning_sec": reasoning_sec,
+                            "specialist_sec": _timing_ctx["specialist_sec"],
+                            "total_sec": t_total,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
+            continue
 
         if "error" in out:
             results.append({"idx": i, "error": out["error"], "gt": gt})
@@ -290,6 +375,28 @@ def main():
             "reasoning_justification": out.get("reasoning_justification", ""),
             "score_table_after_turn": score_manager.to_dict(),
         })
+
+        # Log per-role timings (Head + each selected specialist + Reasoning + Total)
+        sel = out.get("selected_agents", []) or []
+        s1 = sel[0] if len(sel) > 0 else ""
+        s2 = sel[1] if len(sel) > 1 else ""
+        s3 = sel[2] if len(sel) > 2 else ""
+        s1_sec = float(_timing_ctx["specialist_sec"].get(s1, 0.0)) if s1 else 0.0
+        s2_sec = float(_timing_ctx["specialist_sec"].get(s2, 0.0)) if s2 else 0.0
+        s3_sec = float(_timing_ctx["specialist_sec"].get(s3, 0.0)) if s3 else 0.0
+        timing_row = {
+            "idx": i,
+            "head_sec": head_sec,
+            "specialist_sec": {s1: s1_sec, s2: s2_sec, s3: s3_sec},
+            "reasoning_sec": reasoning_sec,
+            "total_sec": t_total,
+        }
+        with open(timing_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(timing_row, ensure_ascii=False) + "\n")
+        with open(timing_csv_path, "a", encoding="utf-8") as f:
+            f.write(
+                f"{i},{head_sec:.4f},{s1},{s1_sec:.4f},{s2},{s2_sec:.4f},{s3},{s3_sec:.4f},{reasoning_sec:.4f},{t_total:.4f}\n"
+            )
 
         if (i + 1) % 10 == 0:
             with open(run_dir / "progress.json", "w") as f:

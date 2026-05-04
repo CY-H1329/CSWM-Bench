@@ -10,6 +10,8 @@ import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import json
+import zipfile
 from datasets import load_dataset
 from PIL import Image
 import io
@@ -65,6 +67,17 @@ BENCHMARK_CONFIGS = {
         "category_key": "question_type",
         "answer_is_mcq_letter": True,
     },
+    # MindCube: multi-image MCQ via a HF-hosted data.zip (jsonl + images paths).
+    # We use the jsonl `gt_answer` as the MCQ letter.
+    "mindcube": {
+        "name": "MLL-Lab/MindCube",
+        "split": "test",
+        "images_key": "images",
+        "question_key": "question",
+        "answer_key": "gt_answer",
+        "category_key": "category",
+        "answer_is_mcq_letter": True,
+    },
 }
 
 # Exact `question_type` strings on HuggingFace (RunsenXu/MMSI-Bench, test split).
@@ -117,6 +130,18 @@ def load_benchmark(
     if benchmark not in BENCHMARK_CONFIGS:
         raise ValueError(f"Unknown benchmark: {benchmark}. Choose from {list(BENCHMARK_CONFIGS.keys())}")
 
+    if benchmark == "mindcube":
+        # MindCube isn't provided as a standard HF datasets table here (it is packaged as data.zip).
+        # We download/extract it once and then load jsonl into a datasets.Dataset for compatibility.
+        from datasets import Dataset
+
+        ds = _load_mindcube_dataset(
+            split="test",
+            max_samples=max_samples,
+            seed=seed,
+        )
+        return Dataset.from_list(ds)
+
     # Try frozen benchmark first
     if use_frozen and benchmark in FROZEN_PATHS:
         frozen_name = FROZEN_PATHS[benchmark]
@@ -168,6 +193,79 @@ def load_benchmark(
     return ds
 
 
+def _mindcube_root() -> Path:
+    # Default cache under repo data/. Override via env for shared storage.
+    root = os.environ.get("MINDCUBE_DIR", "")
+    if root.strip():
+        return Path(root).expanduser()
+    return Path(__file__).resolve().parent.parent.parent / "data" / "mindcube"
+
+
+def _ensure_mindcube_extracted() -> Path:
+    """
+    Ensure MindCube `data.zip` is downloaded and extracted.
+    Returns extraction root (contains `data/raw/*.jsonl` and `data/other_all_image/...`).
+    """
+    out_root = _mindcube_root()
+    raw_jsonl = out_root / "data" / "raw" / "MindCube.jsonl"
+    if raw_jsonl.exists():
+        return out_root
+
+    out_root.mkdir(parents=True, exist_ok=True)
+
+    try:
+        from huggingface_hub import hf_hub_download
+    except Exception as e:  # pragma: no cover
+        raise ImportError("MindCube requires huggingface_hub. pip install huggingface_hub") from e
+
+    zip_path = hf_hub_download(
+        repo_id="MLL-Lab/MindCube",
+        repo_type="dataset",
+        filename="data.zip",
+    )
+    with zipfile.ZipFile(zip_path, "r") as z:
+        z.extractall(str(out_root))
+    if not raw_jsonl.exists():
+        raise FileNotFoundError(f"MindCube extraction failed: missing {raw_jsonl}")
+    return out_root
+
+
+def _load_mindcube_dataset(split: str = "test", max_samples: Optional[int] = None, seed: int = 42) -> List[Dict]:
+    """
+    Load MindCube jsonl into a list[dict]. Each dict includes:
+    - question: str (already contains options A-D)
+    - images: list[str] (relative paths under extracted root)
+    - gt_answer: 'A'|'B'|'C'|'D'
+    - category: list[str] (4-d taxonomy)
+    """
+    root = _ensure_mindcube_extracted()
+    if split in ("test", "eval"):
+        jsonl_path = root / "data" / "raw" / "MindCube.jsonl"
+    elif split in ("train",):
+        jsonl_path = root / "data" / "raw" / "MindCube_train.jsonl"
+    elif split in ("tiny", "tinybench"):
+        jsonl_path = root / "data" / "raw" / "MindCube_tinybench.jsonl"
+    else:
+        raise ValueError("MindCube split must be one of: test, train, tinybench")
+
+    rows: List[Dict] = []
+    with open(jsonl_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            rows.append(obj)
+
+    if max_samples is None or max_samples >= len(rows):
+        return rows
+
+    rng = random.Random(seed)
+    idx = rng.sample(range(len(rows)), min(max_samples, len(rows)))
+    idx.sort()
+    return [rows[i] for i in idx]
+
+
 def get_benchmark_image(example: Dict, benchmark: str) -> Optional[Image.Image]:
     """Extract a single PIL Image (None for multi-image benchmarks — use get_benchmark_images)."""
     cfg = BENCHMARK_CONFIGS[benchmark]
@@ -201,6 +299,20 @@ def get_benchmark_images(example: Dict, benchmark: str) -> List[Image.Image]:
         for im in raw:
             if im is None:
                 continue
+            if benchmark == "mindcube":
+                # MindCube stores relative file paths inside extracted dataset.
+                try:
+                    root = _mindcube_root()
+                    p = (root / "data" / im) if not str(im).startswith("data/") else (root / im)
+                    if not p.exists():
+                        # fallback: allow paths without `data/` prefix
+                        p = root / str(im)
+                    if p.exists():
+                        out.append(Image.open(p).convert("RGB"))
+                        continue
+                except Exception:
+                    # fall through to other decoding paths
+                    pass
             if hasattr(im, "convert"):
                 out.append(im.convert("RGB"))
             elif isinstance(im, (bytes, bytearray)):
@@ -270,5 +382,9 @@ def get_benchmark_category(example: Dict, benchmark: str) -> Optional[str]:
     cfg = BENCHMARK_CONFIGS[benchmark]
     cat_key = cfg.get("category_key")
     if cat_key and cat_key in example:
-        return str(example[cat_key])
+        v = example[cat_key]
+        if benchmark == "mindcube" and isinstance(v, list):
+            # 4-axis taxonomy → a stable string key
+            return "/".join(str(x) for x in v)
+        return str(v)
     return None
